@@ -10,7 +10,10 @@ typedef struct StringView {
 
 inline StringView string_view_create(const char* source)
 {
-  return (StringView){.start = source, .length = strlen(source)};
+  StringView sv;
+  sv.start = source;
+  sv.length = strlen(source);
+  return sv;
 }
 
 #endif // MCC_STRING_VIEW_H

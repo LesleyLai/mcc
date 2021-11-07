@@ -37,7 +37,12 @@ typedef struct Token {
 
 inline Lexer lexer_create(const char* source)
 {
-  return (Lexer){.start = source, .current = source, .line = 1, .column = 1};
+  Lexer lexer;
+  lexer.start = source;
+  lexer.current = source;
+  lexer.line = 1;
+  lexer.column = 1;
+  return lexer;
 }
 
 Token lexer_scan_token(Lexer* lexer);

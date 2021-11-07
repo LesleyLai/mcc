@@ -11,7 +11,7 @@ const char* minimum_source = "int main(void)\n"
 void compile_source(const char* source)
 {
   Lexer lexer = lexer_create(source);
-  while (1) {
+  for (;;) {
     Token token = lexer_scan_token(&lexer);
     if (token.type == TOKEN_EOF) break;
     printf("%d %d:%d \"%.*s\"\n", token.type, token.line, token.column,
