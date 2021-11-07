@@ -1,0 +1,11 @@
+﻿---
+BasedOnStyle: LLVM
+AllowShortBlocksOnASingleLine: Always
+AllowShortIfStatementsOnASingleLine: Always
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: Inline
+BreakBeforeBraces: WebKit
+ColumnLimit: 80
+DerivePointerAlignment: false
+PointerAlignment: Left
+...
