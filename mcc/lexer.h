@@ -3,6 +3,8 @@
 
 #include "string_view.h"
 
+// The lexer consumes source code and produces tokens lazily
+
 typedef struct Lexer {
   const char* start;
   const char* current;

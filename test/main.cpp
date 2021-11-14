@@ -2,5 +2,5 @@
                         // do this in one cpp file
 #include "ApprovalTests.hpp"
 
-auto directoryDisposer =
+[[maybe_unused]] auto directory_disposer =
     ApprovalTests::Approvals::useApprovalsSubdirectory("approval_tests");
