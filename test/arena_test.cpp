@@ -16,13 +16,11 @@ TEST_CASE("Arena allocator")
   REQUIRE(buffer == arena.begin);
   REQUIRE(buffer == arena.ptr);
 
-  auto* p = static_cast<uint8_t*>(
-      arena_aligned_alloc(&arena, alignof(uint8_t), sizeof(uint8_t)));
+  auto* p = static_cast<uint8_t*>(ARENA_ALLOC_OBJECT(&arena, uint8_t));
   *p = 42;
   REQUIRE(p == buffer);
 
-  auto* p2 = static_cast<uint8_t*>(
-      arena_aligned_alloc(&arena, alignof(uint32_t), sizeof(uint32_t)));
+  auto* p2 = static_cast<uint8_t*>(ARENA_ALLOC_OBJECT(&arena, uint32_t));
   REQUIRE(p2 == buffer + sizeof(uint32_t));
 
   REQUIRE(arena.size_remain == size - 2 * sizeof(uint32_t));

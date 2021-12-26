@@ -8,7 +8,7 @@ typedef struct StringView {
   size_t length;
 } StringView;
 
-inline StringView string_view_create(const char* source)
+static inline StringView string_view_create(const char* source)
 {
   StringView sv;
   sv.start = source;

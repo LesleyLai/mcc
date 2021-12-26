@@ -15,10 +15,11 @@ typedef struct Arena {
 
 static inline Arena arena_init(void* buffer, size_t size)
 {
-  Arena arena;
-  arena.begin = buffer;
-  arena.ptr = (Byte*)buffer;
-  arena.size_remain = size;
+  Arena arena = {
+      .begin = buffer,
+      .ptr = (Byte*)buffer,
+      .size_remain = size,
+  };
   return arena;
 }
 
@@ -26,5 +27,15 @@ static inline Arena arena_init(void* buffer, size_t size)
 // alignment from the arena. The size parameter must be an integral multiple of
 // alignment. If the arena doesn't have enough memory, returns NULL
 void* arena_aligned_alloc(Arena* arena, size_t alignment, size_t size);
+
+#if !defined(__cplusplus) && !defined(alignof)
+#define alignof _Alignof
+#endif
+
+#define ARENA_ALLOC_OBJECT(arena, Type)                                        \
+  arena_aligned_alloc((arena), alignof(Type), sizeof(Type))
+
+#define ARENA_ALLOC_ARRAY(arena, Type, n)                                      \
+  arena_aligned_alloc((arena), alignof(Type), sizeof(Type) * (n))
 
 #endif // MCC_ARENA_H

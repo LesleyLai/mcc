@@ -2,8 +2,10 @@
 Checks: '
 bugprone-*,
 cert-*,
+-cert-env33-c,
 clang-analyzer-*,
 concurrency-*,
+-concurrency-mt-unsafe,
 misc-*,
 performance-*,
 readability-misplaced-array-index,

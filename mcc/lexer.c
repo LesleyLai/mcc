@@ -33,15 +33,15 @@ static char lexer_advance(Lexer* lexer)
   return *previous;
 }
 
-// If current character match expected, consumes it and returns true
-// Otherwise returns false
-static bool lexer_match(Lexer* lexer, char expected)
-{
-  if (lexer_is_at_end(lexer)) return false;
-  if (*lexer->current != expected) return false;
-  lexer_advance(lexer);
-  return true;
-}
+//// If current character match expected, consumes it and returns true
+//// Otherwise returns false
+// static bool lexer_match(Lexer* lexer, char expected)
+//{
+//   if (lexer_is_at_end(lexer)) return false;
+//   if (*lexer->current != expected) return false;
+//   lexer_advance(lexer);
+//   return true;
+// }
 
 static void skip_whitespace(Lexer* lexer)
 {
