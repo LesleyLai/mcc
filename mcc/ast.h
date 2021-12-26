@@ -14,7 +14,7 @@ typedef struct Stmt Stmt;
 
 typedef struct CompoundStmt {
   size_t statement_count;
-  Stmt** statements;
+  Stmt* statements;
 } CompoundStmt;
 
 typedef struct ReturnStmt {

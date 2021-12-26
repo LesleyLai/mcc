@@ -9,7 +9,7 @@ void indented_format_to(OutputItr out, int indent, std::string_view format_str,
                         Args&&... args)
 {
   fmt::format_to(out, "{:{}}", "", indent);
-  fmt::format_to(out, format_str, std::forward<Args>(args)...);
+  fmt::format_to(out, fmt::runtime(format_str), std::forward<Args>(args)...);
 }
 
 } // anonymous namespace
@@ -44,8 +44,6 @@ void print_to_string(std::string& buffer, const Stmt& stmt, int indentation)
   case COMPOUND_STMT:
     return print_to_string(buffer, stmt.compound_statement, indentation);
   }
-
-  indented_format_to(std::back_inserter(buffer), indentation, "CompoundStmt\n");
 }
 
 void print_to_string(std::string& buffer, const CompoundStmt& stmt,
@@ -53,7 +51,7 @@ void print_to_string(std::string& buffer, const CompoundStmt& stmt,
 {
   indented_format_to(std::back_inserter(buffer), indentation, "CompoundStmt\n");
   for (std::size_t i = 0; i < stmt.statement_count; ++i) {
-    print_to_string(buffer, *stmt.statements[i], indentation + 2);
+    print_to_string(buffer, stmt.statements[i], indentation + 2);
   }
 }
 

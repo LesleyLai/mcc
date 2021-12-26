@@ -28,11 +28,4 @@ TEST_CASE("Arena allocator")
   auto* p3 = static_cast<uint8_t*>(arena_aligned_alloc(
       &arena, alignof(std::max_align_t), arena.size_remain + 1));
   REQUIRE(p3 == nullptr);
-
-  auto* p4 = static_cast<uint8_t*>(arena_aligned_alloc(
-      &arena, alignof(std::max_align_t), arena.size_remain));
-  REQUIRE(p4 ==
-          buffer + std::max(2 * sizeof(uint32_t), alignof(std::max_align_t)));
-
-  REQUIRE(arena.size_remain == 0);
 }

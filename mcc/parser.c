@@ -15,7 +15,6 @@ typedef struct Parser {
   bool in_panic_mode;
 
   Token current;
-  Token previous;
 } Parser;
 
 static void parse_error_at(Parser* parser, const char* error_msg, Token token)
@@ -29,8 +28,6 @@ static void parse_error_at(Parser* parser, const char* error_msg, Token token)
 
 static void parse_advance(Parser* parser)
 {
-  parser->previous = parser->current;
-
   for (;;) {
     parser->current = lexer_scan_token(&parser->lexer);
     if (parser->current.type != TOKEN_ERROR) break;
@@ -49,43 +46,40 @@ static void parse_consume(Parser* parser, TokenType type, const char* error_msg)
   parse_advance(parser);
 }
 
-static Expr* parse_expr(Parser* parser)
+static void parse_expr(Parser* parser, Expr* result)
 {
-  Expr* expr = NULL;
-
-  if (parser->in_panic_mode) { return NULL; }
+  if (parser->in_panic_mode) { return; }
 
   if (parser->current.type != TOKEN_INTEGER) {
     parse_error_at(parser, "Expect integer literal", parser->current);
-    return NULL;
+    return;
   }
-  expr = ARENA_ALLOC_OBJECT(parser->ast_arena, Expr);
   char* end;
-  expr->val =
+  result->val =
       strtol(parser->current.src.start, &end, 10); // TODO(llai): replace strtol
   assert(end == parser->current.src.start + parser->current.src.length);
   parse_advance(parser);
-  return expr;
 }
 
 static void parse_return_stmt(Parser* parser, ReturnStmt* result)
 {
-  Expr* expr = parse_expr(parser);
+  Expr* expr = ARENA_ALLOC_OBJECT(parser->ast_arena, Expr);
+  parse_expr(parser, expr);
   if (parser->in_panic_mode) return;
 
   *result = (ReturnStmt){.expr = expr};
   parse_consume(parser, TOKEN_SEMICOLON, "Expect ;");
 }
 
-static Stmt* parse_stmt(Parser* parser);
+static void parse_stmt(Parser* parser, Stmt* result);
 
 // TODO: Implement proper vector and use it for compound statement
 #define MAX_STMT_COUNT_IN_COMPOUND_STMT 16
 
 static void parse_compound_stmt(Parser* parser, CompoundStmt* result)
 {
-  Stmt** statements = ARENA_ALLOC_ARRAY(parser->ast_arena, Stmt*,
-                                        MAX_STMT_COUNT_IN_COMPOUND_STMT);
+  Stmt* statements = ARENA_ALLOC_ARRAY(parser->ast_arena, Stmt,
+                                       MAX_STMT_COUNT_IN_COMPOUND_STMT);
   size_t statement_count = 0;
 
   bool encounter_error = false;
@@ -96,12 +90,12 @@ static void parse_compound_stmt(Parser* parser, CompoundStmt* result)
                      parser->current);
       return;
     }
-    Stmt* stmt = parse_stmt(parser);
-    if (stmt == NULL) {
+    parse_stmt(parser, &statements[statement_count]);
+    if (parser->in_panic_mode) {
       encounter_error = true;
       break;
     }
-    statements[statement_count++] = stmt;
+    ++statement_count;
   }
   if (encounter_error) {
     while (parser->current.type != TOKEN_RIGHT_BRACE) {
@@ -114,33 +108,28 @@ static void parse_compound_stmt(Parser* parser, CompoundStmt* result)
                            .statement_count = statement_count};
 }
 
-static Stmt* parse_stmt(Parser* parser)
+static void parse_stmt(Parser* parser, Stmt* result)
 {
-  Stmt* stmt = NULL;
   switch (parser->current.type) {
   case TOKEN_KEYWORD_RETURN: {
     parse_advance(parser);
     ReturnStmt return_stmt;
     parse_return_stmt(parser, &return_stmt);
-    stmt = ARENA_ALLOC_OBJECT(parser->ast_arena, Stmt);
-    *stmt = (Stmt){.type = RETURN_STMT, .return_statement = return_stmt};
+    *result = (Stmt){.type = RETURN_STMT, .return_statement = return_stmt};
     break;
   }
   case TOKEN_LEFT_BRACE: {
     parse_advance(parser);
     CompoundStmt compound_stmt;
     parse_compound_stmt(parser, &compound_stmt);
-    stmt = ARENA_ALLOC_OBJECT(parser->ast_arena, Stmt);
-    *stmt = (Stmt){.type = COMPOUND_STMT, .compound_statement = compound_stmt};
+    *result =
+        (Stmt){.type = COMPOUND_STMT, .compound_statement = compound_stmt};
     break;
   }
   default: {
     parse_error_at(parser, "Expect statement", parser->current);
   }
   }
-
-  parser->in_panic_mode = false; // Panic mode recover at statement boundary
-  return stmt;
 }
 
 static void parse_parameter_list(Parser* parser)
@@ -155,12 +144,12 @@ static StringView parse_identifier(Parser* parser)
   if (parser->current.type != TOKEN_IDENTIFIER) {
     parse_error_at(parser, "Expect Identifier", parser->current);
   }
-
+  StringView name = parser->current.src;
   parse_advance(parser);
-  return parser->previous.src;
+  return name;
 }
 
-static FunctionDecl* parse_function_decl(Parser* parser)
+static void parse_function_decl(Parser* parser, FunctionDecl* result)
 {
   parse_consume(parser, TOKEN_KEYWORD_INT, "Expect keyword int");
 
@@ -177,14 +166,10 @@ static FunctionDecl* parse_function_decl(Parser* parser)
     parse_consume(parser, TOKEN_SEMICOLON, "Expect ;");
   }
 
-  FunctionDecl* decl = ARENA_ALLOC_OBJECT(parser->ast_arena, FunctionDecl);
-  *decl = (FunctionDecl){
+  *result = (FunctionDecl){
       .name = function_name,
       .body = body,
   };
-
-  parser->in_panic_mode = false; // Panic mode recover at function dec boundary
-  return decl;
 }
 
 FunctionDecl* parse(const char* source, Arena* ast_arena)
@@ -195,7 +180,9 @@ FunctionDecl* parse(const char* source, Arena* ast_arena)
                    .in_panic_mode = false};
 
   parse_advance(&parser);
-  FunctionDecl* decl = parse_function_decl(&parser);
+
+  FunctionDecl* decl = ARENA_ALLOC_OBJECT(parser.ast_arena, FunctionDecl);
+  parse_function_decl(&parser, decl);
   parse_consume(&parser, TOKEN_EOF, "Expect end of the file");
 
   return parser.has_error ? NULL : decl;
