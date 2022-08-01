@@ -54,6 +54,15 @@ static void parse_expr(Parser* parser, Expr* result)
     parse_error_at(parser, "Expect integer literal", parser->current);
     return;
   }
+
+  const SourceLocation first_location = {.line = parser->current.line,
+                                         .column = parser->current.column};
+  SourceLocation last_location = first_location;
+  last_location.column += parser->current.src.length;
+
+  result->source_range =
+      (SourceRange){.first = first_location, .last = last_location};
+
   char* end;
   result->val =
       strtol(parser->current.src.start, &end, 10); // TODO(llai): replace strtol
@@ -110,6 +119,9 @@ static void parse_compound_stmt(Parser* parser, CompoundStmt* result)
 
 static void parse_stmt(Parser* parser, Stmt* result)
 {
+  const SourceLocation last = {.line = parser->current.line,
+                               .column = parser->current.column};
+
   switch (parser->current.type) {
   case TOKEN_KEYWORD_RETURN: {
     parse_advance(parser);
@@ -130,6 +142,11 @@ static void parse_stmt(Parser* parser, Stmt* result)
     parse_error_at(parser, "Expect statement", parser->current);
   }
   }
+
+  const SourceLocation end = {.line = parser->current.line,
+                              .column = parser->current.column};
+
+  result->source_range = (SourceRange){.first = last, .last = end};
 }
 
 static void parse_parameter_list(Parser* parser)

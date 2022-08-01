@@ -24,11 +24,32 @@ template <> struct fmt::formatter<StringView> : formatter<string_view> {
   }
 };
 
+template <> struct fmt::formatter<SourceLocation> : formatter<string_view> {
+  // parse is inherited from formatter<string_view>.
+  template <typename FormatContext>
+  auto format(SourceLocation source_location, FormatContext& ctx)
+  {
+    return fmt::format_to(ctx.out(), "{}:{}", source_location.line,
+                          source_location.column);
+  }
+};
+
+template <> struct fmt::formatter<SourceRange> : formatter<string_view> {
+  // parse is inherited from formatter<string_view>.
+  template <typename FormatContext>
+  auto format(SourceRange source_range, FormatContext& ctx)
+  {
+    return fmt::format_to(ctx.out(), "from: {} to: {}", source_range.first,
+                          source_range.last);
+  }
+};
+
 namespace mcc {
 
 void print_to_string(std::string& buffer, const Expr& expr, int indentation)
 {
-  indented_format_to(std::back_inserter(buffer), indentation, "Expr\n");
+  indented_format_to(std::back_inserter(buffer), indentation, "Expr {}\n",
+                     expr.source_range);
   indented_format_to(std::back_inserter(buffer), indentation + 2, "{}\n",
                      expr.val);
 }
@@ -37,19 +58,21 @@ void print_to_string(std::string& buffer, const Stmt& stmt, int indentation)
 {
   switch (stmt.type) {
   case RETURN_STMT:
-    indented_format_to(std::back_inserter(buffer), indentation, "ReturnStmt\n");
-    indented_format_to(std::back_inserter(buffer), indentation + 2, "{}\n",
-                       stmt.return_statement.expr->val);
-    return;
+    indented_format_to(std::back_inserter(buffer), indentation,
+                       "ReturnStmt {}\n", stmt.source_range);
+    print_to_string(buffer, *stmt.return_statement.expr, indentation + 2);
+    break;
   case COMPOUND_STMT:
-    return print_to_string(buffer, stmt.compound_statement, indentation);
+    indented_format_to(std::back_inserter(buffer), indentation,
+                       "CompoundStmt {}\n", stmt.source_range);
+    print_to_string(buffer, stmt.compound_statement, indentation);
+    break;
   }
 }
 
 void print_to_string(std::string& buffer, const CompoundStmt& stmt,
                      int indentation)
 {
-  indented_format_to(std::back_inserter(buffer), indentation, "CompoundStmt\n");
   for (std::size_t i = 0; i < stmt.statement_count; ++i) {
     print_to_string(buffer, stmt.statements[i], indentation + 2);
   }
@@ -59,7 +82,7 @@ void print_to_string(std::string& buffer, const FunctionDecl& decl,
                      int indentation)
 {
   indented_format_to(std::back_inserter(buffer), indentation,
-                     "FunctionDecl <{} ()>\n", decl.name);
+                     "FunctionDecl <{}(void)>\n", decl.name);
   if (decl.body) { print_to_string(buffer, *decl.body, indentation + 2); }
 }
 

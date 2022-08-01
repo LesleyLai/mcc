@@ -6,7 +6,7 @@ add_library(mcc_lib
         arena.h
         ast.h
         parser.h
-        parser.c)
+        parser.c string_view.c)
 target_include_directories(mcc_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(mcc main.c)

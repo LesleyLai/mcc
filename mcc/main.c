@@ -3,65 +3,124 @@
 
 #include "arena.h"
 #include "parser.h"
-//
-// const char* minimum_source = "int main(void)\n"
-//                             "{\n"
-//                             "  return 42;\n"
-//                             "}";
-//
-// int main(void)
-//{
-//  const size_t ast_arena_size = 4000000000; // 4 GB virtual memory
-//  void* ast_buffer = malloc(ast_arena_size);
-//  Arena ast_arena = arena_init(ast_buffer, ast_arena_size);
-//  parse(minimum_source, &ast_arena);
-//}
+#include "string_view.h"
 
-const char* source = "section .text\n"
-                     "global main\n"
-                     "main:\n"
-                     "  mov     rax, 2\n"
-                     "  ret";
-
-void compile(void)
+static void compile_to_file(FILE* asm_file, const char* source)
 {
-  FILE* file = fopen("file.asm", "w");
-  if (!file) {
-    perror("Cannot open file");
+  const size_t ast_arena_size = 4000000000; // 4 GB virtual memory
+  void* ast_buffer = malloc(ast_arena_size);
+  Arena ast_arena = arena_init(ast_buffer, ast_arena_size);
+
+  FunctionDecl* main_func = parse(source, &ast_arena);
+  if (main_func == NULL) {
+    // Parsing failed
+  }
+
+  if (main_func->body->statement_count != 1 &&
+      main_func->body->statements[0].type != COMPOUND_STMT) {
+    printf("Not have a main function!");
+  }
+
+  const int return_value =
+      main_func->body->statements->return_statement.expr->val;
+
+  fputs("section .text\n", asm_file);
+  fputs("global main\n", asm_file);
+  fputs("main:\n", asm_file);
+  fprintf(asm_file, "  mov     rax, %d\n", return_value);
+  fputs("  ret", asm_file);
+}
+
+void compile(const char* asm_filename, const char* source)
+{
+  enum { buffer_size = 1000 };
+  char asm_filename_with_extension[buffer_size];
+
+  const StringView src_filename_sv = string_view_create(asm_filename);
+  if (!string_view_cat(src_filename_sv, string_view_create(".asm"),
+                       asm_filename_with_extension, buffer_size)) {
+    fprintf(stderr, "Filename too long: %.*s", (int)src_filename_sv.length,
+            src_filename_sv.start);
     exit(1);
   }
-  if (fputs(source, file) == EOF) { perror("fputs error"); }
-  fclose(file);
-}
-void assemble(void)
-{
-#ifdef _WIN32
-  system("yasm -fwin64 file.asm -o file.obj");
-#else // linux
-  system("yasm -felf64 file.asm -o file.o");
-#endif
+
+  FILE* asm_file = fopen(asm_filename_with_extension, "w");
+  if (!asm_file) {
+    fprintf(stderr, "Cannot open asm_file %s", asm_filename_with_extension);
+    exit(1);
+  }
+
+  compile_to_file(asm_file, source);
+
+  if (ferror(asm_file)) { perror("Failed to write asm_file"); }
+  fclose(asm_file);
 }
 
-void link(void)
+void assemble(const char* asm_filename, const char* obj_filename)
 {
+  enum { buffer_size = 10000 };
+  char buffer[buffer_size];
+
 #ifdef _WIN32
-  char buffer[10000];
-  snprintf(
-      buffer, 10000,
-      "link.exe /SUBSYSTEM:CONSOLE /ENTRY:main file.obj /OUT:hello.exe 1>NUL");
+  snprintf(buffer, buffer_size, "yasm -fwin64 %s.asm -o %s.obj", asm_filename,
+           obj_filename);
+#else // linux
+  snprintf(buffer, buffer_size, "yasm -felf64 %.*s.asm -o %.*s.o", asm_filename,
+           obj_filename);
+#endif
+
   system(buffer);
-#else // linux
-  system("ld -lc file.o -o hello -I /lib64/ld-linux-x86-64.so.2");
-
-#endif
 }
 
-const char* instrs = "  mov eax, 42\n"
-                     "  ret 0";
-
-int main(void)
+void link(const char* obj_filename, const char* executable_name)
 {
-  compile();
-  assemble();
-  link();
+  enum { buffer_size = 10000 };
+  char buffer[buffer_size];
+#ifdef _WIN32
+  snprintf(buffer, buffer_size,
+           "link.exe /SUBSYSTEM:CONSOLE /ENTRY:main %s.obj /OUT:%s.exe 1>NUL",
+           obj_filename, executable_name);
+#else // linux
+  snprintf(buffer, buffer_size,
+           "ld -lc %s.o -o %s -I /lib64/ld-linux-x86-64.so.2", obj_filename,
+           executable_name);
+#endif
+  system(buffer);
+}
+
+char* file_to_allocated_buffer(FILE* file)
+{
+  fseek(file, 0, SEEK_END);
+  const long length = ftell(file);
+
+  fseek(file, 0, SEEK_SET);
+  char* buffer = malloc(length + 1);
+  fread(buffer, 1, length, file); // TODO: check result of fread
+  buffer[length] = '\0';
+  return buffer;
+}
+
+int main(int argc, char* argv[])
+{
+  if (argc != 2) { puts("Usage: mcc <asm_filename>"); }
+  const char* src_filename_with_extension = argv[1];
+
+  FILE* src_file = fopen(src_filename_with_extension, "rb");
+  if (!src_file) {
+    fprintf(stderr, "Cannot open source file %s", src_filename_with_extension);
+    exit(1);
+  }
+
+  char* source = file_to_allocated_buffer(src_file);
+
+  const char* asm_filename = "file";
+  compile(asm_filename, source);
+
+  free(source);
+
+  const char* obj_filename = asm_filename;
+  assemble(asm_filename, obj_filename);
+
+  const char* executable_name = obj_filename;
+  link(obj_filename, executable_name);
 }
