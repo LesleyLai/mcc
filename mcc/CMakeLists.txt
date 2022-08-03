@@ -6,7 +6,7 @@ add_library(mcc_lib
         arena.h
         ast.h
         parser.h
-        parser.c string_view.c)
+        parser.c string_view.c source_location.h)
 target_link_libraries(mcc_lib
         PUBLIC mcc::compiler_options
         PRIVATE mcc::compiler_warnings)

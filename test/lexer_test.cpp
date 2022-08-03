@@ -10,6 +10,8 @@ extern "C" {
 #include "lexer.h"
 }
 
+#include "source_location_formatter.hpp"
+
 template <> struct fmt::formatter<StringView> : formatter<string_view> {
   // parse is inherited from formatter<string_view>.
 
@@ -31,8 +33,8 @@ template <> struct fmt::formatter<Token> {
 
   auto format(Token token, auto& ctx)
   {
-    return format_to(ctx.out(), "{} {}:{} \"{}\")", token.type, token.line,
-                     token.column, token.src);
+    return format_to(ctx.out(), "{} {} \"{}\")", token.type, token.location,
+                     token.src);
   }
 };
 
@@ -60,11 +62,19 @@ template <> struct fmt::formatter<Token> {
                      to_string(tokenize_source(source)));
 }
 
-TEST_CASE("minimum source")
+TEST_CASE("Lexer test")
 {
-  constexpr const char* minimum_source = "int main(void)\n"
-                                         "{\n"
-                                         "  return 42;\n"
-                                         "}";
-  ApprovalTests::Approvals::verify(verify_scanner(minimum_source));
+  SECTION("minimum source")
+  {
+    constexpr const char* minimum_source = "int main(void)\n"
+                                           "{\n"
+                                           "  return 42;\n"
+                                           "}";
+    ApprovalTests::Approvals::verify(verify_scanner(minimum_source));
+  }
+
+  //  SECTION("Arithmetics")
+  //  {
+  //    ApprovalTests::Approvals::verify(verify_scanner("1 + 2 * (3 - 4) / 5"));
+  //  }
 }

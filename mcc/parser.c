@@ -21,8 +21,8 @@ typedef struct Parser {
 static void parse_error_at(Parser* parser, const char* error_msg, Token token)
 {
   if (parser->in_panic_mode) return;
-  fprintf(stderr, "Syntax error at %d:%d: %s\n", token.line, token.column,
-          error_msg);
+  fprintf(stderr, "Syntax error at %d:%d: %s\n", token.location.line,
+          token.location.column, error_msg);
   parser->has_error = true;
   parser->in_panic_mode = true;
 }
@@ -57,8 +57,7 @@ static Expr* parse_expr(Parser* parser)
     return NULL;
   }
 
-  const SourceLocation first_location = {.line = parser->current.line,
-                                         .column = parser->current.column};
+  const SourceLocation first_location = parser->current.location;
   SourceLocation last_location = first_location;
   last_location.column += (uint32_t)parser->current.src.length;
 
@@ -128,8 +127,9 @@ static CompoundStmt* parse_compound_stmt(Parser* parser,
   parse_consume(parser, TOKEN_RIGHT_BRACE, "Expect }");
 
   const SourceLocation last_loc = {
-      .line = parser->previous.line,
-      .column = parser->previous.column + (int)parser->previous.src.length - 1,
+      .line = parser->previous.location.line,
+      .column = parser->previous.location.column +
+                (int)parser->previous.src.length - 1,
   };
 
   CompoundStmt* result = ARENA_ALLOC_OBJECT(parser->ast_arena, CompoundStmt);
@@ -143,10 +143,7 @@ static CompoundStmt* parse_compound_stmt(Parser* parser,
 
 static Stmt* parse_stmt(Parser* parser)
 {
-  const SourceLocation first_loc = {
-      .line = parser->current.line,
-      .column = parser->current.column,
-  };
+  const SourceLocation first_loc = parser->current.location;
 
   switch (parser->current.type) {
   case TOKEN_KEYWORD_RETURN: {
@@ -185,8 +182,7 @@ static FunctionDecl* parse_function_decl(Parser* parser)
 {
   if (parser->in_panic_mode) { return NULL; }
 
-  const SourceLocation first_location = (SourceLocation){
-      .line = parser->current.line, .column = parser->current.column};
+  const SourceLocation first_location = parser->current.location;
 
   parse_consume(parser, TOKEN_KEYWORD_INT, "Expect keyword int");
   StringView function_name = parse_identifier(parser);
@@ -196,9 +192,7 @@ static FunctionDecl* parse_function_decl(Parser* parser)
   CompoundStmt* body = NULL;
 
   if (parser->current.type == TOKEN_LEFT_BRACE) { // is definition
-    const SourceLocation compound_first_location = {
-        .line = parser->current.line, .column = parser->current.column};
-
+    const SourceLocation compound_first_location = parser->current.location;
     parse_advance(parser);
     body = parse_compound_stmt(parser, compound_first_location);
   } else {

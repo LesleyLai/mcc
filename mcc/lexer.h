@@ -1,6 +1,9 @@
 #ifndef MCC_LEXER_H
 #define MCC_LEXER_H
 
+#include <stdint.h>
+
+#include "source_location.h"
 #include "string_view.h"
 
 // The lexer consumes source code and produces tokens lazily
@@ -8,8 +11,8 @@
 typedef struct Lexer {
   const char* start;
   const char* current;
-  int line;
-  int column;
+  uint32_t line;
+  uint32_t column;
 } Lexer;
 
 typedef enum TokenType {
@@ -33,8 +36,7 @@ typedef enum TokenType {
 typedef struct Token {
   StringView src;
   TokenType type;
-  int line;
-  int column;
+  SourceLocation location;
 } Token;
 
 inline Lexer lexer_create(const char* source)

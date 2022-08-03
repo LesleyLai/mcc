@@ -11,18 +11,17 @@ static bool lexer_is_at_end(const Lexer* lexer)
 static Token lexer_make_token(const Lexer* lexer, TokenType type)
 {
   const int length = (int)(lexer->current - lexer->start);
-  return (Token){.src = {.start = lexer->start, .length = (size_t)length},
-                 .type = type,
-                 .line = lexer->line,
-                 .column = lexer->column - length};
+  return (Token){
+      .src = {.start = lexer->start, .length = (size_t)length},
+      .type = type,
+      .location = {.line = lexer->line, .column = lexer->column - length}};
 }
 
 static Token lexer_error_token(const Lexer* lexer, StringView error_msg)
 {
   return (Token){.src = error_msg,
                  .type = TOKEN_ERROR,
-                 .line = lexer->line,
-                 .column = lexer->column};
+                 .location = {.line = lexer->line, .column = lexer->column}};
 }
 
 // consumes the current character and returns it

@@ -1,6 +1,7 @@
 #include <fmt/format.h>
 
 #include "ast_printer.hpp"
+#include "source_location_formatter.hpp"
 
 namespace {
 
@@ -21,26 +22,6 @@ template <> struct fmt::formatter<StringView> : formatter<string_view> {
   {
     string_view name{sv.start, sv.length};
     return formatter<string_view>::format(name, ctx);
-  }
-};
-
-template <> struct fmt::formatter<SourceLocation> : formatter<string_view> {
-  // parse is inherited from formatter<string_view>.
-  template <typename FormatContext>
-  auto format(SourceLocation source_location, FormatContext& ctx)
-  {
-    return fmt::format_to(ctx.out(), "{}:{}", source_location.line,
-                          source_location.column);
-  }
-};
-
-template <> struct fmt::formatter<SourceRange> : formatter<string_view> {
-  // parse is inherited from formatter<string_view>.
-  template <typename FormatContext>
-  auto format(SourceRange source_range, FormatContext& ctx)
-  {
-    return fmt::format_to(ctx.out(), "from: {} to: {}", source_range.first,
-                          source_range.last);
   }
 };
 
