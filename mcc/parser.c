@@ -129,7 +129,7 @@ static CompoundStmt* parse_compound_stmt(Parser* parser,
 
   const SourceLocation last_loc = {
       .line = parser->previous.line,
-      .column = parser->previous.column + parser->previous.src.length - 1,
+      .column = parser->previous.column + (int)parser->previous.src.length - 1,
   };
 
   CompoundStmt* result = ARENA_ALLOC_OBJECT(parser->ast_arena, CompoundStmt);

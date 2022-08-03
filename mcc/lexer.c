@@ -81,7 +81,7 @@ static Token lexer_scan_number(Lexer* lexer)
 static TokenType check_keyword(Lexer* lexer, int start_position,
                                StringView rest, TokenType type)
 {
-  if (lexer->current - lexer->start == start_position + rest.length &&
+  if (lexer->current - lexer->start == start_position + (int)rest.length &&
       memcmp(lexer->start + start_position, rest.start, rest.length) == 0) {
     return type;
   }
