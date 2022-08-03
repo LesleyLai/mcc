@@ -78,13 +78,9 @@ public:
   return {std::make_unique<CFilesInDirectoryGenerator>(root)};
 }
 
-[[nodiscard]] auto verify_compilation(const std::string& source) -> std::string
+[[nodiscard]] auto verify_compilation(const std::string& source,
+                                      Arena& ast_arena) -> std::string
 {
-  const size_t ast_arena_size = 4'000'000'000; // 4 GB virtual memory
-
-  const auto ast_buffer = std::make_unique<std::byte[]>(ast_arena_size);
-  Arena ast_arena = arena_init(ast_buffer.get(), ast_arena_size);
-
   std::string output;
   fmt::format_to(std::back_inserter(output), "Source:\n============\n");
   fmt::format_to(std::back_inserter(output), "{}\n\n", source);
@@ -105,27 +101,34 @@ public:
 
 TEST_CASE("Integration tests")
 {
+  const size_t ast_arena_size = 40'000'000; // 40 mb virtual memory
+
+  const auto ast_buffer = std::make_unique<std::byte[]>(ast_arena_size);
+  Arena ast_arena = arena_init(ast_buffer.get(), ast_arena_size);
+
   const auto test_src_directory = path{__FILE__}.remove_filename();
-  const auto test_data_directory =
-      path{__FILE__}.remove_filename() / "test_data";
+  const auto test_data_directory = test_src_directory / "test_data";
 
-  auto file_path = GENERATE_COPY(c_files_in_directory(test_data_directory));
+  SECTION("Verify all c files")
+  {
+    auto file_path = GENERATE_COPY(c_files_in_directory(test_data_directory));
 
-  const auto src = read_file_to_string(file_path.string());
+    const auto src = read_file_to_string(file_path.string());
 
-  const auto test_relative_dir =
-      file_path.lexically_relative(test_src_directory)
-          .remove_filename()
-          .string();
-  const auto test_name = file_path.filename().replace_extension().string();
+    const auto test_relative_dir =
+        file_path.lexically_relative(test_src_directory)
+            .remove_filename()
+            .string();
+    const auto test_name = file_path.filename().replace_extension().string();
 
-  [[maybe_unused]] const auto disposer =
-      ApprovalTests::Approvals::useApprovalsSubdirectory(test_relative_dir);
-  const auto namer = ApprovalTests::TemplatedCustomNamer::create(
-      fmt::format("{{TestSourceDirectory}}/{{ApprovalsSubdirectory}}/"
-                  "{}.{{ApprovedOrReceived}}.{{FileExtension}}",
-                  test_name));
+    [[maybe_unused]] const auto disposer =
+        ApprovalTests::Approvals::useApprovalsSubdirectory(test_relative_dir);
+    const auto namer = ApprovalTests::TemplatedCustomNamer::create(
+        fmt::format("{{TestSourceDirectory}}/{{ApprovalsSubdirectory}}/"
+                    "{}.{{ApprovedOrReceived}}.{{FileExtension}}",
+                    test_name));
 
-  ApprovalTests::Approvals::verify(verify_compilation(src),
-                                   ApprovalTests::Options().withNamer(namer));
+    ApprovalTests::Approvals::verify(verify_compilation(src, ast_arena),
+                                     ApprovalTests::Options().withNamer(namer));
+  }
 }
