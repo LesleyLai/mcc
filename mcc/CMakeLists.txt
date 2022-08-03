@@ -8,6 +8,7 @@ add_library(mcc_lib
         parser.h
         parser.c string_view.c)
 target_include_directories(mcc_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_options(mcc_lib PRIVATE "/W4")
 
 add_executable(mcc main.c)
 target_link_libraries(mcc PRIVATE mcc_lib)

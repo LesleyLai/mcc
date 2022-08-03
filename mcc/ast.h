@@ -22,27 +22,24 @@ typedef struct Expr {
 
 typedef enum StatementType { COMPOUND_STMT, RETURN_STMT } StatementType;
 
-typedef struct Stmt Stmt;
-
-typedef struct CompoundStmt {
-  size_t statement_count;
-  Stmt* statements;
-} CompoundStmt;
-
-typedef struct ReturnStmt {
-  Expr* expr;
-} ReturnStmt;
-
 typedef struct Stmt {
   SourceRange source_range;
   StatementType type;
-  union {
-    CompoundStmt compound_statement;
-    ReturnStmt return_statement;
-  };
 } Stmt;
 
+typedef struct CompoundStmt {
+  Stmt base;
+  size_t statement_count;
+  Stmt** statements;
+} CompoundStmt;
+
+typedef struct ReturnStmt {
+  Stmt base;
+  Expr* expr;
+} ReturnStmt;
+
 typedef struct FunctionDecl {
+  SourceRange source_range;
   StringView name;
   CompoundStmt* body;
 } FunctionDecl;

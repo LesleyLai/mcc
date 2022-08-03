@@ -2,3 +2,6 @@
 cmake-build-*
 *.received.txt
 *.bak
+*.asm
+*.obj
+*.o

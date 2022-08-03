@@ -1,0 +1,15 @@
+Source:
+============
+int main(void)
+{
+  return 42;
+}
+
+AST:
+============
+FunctionDecl <main(void) -> int> from: 1:1 to: 3:12
+  CompoundStmt from: 2:1 to: 4:1
+    ReturnStmt from: 3:3 to: 3:12
+      Expr from: 3:10 to: 3:12
+        42
+

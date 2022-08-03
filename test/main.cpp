@@ -3,4 +3,4 @@
 #include "ApprovalTests.hpp"
 
 [[maybe_unused]] auto directory_disposer =
-    ApprovalTests::Approvals::useApprovalsSubdirectory("approval_tests");
+    ApprovalTests::Approvals::useApprovalsSubdirectory("test_data");

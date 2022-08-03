@@ -15,6 +15,7 @@ typedef struct Parser {
   bool in_panic_mode;
 
   Token current;
+  Token previous;
 } Parser;
 
 static void parse_error_at(Parser* parser, const char* error_msg, Token token)
@@ -29,6 +30,7 @@ static void parse_error_at(Parser* parser, const char* error_msg, Token token)
 static void parse_advance(Parser* parser)
 {
   for (;;) {
+    parser->previous = parser->current;
     parser->current = lexer_scan_token(&parser->lexer);
     if (parser->current.type != TOKEN_ERROR) break;
     parse_error_at(parser, "Error", parser->current);
@@ -46,20 +48,21 @@ static void parse_consume(Parser* parser, TokenType type, const char* error_msg)
   parse_advance(parser);
 }
 
-static void parse_expr(Parser* parser, Expr* result)
+static Expr* parse_expr(Parser* parser)
 {
-  if (parser->in_panic_mode) { return; }
+  if (parser->in_panic_mode) { return NULL; }
 
   if (parser->current.type != TOKEN_INTEGER) {
     parse_error_at(parser, "Expect integer literal", parser->current);
-    return;
+    return NULL;
   }
 
   const SourceLocation first_location = {.line = parser->current.line,
                                          .column = parser->current.column};
   SourceLocation last_location = first_location;
-  last_location.column += parser->current.src.length;
+  last_location.column += (uint32_t)parser->current.src.length;
 
+  Expr* result = ARENA_ALLOC_OBJECT(parser->ast_arena, Expr);
   result->source_range =
       (SourceRange){.first = first_location, .last = last_location};
 
@@ -68,27 +71,37 @@ static void parse_expr(Parser* parser, Expr* result)
       strtol(parser->current.src.start, &end, 10); // TODO(llai): replace strtol
   assert(end == parser->current.src.start + parser->current.src.length);
   parse_advance(parser);
+  return result;
 }
 
-static void parse_return_stmt(Parser* parser, ReturnStmt* result)
+static ReturnStmt* parse_return_stmt(Parser* parser, SourceLocation first_loc)
 {
-  Expr* expr = ARENA_ALLOC_OBJECT(parser->ast_arena, Expr);
-  parse_expr(parser, expr);
-  if (parser->in_panic_mode) return;
+  Expr* expr = parse_expr(parser);
+  if (parser->in_panic_mode) return NULL;
 
-  *result = (ReturnStmt){.expr = expr};
+  assert(expr != NULL);
+
+  ReturnStmt* result = ARENA_ALLOC_OBJECT(parser->ast_arena, ReturnStmt);
+  *result = (ReturnStmt){
+      .base = {.type = RETURN_STMT, // TODO source range
+               .source_range = {.first = first_loc,
+                                .last = expr->source_range.last}},
+      .expr = expr,
+  };
   parse_consume(parser, TOKEN_SEMICOLON, "Expect ;");
+  return result;
 }
 
-static void parse_stmt(Parser* parser, Stmt* result);
+static Stmt* parse_stmt(Parser* parser);
 
 // TODO: Implement proper vector and use it for compound statement
 #define MAX_STMT_COUNT_IN_COMPOUND_STMT 16
 
-static void parse_compound_stmt(Parser* parser, CompoundStmt* result)
+static CompoundStmt* parse_compound_stmt(Parser* parser,
+                                         SourceLocation first_loc)
 {
-  Stmt* statements = ARENA_ALLOC_ARRAY(parser->ast_arena, Stmt,
-                                       MAX_STMT_COUNT_IN_COMPOUND_STMT);
+  Stmt** statements = ARENA_ALLOC_ARRAY(parser->ast_arena, Stmt*,
+                                        MAX_STMT_COUNT_IN_COMPOUND_STMT);
   size_t statement_count = 0;
 
   bool encounter_error = false;
@@ -97,9 +110,9 @@ static void parse_compound_stmt(Parser* parser, CompoundStmt* result)
       parse_error_at(parser,
                      "Too many statement in compound statement to handle",
                      parser->current);
-      return;
+      return NULL;
     }
-    parse_stmt(parser, &statements[statement_count]);
+    statements[statement_count] = parse_stmt(parser);
     if (parser->in_panic_mode) {
       encounter_error = true;
       break;
@@ -113,40 +126,42 @@ static void parse_compound_stmt(Parser* parser, CompoundStmt* result)
   }
 
   parse_consume(parser, TOKEN_RIGHT_BRACE, "Expect }");
-  *result = (CompoundStmt){.statements = statements,
-                           .statement_count = statement_count};
+
+  const SourceLocation last_loc = {
+      .line = parser->previous.line,
+      .column = parser->previous.column + parser->previous.src.length - 1,
+  };
+
+  CompoundStmt* result = ARENA_ALLOC_OBJECT(parser->ast_arena, CompoundStmt);
+  *result = (CompoundStmt){
+      .base = {.type = COMPOUND_STMT,
+               .source_range = {.first = first_loc, .last = last_loc}},
+      .statements = statements,
+      .statement_count = statement_count};
+  return result;
 }
 
-static void parse_stmt(Parser* parser, Stmt* result)
+static Stmt* parse_stmt(Parser* parser)
 {
-  const SourceLocation last = {.line = parser->current.line,
-                               .column = parser->current.column};
+  const SourceLocation first_loc = {
+      .line = parser->current.line,
+      .column = parser->current.column,
+  };
 
   switch (parser->current.type) {
   case TOKEN_KEYWORD_RETURN: {
     parse_advance(parser);
-    ReturnStmt return_stmt;
-    parse_return_stmt(parser, &return_stmt);
-    *result = (Stmt){.type = RETURN_STMT, .return_statement = return_stmt};
-    break;
+    return (Stmt*)parse_return_stmt(parser, first_loc);
   }
   case TOKEN_LEFT_BRACE: {
     parse_advance(parser);
-    CompoundStmt compound_stmt;
-    parse_compound_stmt(parser, &compound_stmt);
-    *result =
-        (Stmt){.type = COMPOUND_STMT, .compound_statement = compound_stmt};
-    break;
+    return (Stmt*)parse_compound_stmt(parser, first_loc);
   }
   default: {
     parse_error_at(parser, "Expect statement", parser->current);
+    return NULL;
   }
   }
-
-  const SourceLocation end = {.line = parser->current.line,
-                              .column = parser->current.column};
-
-  result->source_range = (SourceRange){.first = last, .last = end};
 }
 
 static void parse_parameter_list(Parser* parser)
@@ -166,27 +181,41 @@ static StringView parse_identifier(Parser* parser)
   return name;
 }
 
-static void parse_function_decl(Parser* parser, FunctionDecl* result)
+static FunctionDecl* parse_function_decl(Parser* parser)
 {
-  parse_consume(parser, TOKEN_KEYWORD_INT, "Expect keyword int");
+  if (parser->in_panic_mode) { return NULL; }
 
+  const SourceLocation first_location = (SourceLocation){
+      .line = parser->current.line, .column = parser->current.column};
+
+  parse_consume(parser, TOKEN_KEYWORD_INT, "Expect keyword int");
   StringView function_name = parse_identifier(parser);
 
   parse_parameter_list(parser);
 
   CompoundStmt* body = NULL;
+
   if (parser->current.type == TOKEN_LEFT_BRACE) { // is definition
+    const SourceLocation compound_first_location = {
+        .line = parser->current.line, .column = parser->current.column};
+
     parse_advance(parser);
-    body = ARENA_ALLOC_OBJECT(parser->ast_arena, CompoundStmt);
-    parse_compound_stmt(parser, body);
+    body = parse_compound_stmt(parser, compound_first_location);
   } else {
     parse_consume(parser, TOKEN_SEMICOLON, "Expect ;");
   }
+  if (parser->in_panic_mode) { return NULL; }
 
-  *result = (FunctionDecl){
+  const SourceLocation last_location =
+      body->statements[body->statement_count - 1]->source_range.last;
+
+  FunctionDecl* decl = ARENA_ALLOC_OBJECT(parser->ast_arena, FunctionDecl);
+  *decl = (FunctionDecl){
+      .source_range = {.first = first_location, .last = last_location},
       .name = function_name,
       .body = body,
   };
+  return decl;
 }
 
 FunctionDecl* parse(const char* source, Arena* ast_arena)
@@ -198,8 +227,7 @@ FunctionDecl* parse(const char* source, Arena* ast_arena)
 
   parse_advance(&parser);
 
-  FunctionDecl* decl = ARENA_ALLOC_OBJECT(parser.ast_arena, FunctionDecl);
-  parse_function_decl(&parser, decl);
+  FunctionDecl* decl = parse_function_decl(&parser);
   parse_consume(&parser, TOKEN_EOF, "Expect end of the file");
 
   return parser.has_error ? NULL : decl;

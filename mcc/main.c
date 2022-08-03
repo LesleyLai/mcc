@@ -13,16 +13,19 @@ static void compile_to_file(FILE* asm_file, const char* source)
 
   FunctionDecl* main_func = parse(source, &ast_arena);
   if (main_func == NULL) {
-    // Parsing failed
+    fprintf(stderr, "Failed to parse the program");
+    return;
   }
 
-  if (main_func->body->statement_count != 1 &&
-      main_func->body->statements[0].type != COMPOUND_STMT) {
-    printf("Not have a main function!");
+  if (main_func->body->statement_count != 1 ||
+      main_func->body->statements[0]->type != RETURN_STMT) {
+    // TODO: Not support yet
+    fprintf(stderr, "MCC does not support this kind of program yet");
+    return;
   }
 
   const int return_value =
-      main_func->body->statements->return_statement.expr->val;
+      ((ReturnStmt*)main_func->body->statements[0])->expr->val;
 
   fputs("section .text\n", asm_file);
   fputs("global main\n", asm_file);
