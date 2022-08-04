@@ -134,6 +134,10 @@ Token lexer_scan_token(Lexer* lexer)
   case '{': return lexer_make_token(lexer, TOKEN_LEFT_BRACE);
   case '}': return lexer_make_token(lexer, TOKEN_RIGHT_BRACE);
   case ';': return lexer_make_token(lexer, TOKEN_SEMICOLON);
+  case '+': return lexer_make_token(lexer, TOKEN_PLUS);
+  case '-': return lexer_make_token(lexer, TOKEN_MINUS);
+  case '*': return lexer_make_token(lexer, TOKEN_STAR);
+  case '/': return lexer_make_token(lexer, TOKEN_SLASH);
   default: break;
   }
 

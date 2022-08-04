@@ -33,7 +33,7 @@ template <> struct fmt::formatter<Token> {
 
   auto format(Token token, auto& ctx)
   {
-    return format_to(ctx.out(), "{} {} \"{}\")", token.type, token.location,
+    return format_to(ctx.out(), "{} {} \"{}\"", token.type, token.location,
                      token.src);
   }
 };
@@ -73,8 +73,8 @@ TEST_CASE("Lexer test")
     ApprovalTests::Approvals::verify(verify_scanner(minimum_source));
   }
 
-  //  SECTION("Arithmetics")
-  //  {
-  //    ApprovalTests::Approvals::verify(verify_scanner("1 + 2 * (3 - 4) / 5"));
-  //  }
+  SECTION("Arithmetics")
+  {
+    ApprovalTests::Approvals::verify(verify_scanner("1 + 2 * (3 - 4) / 5"));
+  }
 }

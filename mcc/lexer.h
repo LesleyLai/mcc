@@ -22,6 +22,11 @@ typedef enum TokenType {
   TOKEN_RIGHT_BRACE, // }
   TOKEN_SEMICOLON,   // ;
 
+  TOKEN_PLUS,  // +
+  TOKEN_MINUS, // -
+  TOKEN_STAR,  // *
+  TOKEN_SLASH, // /
+
   TOKEN_KEYWORD_VOID,
   TOKEN_KEYWORD_INT,
   TOKEN_KEYWORD_RETURN,
