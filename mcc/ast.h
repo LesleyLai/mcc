@@ -2,14 +2,35 @@
 #define MCC_AST_H
 
 #include "source_location.h"
-#include "string_view.h"
+#include "utils/str.h"
 
 #include <stdlib.h>
 
+typedef enum ExprType { CONST_EXPR, BINARY_OP_EXPR } ExprType;
+
 typedef struct Expr {
   SourceRange source_range;
-  int val;
+  ExprType type;
 } Expr;
+
+typedef struct ConstExpr {
+  Expr base;
+  int val;
+} ConstExpr;
+
+typedef enum BinaryOpType {
+  BINARY_OP_PLUS,
+  BINARY_OP_MINUS,
+  BINARY_OP_MULT,
+  BINARY_OP_DIVIDE
+} BinaryOpType;
+
+typedef struct BinaryOpExpr {
+  Expr base;
+  BinaryOpType binary_op_type;
+  Expr* lhs;
+  Expr* rhs;
+} BinaryOp;
 
 typedef enum StatementType { COMPOUND_STMT, RETURN_STMT } StatementType;
 

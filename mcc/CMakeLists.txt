@@ -1,12 +1,12 @@
 add_library(mcc_lib
         lexer.h
         lexer.c
-        string_view.h
-        arena.c
-        arena.h
+        utils/str.h
+        utils/allocators.c
+        utils/allocators.h
         ast.h
         parser.h
-        parser.c string_view.c source_location.h)
+        parser.c utils/str.c source_location.h utils/defer.h)
 target_link_libraries(mcc_lib
         PUBLIC mcc::compiler_options
         PRIVATE mcc::compiler_warnings)

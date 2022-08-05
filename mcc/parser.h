@@ -2,7 +2,7 @@
 #define MCC_PARSER_H
 
 #include "ast.h"
-#include "string_view.h"
+#include "utils/str.h"
 
 typedef struct Arena Arena;
 

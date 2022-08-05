@@ -31,8 +31,17 @@ void print_to_string(std::string& buffer, const Expr& expr, int indentation)
 {
   indented_format_to(std::back_inserter(buffer), indentation, "Expr {}\n",
                      expr.source_range);
-  indented_format_to(std::back_inserter(buffer), indentation + 2, "{}\n",
-                     expr.val);
+  switch (expr.type) {
+  case CONST_EXPR: {
+    const auto& const_expr = (const ConstExpr&)expr;
+    indented_format_to(std::back_inserter(buffer), indentation + 2, "{}\n",
+                       const_expr.val);
+    return;
+  }
+  case BINARY_OP_EXPR:
+    // TODO: print binary operators
+    return;
+  }
 }
 
 void print_to_string(std::string& buffer, const Stmt& stmt, int indentation)

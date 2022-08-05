@@ -1,6 +1,12 @@
-#include "arena.h"
+#include "allocators.h"
 
 #include <stdint.h>
+
+void* poly_aligned_alloc(const PolyAllocator* allocator, size_t alignment,
+                         size_t size)
+{
+  return allocator->aligned_alloc(allocator, alignment, size);
+}
 
 // Given a pointer ptr, returns a pointer aligned by the specified alignment
 // The returned pointer always have higher address than the original pointer
@@ -22,4 +28,24 @@ void* arena_aligned_alloc(Arena* arena, size_t alignment, size_t size)
   arena->ptr = aligned_ptr + size;
   arena->size_remain -= bump_size;
   return aligned_ptr;
+}
+
+void arena_reset(Arena* arena)
+{
+  Byte* begin = (Byte*)arena->begin;
+  arena->size_remain += (arena->ptr - begin);
+  arena->ptr = begin;
+}
+
+// To be used as a function pointer in PolyAllocator
+static void* arena_poly_aligned_alloc(const PolyAllocator* self,
+                                      size_t alignment, size_t size)
+{
+  return arena_aligned_alloc((Arena*)self->user_data, alignment, size);
+}
+
+PolyAllocator poly_allocator_from_arena(Arena* arena)
+{
+  return (PolyAllocator){.user_data = arena,
+                         .aligned_alloc = arena_poly_aligned_alloc};
 }

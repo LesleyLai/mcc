@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #include "source_location.h"
-#include "string_view.h"
+#include "utils/str.h"
 
 // The lexer consumes source code and produces tokens lazily
 
@@ -35,7 +35,9 @@ typedef enum TokenType {
   TOKEN_INTEGER,
 
   TOKEN_ERROR,
-  TOKEN_EOF
+  TOKEN_EOF,
+
+  TOKEN_TYPES_COUNT
 } TokenType;
 
 typedef struct Token {

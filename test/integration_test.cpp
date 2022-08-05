@@ -9,8 +9,8 @@
 #include <memory>
 
 extern "C" {
-#include "arena.h"
 #include "parser.h"
+#include "utils/allocators.h"
 }
 
 #include "ast_printer.hpp"

@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "arena.h"
 #include "parser.h"
-#include "string_view.h"
+#include "utils/allocators.h"
+#include "utils/str.h"
 
 static void compile_to_file(FILE* asm_file, const char* source)
 {
@@ -25,7 +25,7 @@ static void compile_to_file(FILE* asm_file, const char* source)
   }
 
   const int return_value =
-      ((ReturnStmt*)main_func->body->statements[0])->expr->val;
+      ((ConstExpr*)((ReturnStmt*)main_func->body->statements[0])->expr)->val;
 
   fputs("section .text\n", asm_file);
   fputs("global main\n", asm_file);
@@ -39,8 +39,8 @@ void compile(const char* asm_filename, const char* source)
   enum { buffer_size = 1000 };
   char asm_filename_with_extension[buffer_size];
 
-  const StringView src_filename_sv = string_view_create(asm_filename);
-  if (!string_view_cat(src_filename_sv, string_view_create(".asm"),
+  const StringView src_filename_sv = string_view_from_c_str(asm_filename);
+  if (!string_view_cat(src_filename_sv, string_view_from_c_str(".asm"),
                        asm_filename_with_extension, buffer_size)) {
     fprintf(stderr, "Filename too long: %.*s", (int)src_filename_sv.length,
             src_filename_sv.start);
@@ -105,7 +105,10 @@ char* file_to_allocated_buffer(FILE* file)
 
 int main(int argc, char* argv[])
 {
-  if (argc != 2) { puts("Usage: mcc <asm_filename>"); }
+  if (argc != 2) {
+    puts("Usage: mcc <asm_filename>");
+    return 1;
+  }
   const char* src_filename_with_extension = argv[1];
 
   FILE* src_file = fopen(src_filename_with_extension, "rb");

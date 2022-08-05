@@ -13,8 +13,6 @@ extern "C" {
 #include "source_location_formatter.hpp"
 
 template <> struct fmt::formatter<StringView> : formatter<string_view> {
-  // parse is inherited from formatter<string_view>.
-
   template <typename FormatContext>
   auto format(StringView sv, FormatContext& ctx)
   {

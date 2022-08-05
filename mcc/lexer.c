@@ -141,5 +141,6 @@ Token lexer_scan_token(Lexer* lexer)
   default: break;
   }
 
-  return lexer_error_token(lexer, string_view_create("Unexpected character."));
+  return lexer_error_token(lexer,
+                           string_view_from_c_str("Unexpected character."));
 }
