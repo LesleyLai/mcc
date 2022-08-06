@@ -4,6 +4,7 @@ bugprone-*,
 cert-*,
 -cert-env33-c,
 clang-analyzer-*,
+-clang-analyzer-security,
 concurrency-*,
 -concurrency-mt-unsafe,
 misc-*,
@@ -14,7 +15,6 @@ readability-redundant-*,
 readability-simplify-*,
 -modernize-deprecated-headers
 '
-WarningsAsErrors: '*'
 HeaderFilterRegex: 'catch.hpp'
 FormatStyle: 'file'
 CheckOptions:

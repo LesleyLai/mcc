@@ -36,20 +36,23 @@ static void compile_to_file(FILE* asm_file, const char* source)
 
 void compile(const char* asm_filename, const char* source)
 {
-  enum { buffer_size = 1000 };
-  char asm_filename_with_extension[buffer_size];
+  enum { temp_buffer_size = 1000 };
+  uint8_t* temp_buffer[temp_buffer_size];
+  Arena temp_arena = arena_init(temp_buffer, temp_buffer_size);
+  PolyAllocator allocator = poly_allocator_from_arena(&temp_arena);
 
   const StringView src_filename_sv = string_view_from_c_str(asm_filename);
-  if (!string_view_cat(src_filename_sv, string_view_from_c_str(".asm"),
-                       asm_filename_with_extension, buffer_size)) {
-    fprintf(stderr, "Filename too long: %.*s", (int)src_filename_sv.length,
-            src_filename_sv.start);
-    exit(1);
-  }
 
-  FILE* asm_file = fopen(asm_filename_with_extension, "w");
+  StringBuffer asm_filename_with_extension =
+      string_buffer_from_view(src_filename_sv, &allocator);
+  string_buffer_append(&asm_filename_with_extension,
+                       string_view_from_c_str(".asm"));
+
+  FILE* asm_file = fopen(asm_filename_with_extension.start, "w");
+
   if (!asm_file) {
-    fprintf(stderr, "Cannot open asm_file %s", asm_filename_with_extension);
+    fprintf(stderr, "Cannot open asm file %s",
+            asm_filename_with_extension.start);
     exit(1);
   }
 
