@@ -12,7 +12,7 @@ static Token lexer_make_token(const Lexer* lexer, TokenType type)
 {
   const int length = (int)(lexer->current - lexer->start);
   return (Token){
-      .src = {.start = lexer->start, .length = (size_t)length},
+      .src = {.start = lexer->start, .size = (size_t)length},
       .type = type,
       .location = {.line = lexer->line, .column = lexer->column - length}};
 }
@@ -80,8 +80,8 @@ static Token lexer_scan_number(Lexer* lexer)
 static TokenType check_keyword(Lexer* lexer, int start_position,
                                StringView rest, TokenType type)
 {
-  if (lexer->current - lexer->start == start_position + (int)rest.length &&
-      memcmp(lexer->start + start_position, rest.start, rest.length) == 0) {
+  if (lexer->current - lexer->start == start_position + (int)rest.size &&
+      memcmp(lexer->start + start_position, rest.start, rest.size) == 0) {
     return type;
   }
 
@@ -93,15 +93,15 @@ static TokenType lexer_get_identifier_type(Lexer* lexer)
   TokenType type = TOKEN_IDENTIFIER;
   switch (lexer->start[0]) {
   case 'v':
-    type = check_keyword(lexer, 1, (StringView){.start = "oid", .length = 3},
+    type = check_keyword(lexer, 1, (StringView){.start = "oid", .size = 3},
                          TOKEN_KEYWORD_VOID);
     break;
   case 'i':
-    type = check_keyword(lexer, 1, (StringView){.start = "nt", .length = 2},
+    type = check_keyword(lexer, 1, (StringView){.start = "nt", .size = 2},
                          TOKEN_KEYWORD_INT);
     break;
   case 'r':
-    type = check_keyword(lexer, 1, (StringView){.start = "eturn", .length = 5},
+    type = check_keyword(lexer, 1, (StringView){.start = "eturn", .size = 5},
                          TOKEN_KEYWORD_RETURN);
     break;
   }

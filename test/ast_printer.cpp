@@ -20,7 +20,7 @@ template <> struct fmt::formatter<StringView> : formatter<string_view> {
   template <typename FormatContext>
   auto format(StringView sv, FormatContext& ctx)
   {
-    string_view name{sv.start, sv.length};
+    string_view name{sv.start, sv.size};
     return formatter<string_view>::format(name, ctx);
   }
 };

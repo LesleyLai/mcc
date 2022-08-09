@@ -48,11 +48,11 @@ void compile(const char* asm_filename, const char* source)
   string_buffer_append(&asm_filename_with_extension,
                        string_view_from_c_str(".asm"));
 
-  FILE* asm_file = fopen(asm_filename_with_extension.start, "w");
+  FILE* asm_file = fopen(string_buffer_data(&asm_filename_with_extension), "w");
 
   if (!asm_file) {
     fprintf(stderr, "Cannot open asm file %s",
-            asm_filename_with_extension.start);
+            string_buffer_data(&asm_filename_with_extension));
     exit(1);
   }
 

@@ -41,7 +41,7 @@ static void parse_consume(Parser* parser, TokenType type, const char* error_msg)
 {
   if (parser->current.type != type) {
     parse_error_at(parser, error_msg, parser->current);
-    fprintf(stderr, "Gets %.*s\n", (int)parser->current.src.length,
+    fprintf(stderr, "Gets %.*s\n", (int)parser->current.src.size,
             parser->current.src.start);
   }
 
@@ -54,7 +54,7 @@ static Expr* parse_number_literal(Parser* parser)
 {
   const SourceLocation first_location = parser->previous.location;
   SourceLocation last_location = first_location;
-  last_location.column += (uint32_t)parser->previous.src.length;
+  last_location.column += (uint32_t)parser->previous.src.size;
 
   const int val = strtol(parser->previous.src.start, NULL,
                          10); // TODO(llai): replace strtol
@@ -240,8 +240,8 @@ static CompoundStmt* parse_compound_stmt(Parser* parser,
 
   const SourceLocation last_loc = {
       .line = parser->previous.location.line,
-      .column = parser->previous.location.column +
-                (int)parser->previous.src.length - 1,
+      .column =
+          parser->previous.location.column + (int)parser->previous.src.size - 1,
   };
 
   CompoundStmt* result = ARENA_ALLOC_OBJECT(parser->ast_arena, CompoundStmt);

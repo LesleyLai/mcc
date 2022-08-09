@@ -16,8 +16,7 @@ template <> struct fmt::formatter<StringView> : formatter<string_view> {
   template <typename FormatContext>
   auto format(StringView sv, FormatContext& ctx)
   {
-    return formatter<string_view>::format(string_view{sv.start, sv.length},
-                                          ctx);
+    return formatter<string_view>::format(string_view{sv.start, sv.size}, ctx);
   }
 };
 
