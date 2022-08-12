@@ -3,7 +3,7 @@
 
 extern "C" {
 #include "ast.h"
-};
+}
 
 #include <string>
 

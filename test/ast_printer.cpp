@@ -33,7 +33,7 @@ void print_to_string(std::string& buffer, const Expr& expr, int indentation)
                      expr.source_range);
   switch (expr.type) {
   case CONST_EXPR: {
-    const auto& const_expr = (const ConstExpr&)expr;
+    const auto& const_expr = reinterpret_cast<const ConstExpr&>(expr);
     indented_format_to(std::back_inserter(buffer), indentation + 2, "{}\n",
                        const_expr.val);
     return;
@@ -50,12 +50,13 @@ void print_to_string(std::string& buffer, const Stmt& stmt, int indentation)
   case RETURN_STMT:
     indented_format_to(std::back_inserter(buffer), indentation,
                        "ReturnStmt {}\n", stmt.source_range);
-    print_to_string(buffer, *((const ReturnStmt&)stmt).expr, indentation + 2);
+    print_to_string(buffer, *(reinterpret_cast<const ReturnStmt&>(stmt)).expr,
+                    indentation + 2);
     break;
   case COMPOUND_STMT:
     indented_format_to(std::back_inserter(buffer), indentation,
                        "CompoundStmt {}\n", stmt.source_range);
-    const auto& compound_stmt = (const CompoundStmt&)stmt;
+    const auto& compound_stmt = reinterpret_cast<const CompoundStmt&>(stmt);
     for (std::size_t i = 0; i < compound_stmt.statement_count; ++i) {
       print_to_string(buffer, *compound_stmt.statements[i], indentation + 2);
     }

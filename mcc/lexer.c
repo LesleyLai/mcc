@@ -10,11 +10,11 @@ static bool lexer_is_at_end(const Lexer* lexer)
 
 static Token lexer_make_token(const Lexer* lexer, TokenType type)
 {
-  const int length = (int)(lexer->current - lexer->start);
-  return (Token){
-      .src = {.start = lexer->start, .size = (size_t)length},
-      .type = type,
-      .location = {.line = lexer->line, .column = lexer->column - length}};
+  const size_t length = (size_t)(lexer->current - lexer->start);
+  return (Token){.src = {.start = lexer->start, .size = length},
+                 .type = type,
+                 .location = {.line = lexer->line,
+                              .column = (uint32_t)(lexer->column - length)}};
 }
 
 static Token lexer_error_token(const Lexer* lexer, StringView error_msg)

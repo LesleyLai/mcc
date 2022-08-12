@@ -21,7 +21,7 @@ static Byte* align_forward(Byte* ptr, size_t alignment)
 void* arena_aligned_alloc(Arena* arena, size_t alignment, size_t size)
 {
   Byte* aligned_ptr = align_forward(arena->ptr, alignment);
-  const size_t size_for_alignment = aligned_ptr - arena->ptr;
+  const size_t size_for_alignment = (size_t)(aligned_ptr - arena->ptr);
   const size_t bump_size = size_for_alignment + size;
   if (arena->size_remain < bump_size) { return NULL; }
 
@@ -33,7 +33,7 @@ void* arena_aligned_alloc(Arena* arena, size_t alignment, size_t size)
 void arena_reset(Arena* arena)
 {
   Byte* begin = (Byte*)arena->begin;
-  arena->size_remain += (arena->ptr - begin);
+  arena->size_remain += (size_t)(arena->ptr - begin);
   arena->ptr = begin;
 }
 

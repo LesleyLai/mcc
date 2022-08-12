@@ -8,10 +8,10 @@ extern "C" {
 
 TEST_CASE("String Buffer")
 {
-  constexpr auto size = 1000;
-  std::uint8_t buffer[size];
+  constexpr auto buffer_size = 1000;
+  std::uint8_t buffer[buffer_size];
 
-  Arena arena = arena_init(buffer, size);
+  Arena arena = arena_init(buffer, buffer_size);
   PolyAllocator poly_allocator = poly_allocator_from_arena(&arena);
 
   SECTION("String buffer push")
@@ -23,9 +23,9 @@ TEST_CASE("String Buffer")
     REQUIRE(string_buffer_capacity(string) == small_string_capacity);
     REQUIRE(string_buffer_size(string) == 1);
     REQUIRE(string_buffer_data(&string)[0] == 'a');
-    REQUIRE(string_view_eq(string_view_from_buffer(string),
+    REQUIRE(string_view_eq(string_view_from_buffer(&string),
                            string_view_from_c_str("a")));
-    REQUIRE(!string_view_eq(string_view_from_buffer(string),
+    REQUIRE(!string_view_eq(string_view_from_buffer(&string),
                             string_view_from_c_str("")));
   }
 
@@ -55,7 +55,16 @@ TEST_CASE("String Buffer")
       auto string = string_buffer_from_c_str("Hello, ", &poly_allocator);
       string_buffer_append(&string, string_view_from_c_str("world!"));
 
-      REQUIRE(string_view_eq(string_view_from_buffer(string),
+      //      auto sv = string_view_from_c_str("Hello, world!");
+      //      fmt::print("{}\n", sv.size);
+      //      fmt::print("{}\n", string_buffer_size(string));
+      //
+      //      for (int i = 0; i < 13; ++i) {
+      //        fmt::print("{}:{}\n", sv.start[i],
+      //        string_buffer_data(&string)[i]);
+      //      }
+
+      REQUIRE(string_view_eq(string_view_from_buffer(&string),
                              string_view_from_c_str("Hello, world!")));
     }
 
@@ -67,7 +76,7 @@ TEST_CASE("String Buffer")
                                "from this really really really weird string!"));
 
       REQUIRE(string_view_eq(
-          string_view_from_buffer(string),
+          string_view_from_buffer(&string),
           string_view_from_c_str(
               "Hello from this really really really weird string!")));
     }
@@ -79,7 +88,7 @@ TEST_CASE("String Buffer")
       string_buffer_append(&string, string_view_from_c_str("weird string!"));
 
       REQUIRE(string_view_eq(
-          string_view_from_buffer(string),
+          string_view_from_buffer(&string),
           string_view_from_c_str(
               "Hello from this really really really weird string!")));
     }

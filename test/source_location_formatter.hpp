@@ -5,7 +5,7 @@
 
 extern "C" {
 #include "source_location.h"
-};
+}
 
 template <> struct fmt::formatter<SourceLocation> : formatter<string_view> {
   // parse is inherited from formatter<string_view>.

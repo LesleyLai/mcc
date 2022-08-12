@@ -56,8 +56,8 @@ static Expr* parse_number_literal(Parser* parser)
   SourceLocation last_location = first_location;
   last_location.column += (uint32_t)parser->previous.src.size;
 
-  const int val = strtol(parser->previous.src.start, NULL,
-                         10); // TODO(llai): replace strtol
+  const int val = (int)strtol(parser->previous.src.start, NULL,
+                              10); // TODO(llai): replace strtol
 
   ConstExpr* result = ARENA_ALLOC_OBJECT(parser->ast_arena, ConstExpr);
   *result = (ConstExpr){
@@ -135,8 +135,8 @@ static Expr* parse_precedence(Parser* parser, Precedence precedence)
 
   while (precedence <= get_rule(parser->current.type)->precedence) {
     parse_advance(parser);
-    ParseFn infix_rule = get_rule(parser->previous.type)->infix;
-    Expr* rhs = infix_rule(parser);
+    // ParseFn infix_rule = get_rule(parser->previous.type)->infix;
+    //  Expr* rhs = infix_rule(parser);
   }
 
   return expr;
@@ -167,14 +167,14 @@ static Expr* parse_binary_op(Parser* parser)
   const ParseRule* rule = get_rule(operator_type);
   parse_precedence(parser, (Precedence)(rule->precedence + 1));
 
-  BinaryOpType binary_op_type;
-  switch (operator_type) {
-  case TOKEN_PLUS: binary_op_type = BINARY_OP_PLUS; break;
-  case TOKEN_MINUS: binary_op_type = BINARY_OP_MINUS; break;
-  case TOKEN_STAR: binary_op_type = BINARY_OP_MULT; break;
-  case TOKEN_SLASH: binary_op_type = BINARY_OP_DIVIDE; break;
-  default: return NULL; // TODO: better error reporting for unreachable
-  }
+  //  BinaryOpType binary_op_type;
+  //  switch (operator_type) {
+  //  case TOKEN_PLUS: binary_op_type = BINARY_OP_PLUS; break;
+  //  case TOKEN_MINUS: binary_op_type = BINARY_OP_MINUS; break;
+  //  case TOKEN_STAR: binary_op_type = BINARY_OP_MULT; break;
+  //  case TOKEN_SLASH: binary_op_type = BINARY_OP_DIVIDE; break;
+  //  default: return NULL; // TODO: better error reporting for unreachable
+  //  }
 
   return NULL;
 }
@@ -240,8 +240,8 @@ static CompoundStmt* parse_compound_stmt(Parser* parser,
 
   const SourceLocation last_loc = {
       .line = parser->previous.location.line,
-      .column =
-          parser->previous.location.column + (int)parser->previous.src.size - 1,
+      .column = (uint32_t)(parser->previous.location.column +
+                           parser->previous.src.size - 1),
   };
 
   CompoundStmt* result = ARENA_ALLOC_OBJECT(parser->ast_arena, CompoundStmt);

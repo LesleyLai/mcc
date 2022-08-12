@@ -76,10 +76,16 @@ static size_t _string_buffer_size_large(StringBuffer self)
   return self.data_.large_.size_with_bit_mark_ >> 1;
 }
 
-StringView string_view_from_buffer(StringBuffer buffer)
+StringView string_view_from_buffer(const StringBuffer* buffer)
 {
-  return (StringView){.start = string_buffer_data(&buffer),
-                      .size = string_buffer_size(buffer)};
+  return (StringView){.start = string_buffer_const_data(buffer),
+                      .size = string_buffer_size(*buffer)};
+}
+
+const char* string_buffer_const_data(const StringBuffer* self)
+{
+  return _string_buffer_is_large(*self) ? self->data_.large_.data_
+                                        : self->data_.small_.data_;
 }
 
 char* string_buffer_data(StringBuffer* self)
