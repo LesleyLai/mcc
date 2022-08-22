@@ -90,22 +90,18 @@ static TokenType check_keyword(Lexer* lexer, int start_position,
 
 static TokenType lexer_get_identifier_type(Lexer* lexer)
 {
-  TokenType type = TOKEN_IDENTIFIER;
   switch (lexer->start[0]) {
   case 'v':
-    type = check_keyword(lexer, 1, (StringView){.start = "oid", .size = 3},
+    return check_keyword(lexer, 1, (StringView){.start = "oid", .size = 3},
                          TOKEN_KEYWORD_VOID);
-    break;
   case 'i':
-    type = check_keyword(lexer, 1, (StringView){.start = "nt", .size = 2},
+    return check_keyword(lexer, 1, (StringView){.start = "nt", .size = 2},
                          TOKEN_KEYWORD_INT);
-    break;
   case 'r':
-    type = check_keyword(lexer, 1, (StringView){.start = "eturn", .size = 5},
+    return check_keyword(lexer, 1, (StringView){.start = "eturn", .size = 5},
                          TOKEN_KEYWORD_RETURN);
-    break;
+  default: return TOKEN_IDENTIFIER;
   }
-  return type;
 }
 
 static Token lexer_scan_identifier(Lexer* lexer)

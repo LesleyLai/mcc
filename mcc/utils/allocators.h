@@ -32,7 +32,8 @@ typedef unsigned char Byte;
 
 typedef struct Arena {
   void* begin;
-  Byte* ptr;
+  Byte* previous;
+  Byte* current;
   size_t size_remain;
 } Arena;
 
@@ -40,19 +41,22 @@ static inline Arena arena_init(void* buffer, size_t size)
 {
   Arena arena = {
       .begin = buffer,
-      .ptr = (Byte*)buffer,
+      .previous = NULL,
+      .current = (Byte*)buffer,
       .size_remain = size,
   };
   return arena;
 }
 
-// Reset the arena and the underlying buffer can be reused later
 void arena_reset(Arena* arena);
-
-// Allocate size bytes of uninitialized storage whose alignment is specified by
-// alignment from the arena. The size parameter must be an integral multiple of
-// alignment. If the arena doesn't have enough memory, returns NULL
 void* arena_aligned_alloc(Arena* arena, size_t alignment, size_t size);
+void* arena_aligned_grow(Arena* arena, void* p, size_t new_alignment,
+                         size_t new_size);
+void* arena_aligned_shrink(Arena* arena, void* p, size_t new_alignment,
+                           size_t new_size);
+
+// void* arena_aligned_realloc(Arena* arena, void* p, size_t alignment,
+//                             size_t new_size);
 
 #if !defined(__cplusplus) && !defined(alignof)
 #define alignof _Alignof
@@ -63,6 +67,12 @@ void* arena_aligned_alloc(Arena* arena, size_t alignment, size_t size);
 
 #define ARENA_ALLOC_ARRAY(arena, Type, n)                                      \
   arena_aligned_alloc((arena), alignof(Type), sizeof(Type) * (n))
+
+#define ARENA_GROW_ARRAY(arena, Type, p, n)                                    \
+  arena_aligned_grow((arena), (p), alignof(Type), sizeof(Type) * (n))
+
+#define ARENA_SHRINK_ARRAY(arena, Type, p, n)                                  \
+  arena_aligned_shrink((arena), (p), alignof(Type), sizeof(Type) * (n))
 
 PolyAllocator poly_allocator_from_arena(Arena* arena);
 

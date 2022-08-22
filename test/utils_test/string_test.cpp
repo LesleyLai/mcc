@@ -55,15 +55,6 @@ TEST_CASE("String Buffer")
       auto string = string_buffer_from_c_str("Hello, ", &poly_allocator);
       string_buffer_append(&string, string_view_from_c_str("world!"));
 
-      //      auto sv = string_view_from_c_str("Hello, world!");
-      //      fmt::print("{}\n", sv.size);
-      //      fmt::print("{}\n", string_buffer_size(string));
-      //
-      //      for (int i = 0; i < 13; ++i) {
-      //        fmt::print("{}:{}\n", sv.start[i],
-      //        string_buffer_data(&string)[i]);
-      //      }
-
       REQUIRE(string_view_eq(string_view_from_buffer(&string),
                              string_view_from_c_str("Hello, world!")));
     }
