@@ -71,7 +71,7 @@ void assemble(const char* asm_filename, const char* obj_filename)
   snprintf(buffer, buffer_size, "yasm -fwin64 %s.asm -o %s.obj", asm_filename,
            obj_filename);
 #else // linux
-  snprintf(buffer, buffer_size, "yasm -felf64 %.*s.asm -o %.*s.o", asm_filename,
+  snprintf(buffer, buffer_size, "yasm -felf64 %s.asm -o %s.o", asm_filename,
            obj_filename);
 #endif
 
@@ -100,8 +100,8 @@ char* file_to_allocated_buffer(FILE* file)
   const long length = ftell(file);
 
   fseek(file, 0, SEEK_SET);
-  char* buffer = malloc(length + 1);
-  fread(buffer, 1, length, file); // TODO: check result of fread
+  char* buffer = malloc((unsigned long)(length + 1));
+  fread(buffer, 1, (unsigned long)length, file); // TODO: check result of fread
   buffer[length] = '\0';
   return buffer;
 }
@@ -116,7 +116,8 @@ int main(int argc, char* argv[])
 
   FILE* src_file = fopen(src_filename_with_extension, "rb");
   if (!src_file) {
-    fprintf(stderr, "Cannot open source file %s", src_filename_with_extension);
+    fprintf(stderr, "Mcc: fatal error: %s: No such file",
+            src_filename_with_extension);
     exit(1);
   }
 

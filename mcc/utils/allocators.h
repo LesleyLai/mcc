@@ -12,6 +12,10 @@ typedef struct PolyAllocator {
   void* user_data;
   void* (*aligned_alloc)(const PolyAllocator* self, size_t alignment,
                          size_t size);
+  void* (*aligned_grow)(const PolyAllocator* self, void* p,
+                        size_t new_alignment, size_t new_size);
+  void* (*aligned_shrink)(const PolyAllocator* self, void* p,
+                          size_t new_alignment, size_t new_size);
 } PolyAllocator;
 
 #if !defined(__cplusplus) && !defined(alignof)
@@ -22,6 +26,10 @@ typedef struct PolyAllocator {
 // integral multiple of alignment.
 void* poly_aligned_alloc(const PolyAllocator* allocator, size_t alignment,
                          size_t size);
+void* poly_aligned_grow(const PolyAllocator* allocator, void* p,
+                        size_t new_alignment, size_t new_size);
+void* poly_aligned_shrink(const PolyAllocator* allocator, void* p,
+                          size_t new_alignment, size_t new_size);
 
 #define POLY_ALLOC_OBJECT(allocator, Type)                                     \
   poly_aligned_alloc((allocator), alignof(Type), sizeof(Type))
@@ -54,9 +62,6 @@ void* arena_aligned_grow(Arena* arena, void* p, size_t new_alignment,
                          size_t new_size);
 void* arena_aligned_shrink(Arena* arena, void* p, size_t new_alignment,
                            size_t new_size);
-
-// void* arena_aligned_realloc(Arena* arena, void* p, size_t alignment,
-//                             size_t new_size);
 
 #if !defined(__cplusplus) && !defined(alignof)
 #define alignof _Alignof

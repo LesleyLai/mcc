@@ -11,6 +11,18 @@ void* poly_aligned_alloc(const PolyAllocator* allocator, size_t alignment,
   return allocator->aligned_alloc(allocator, alignment, size);
 }
 
+void* poly_aligned_grow(const PolyAllocator* allocator, void* p,
+                        size_t new_alignment, size_t new_size)
+{
+  return allocator->aligned_grow(allocator, p, new_alignment, new_size);
+}
+
+void* poly_aligned_shrink(const PolyAllocator* allocator, void* p,
+                          size_t new_alignment, size_t new_size)
+{
+  return allocator->aligned_shrink(allocator, p, new_alignment, new_size);
+}
+
 // Given a pointer current, returns a pointer aligned by the specified alignment
 // The returned pointer always have higher address than the original pointer
 static Byte* align_forward(Byte* ptr, size_t alignment)
@@ -75,7 +87,7 @@ void* arena_aligned_grow(Arena* arena, void* p, size_t new_alignment,
 {
   if (p != arena->previous || arena->size_remain < new_size) return NULL;
   Byte* aligned_ptr = align_forward(arena->previous, new_alignment);
-  const size_t old_size = arena->current - arena->previous;
+  const size_t old_size = (size_t)(arena->current - arena->previous);
   assert(old_size < new_size);
 
   if (p != aligned_ptr) {
@@ -96,7 +108,7 @@ void* arena_aligned_shrink(Arena* arena, void* p, size_t new_alignment,
                            size_t new_size)
 {
   Byte* aligned_ptr = align_forward(arena->previous, new_alignment);
-  const size_t old_size = arena->current - arena->previous;
+  const size_t old_size = (size_t)(arena->current - arena->previous);
 
   assert(old_size >= new_size);
   if (p != arena->previous || old_size < new_size || p != aligned_ptr) {
@@ -124,8 +136,24 @@ static void* arena_poly_aligned_alloc(const PolyAllocator* self,
   return arena_aligned_alloc((Arena*)self->user_data, alignment, size);
 }
 
+static void* arena_poly_aligned_grow(const PolyAllocator* self, void* p,
+                                     size_t new_alignment, size_t new_size)
+{
+  return arena_aligned_grow((Arena*)self->user_data, p, new_alignment,
+                            new_size);
+}
+
+static void* arena_poly_aligned_shrink(const PolyAllocator* self, void* p,
+                                       size_t new_alignment, size_t new_size)
+{
+  return arena_aligned_shrink((Arena*)self->user_data, p, new_alignment,
+                              new_size);
+}
+
 PolyAllocator poly_allocator_from_arena(Arena* arena)
 {
   return (PolyAllocator){.user_data = arena,
-                         .aligned_alloc = arena_poly_aligned_alloc};
+                         .aligned_alloc = arena_poly_aligned_alloc,
+                         .aligned_grow = arena_poly_aligned_grow,
+                         .aligned_shrink = arena_poly_aligned_shrink};
 }

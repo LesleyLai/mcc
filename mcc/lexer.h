@@ -46,7 +46,7 @@ typedef struct Token {
   SourceLocation location;
 } Token;
 
-inline Lexer lexer_create(const char* source)
+static inline Lexer lexer_create(const char* source)
 {
   Lexer lexer;
   lexer.start = source;

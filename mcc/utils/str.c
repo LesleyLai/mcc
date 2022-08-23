@@ -112,10 +112,9 @@ static void _string_buffer_grow_large(StringBuffer* self, size_t new_capacity)
   assert(new_capacity > self->data_.large_.capacity_ ||
          new_capacity > small_string_capacity);
   self->data_.large_.capacity_ = new_capacity;
-  char* new_data =
-      poly_aligned_alloc(self->allocator, alignof(char), new_capacity + 1);
-  memcpy(new_data, self->data_.large_.data_, _string_buffer_size_large(*self));
-  self->data_.large_.data_ = new_data;
+  self->data_.large_.data_ =
+      poly_aligned_grow(self->allocator, self->data_.large_.data_,
+                        alignof(char), new_capacity + 1);
 }
 
 static void _string_buffer_push_small(StringBuffer* self, char c)
@@ -128,7 +127,6 @@ static void _string_buffer_push_small(StringBuffer* self, char c)
     self->data_.small_.size_with_bit_mark_ += 2;
   } else {
     // small to large
-
     size_t new_capacity = small_string_capacity * 2;
     char* new_start =
         poly_aligned_alloc(self->allocator, alignof(char), new_capacity + 1);
