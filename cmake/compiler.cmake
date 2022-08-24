@@ -4,10 +4,14 @@ add_library(mcc::compiler_warnings ALIAS mcc_compiler_warnings)
 add_library(mcc_compiler_options INTERFACE)
 add_library(mcc::compiler_options ALIAS mcc_compiler_options)
 
+include(CMakeDependentOption)
+cmake_dependent_option(MCC_WARNING_AS_ERROR "Treats compiler warnings as errors" ON MCC_ENABLE_DEVELOPER_MODE OFF)
+cmake_dependent_option(MCC_USE_ASAN "Enable the Address Sanitizers" ON MCC_ENABLE_DEVELOPER_MODE OFF)
+cmake_dependent_option(MCC_USE_TSAN "Enable the Thread Sanitizers" OFF MCC_ENABLE_DEVELOPER_MODE OFF)
+cmake_dependent_option(MCC_USE_MSAN "Enable the Memory Sanitizers" OFF MCC_ENABLE_DEVELOPER_MODE OFF)
+cmake_dependent_option(MCC_USE_UBSAN "Enable the Undefined Behavior Sanitizers" ON MCC_ENABLE_DEVELOPER_MODE OFF)
 
 # Compiler specific settings
-
-option(MCC_WARNING_AS_ERROR "Treats compiler warnings as errors" ON)
 if (MSVC)
     target_compile_options(mcc_compiler_warnings
             INTERFACE
@@ -53,7 +57,6 @@ elseif (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     endif ()
 endif ()
 
-option(MCC_USE_ASAN "Enable the Address Sanitizers" OFF)
 if (MCC_USE_ASAN)
     message("Enable Address Sanitizer")
     target_compile_options(mcc_compiler_options INTERFACE
@@ -62,7 +65,6 @@ if (MCC_USE_ASAN)
             -fsanitize=address)
 endif ()
 
-option(MCC_USE_TSAN "Enable the Thread Sanitizers" OFF)
 if (MCC_USE_TSAN)
     message("Enable Thread Sanitizer")
     target_compile_options(mcc_compiler_options INTERFACE
@@ -71,7 +73,6 @@ if (MCC_USE_TSAN)
             -fsanitize=thread)
 endif ()
 
-option(MCC_USE_MSAN "Enable the Memory Sanitizers" OFF)
 if (MCC_USE_MSAN)
     message("Enable Memory Sanitizer")
     target_compile_options(mcc_compiler_options INTERFACE
@@ -80,7 +81,6 @@ if (MCC_USE_MSAN)
             -fsanitize=memory)
 endif ()
 
-option(MCC_USE_UBSAN "Enable the Undefined Behavior Sanitizers" OFF)
 if (MCC_USE_UBSAN)
     message("Enable Undefined Behavior Sanitizer ")
     target_compile_options(mcc_compiler_options INTERFACE

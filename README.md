@@ -6,7 +6,8 @@ Working-in-progress C compiler written in C. My goal is to make it able to self-
 
 ### Requirement
 
-Conan package manager is required for tools. It is not required for the mcc compiler itself (which has no dependencies).
+Conan package manager is required for tools and tests. It is not required for the mcc compiler itself (which has no
+dependencies).
 
 ## Run
 

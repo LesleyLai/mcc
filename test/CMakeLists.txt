@@ -13,3 +13,4 @@ add_executable(mcc_test
         utils_test/string_test.cpp)
 target_link_libraries(mcc_test PUBLIC mcc_lib mcc::compiler_warnings Catch2::Catch2 fmt::fmt ApprovalTests::ApprovalTests)
 
+add_test(NAME mcc COMMAND mcc_test)

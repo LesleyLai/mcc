@@ -8,6 +8,11 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# The "developer mode" is a one-stop setting that
+# - enables address and UB sanitizers when possible
+# - treats warning as errors
+set(MCC_ENABLE_DEVELOPER_MODE FALSE CACHE BOOL "Enable 'developer mode'")
+
 include("cmake/compiler.cmake")
 
 add_subdirectory(mcc)
