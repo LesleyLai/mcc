@@ -18,14 +18,14 @@ static void compile_to_file(FILE* asm_file, const char* source)
   }
 
   if (main_func->body->statement_count != 1 ||
-      main_func->body->statements[0]->type != RETURN_STMT) {
+      main_func->body->statements[0].type != RETURN_STMT) {
     // TODO: Not support yet
     fprintf(stderr, "MCC does not support this kind of program yet");
     return;
   }
 
   const int return_value =
-      ((ConstExpr*)((ReturnStmt*)main_func->body->statements[0])->expr)->val;
+      main_func->body->statements[0].ret.expr->const_expr.val;
 
   fputs("section .text\n", asm_file);
   fputs("global main\n", asm_file);
@@ -75,7 +75,10 @@ void assemble(const char* asm_filename, const char* obj_filename)
            obj_filename);
 #endif
 
-  system(buffer);
+  if (system(buffer)) {
+    fprintf(stderr, "Failed to call the assembler");
+    exit(1);
+  }
 }
 
 void link(const char* obj_filename, const char* executable_name)
@@ -91,7 +94,10 @@ void link(const char* obj_filename, const char* executable_name)
            "ld -lc %s.o -o %s -I /lib64/ld-linux-x86-64.so.2", obj_filename,
            executable_name);
 #endif
-  system(buffer);
+  if (system(buffer)) {
+    fprintf(stderr, "Failed to call the linker");
+    exit(1);
+  }
 }
 
 char* file_to_allocated_buffer(FILE* file)
@@ -101,7 +107,12 @@ char* file_to_allocated_buffer(FILE* file)
 
   fseek(file, 0, SEEK_SET);
   char* buffer = malloc((unsigned long)(length + 1));
-  fread(buffer, 1, (unsigned long)length, file); // TODO: check result of fread
+  size_t read_res = fread(buffer, 1, (unsigned long)length,
+                          file); // TODO: check result of fread
+  if (read_res != (unsigned long)length) {
+    fprintf(stderr, "Error during reading file");
+    exit(1);
+  }
   buffer[length] = '\0';
   return buffer;
 }

@@ -30,8 +30,8 @@ template <> struct fmt::formatter<Token> {
 
   auto format(Token token, auto& ctx)
   {
-    return format_to(ctx.out(), "{} {} \"{}\"", token.type, token.location,
-                     token.src);
+    return fmt::format_to(ctx.out(), "{} {} \"{}\"", token.type, token.location,
+                          token.src);
   }
 };
 

@@ -8,16 +8,6 @@
 
 typedef enum ExprType { CONST_EXPR, BINARY_OP_EXPR } ExprType;
 
-typedef struct Expr {
-  SourceRange source_range;
-  ExprType type;
-} Expr;
-
-typedef struct ConstExpr {
-  Expr base;
-  int val;
-} ConstExpr;
-
 typedef enum BinaryOpType {
   BINARY_OP_PLUS,
   BINARY_OP_MINUS,
@@ -25,30 +15,48 @@ typedef enum BinaryOpType {
   BINARY_OP_DIVIDE
 } BinaryOpType;
 
-typedef struct BinaryOpExpr {
-  Expr base;
+typedef struct Expr Expr;
+
+struct ConstExpr {
+  int val;
+};
+
+struct BinaryOpExpr {
   BinaryOpType binary_op_type;
   Expr* lhs;
   Expr* rhs;
-} BinaryOp;
+};
+
+typedef struct Expr {
+  SourceRange source_range;
+  ExprType type;
+  union {
+    struct ConstExpr const_expr;
+    struct BinaryOpExpr binary_op;
+  };
+} Expr;
 
 typedef enum StatementType { COMPOUND_STMT, RETURN_STMT } StatementType;
+
+typedef struct Stmt Stmt;
+
+typedef struct CompoundStmt {
+  size_t statement_count;
+  Stmt* statements;
+} CompoundStmt;
+
+typedef struct ReturnStmt {
+  Expr* expr;
+} ReturnStmt;
 
 typedef struct Stmt {
   SourceRange source_range;
   StatementType type;
+  union {
+    CompoundStmt compound;
+    ReturnStmt ret;
+  };
 } Stmt;
-
-typedef struct CompoundStmt {
-  Stmt base;
-  size_t statement_count;
-  Stmt** statements;
-} CompoundStmt;
-
-typedef struct ReturnStmt {
-  Stmt base;
-  Expr* expr;
-} ReturnStmt;
 
 typedef struct FunctionDecl {
   SourceRange source_range;

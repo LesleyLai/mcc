@@ -1,31 +1,26 @@
 name: ci
 on:
   pull_request:
-  #  release:
-  #    types: [published]
+    types: [ opened, reopened ]
   push:
     branches:
-      - main
-      - develop
+      - '**' # every branches
 
 env:
   # Conan cache environment variables
   CONAN_SYSREQUIRES_MODE: enabled
   CONAN_USER_HOME: "${{ github.workspace }}/conan-cache"
   CONAN_USER_HOME_SHORT: "${{ github.workspace }}/conan-cache/short"
-  CLANG_TIDY_VERSION: "13.0.0"
 
 jobs:
   Test:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
-
       matrix:
         os:
           - ubuntu-20.04
           - macos-10.15
-          - windows-2019
         compiler:
           - llvm-13.0.0
           - gcc-11
@@ -39,9 +34,8 @@ jobs:
           - OFF
 
         exclude:
-          # mingw is determined by this author to be too buggy to support
-          - os: windows-2019
-            compiler: gcc-11
+          - compiler: gcc-11
+            os: macos-10.15
 
         include:
           # Add appropriate variables for gcov version required. This will intentionally break
@@ -92,13 +86,6 @@ jobs:
 
 
     steps:
-      - name: Check for llvm version mismatches
-        if: ${{ contains(matrix.compiler, 'llvm') && !contains(matrix.compiler, env.CLANG_TIDY_VERSION) }}
-        uses: actions/github-script@v3
-        with:
-          script: |
-            core.setFailed('There is a mismatch between configured llvm compiler and clang-tidy version chosen')
-
       - uses: actions/checkout@v2
 
       - name: Setup Cache
@@ -114,17 +101,11 @@ jobs:
         with:
           compiler: ${{ matrix.compiler }}
           vcvarsall: ${{ contains(matrix.os, 'windows' )}}
-
           cmake: true
           ninja: true
           conan: true
           vcpkg: false
           ccache: true
-          clangtidy: ${{ env.CLANG_TIDY_VERSION }}
-
-
-          cppcheck: true
-
           gcovr: true
           opencppcoverage: true
 
@@ -149,7 +130,7 @@ jobs:
         # Execute tests defined by the CMake configuration.
         # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
         run: |
-          ctest -C ${{matrix.build_type}}
+          ctest -C ${{matrix.build_type}} --output-on-failure
           gcovr -j ${{env.nproc}} --delete --root ../ --print-summary --xml-pretty --xml coverage.xml . --gcov-executable '${{ matrix.gcov_executable }}'
 
       - name: Windows - Test and coverage
@@ -162,7 +143,7 @@ jobs:
       #   if: matrix.package_generator != ''
       #   working-directory: ./build
       #   run: |
-      #     cpack -C ${{matrix.build_type}} -G ${{matrix.package_generator}}
+      #     cpack -C ${{matrix.build_type}} -G ${{matfrix.package_generator}}
 
       # - name: Publish Tagged Release
       #   uses: softprops/action-gh-release@v1
@@ -170,7 +151,6 @@ jobs:
       #   with:
       #     files: |
       #       build/*-*${{ matrix.build_type }}*-*.*
-
 
       # - name: Publish to codecov
       #   uses: codecov/codecov-action@v2

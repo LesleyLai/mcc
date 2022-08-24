@@ -59,32 +59,40 @@ endif ()
 
 if (MCC_USE_ASAN)
     message("Enable Address Sanitizer")
-    target_compile_options(mcc_compiler_options INTERFACE
-            -fsanitize=address -fno-omit-frame-pointer)
-    target_link_libraries(mcc_compiler_options INTERFACE
-            -fsanitize=address)
+    if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(mcc_compiler_options INTERFACE
+                -fsanitize=address -fno-omit-frame-pointer)
+        target_link_libraries(mcc_compiler_options INTERFACE
+                -fsanitize=address)
+    endif ()
 endif ()
 
 if (MCC_USE_TSAN)
     message("Enable Thread Sanitizer")
-    target_compile_options(mcc_compiler_options INTERFACE
-            -fsanitize=thread)
-    target_link_libraries(mcc_compiler_options INTERFACE
-            -fsanitize=thread)
+    if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(mcc_compiler_options INTERFACE
+                -fsanitize=thread)
+        target_link_libraries(mcc_compiler_options INTERFACE
+                -fsanitize=thread)
+    endif ()
 endif ()
 
 if (MCC_USE_MSAN)
     message("Enable Memory Sanitizer")
-    target_compile_options(mcc_compiler_options INTERFACE
-            -fsanitize=memory -fno-omit-frame-pointer)
-    target_link_libraries(mcc_compiler_options INTERFACE
-            -fsanitize=memory)
+    if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(mcc_compiler_options INTERFACE
+                -fsanitize=memory -fno-omit-frame-pointer)
+        target_link_libraries(mcc_compiler_options INTERFACE
+                -fsanitize=memory)
+    endif ()
 endif ()
 
 if (MCC_USE_UBSAN)
     message("Enable Undefined Behavior Sanitizer ")
-    target_compile_options(mcc_compiler_options INTERFACE
-            -fsanitize=undefined)
-    target_link_libraries(mcc_compiler_options INTERFACE
-            -fsanitize=undefined)
+    if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(mcc_compiler_options INTERFACE
+                -fsanitize=undefined)
+        target_link_libraries(mcc_compiler_options INTERFACE
+                -fsanitize=undefined)
+    endif ()
 endif ()

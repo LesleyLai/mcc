@@ -33,9 +33,8 @@ void print_to_string(std::string& buffer, const Expr& expr, int indentation)
                      expr.source_range);
   switch (expr.type) {
   case CONST_EXPR: {
-    const auto& const_expr = reinterpret_cast<const ConstExpr&>(expr);
     indented_format_to(std::back_inserter(buffer), indentation + 2, "{}\n",
-                       const_expr.val);
+                       expr.const_expr.val);
     return;
   }
   case BINARY_OP_EXPR:
@@ -44,23 +43,30 @@ void print_to_string(std::string& buffer, const Expr& expr, int indentation)
   }
 }
 
+void print_to_string(std::string& buffer, const CompoundStmt& stmt,
+                     int indentation);
+
 void print_to_string(std::string& buffer, const Stmt& stmt, int indentation)
 {
   switch (stmt.type) {
   case RETURN_STMT:
     indented_format_to(std::back_inserter(buffer), indentation,
                        "ReturnStmt {}\n", stmt.source_range);
-    print_to_string(buffer, *(reinterpret_cast<const ReturnStmt&>(stmt)).expr,
-                    indentation + 2);
+    print_to_string(buffer, *stmt.ret.expr, indentation + 2);
     break;
   case COMPOUND_STMT:
     indented_format_to(std::back_inserter(buffer), indentation,
                        "CompoundStmt {}\n", stmt.source_range);
-    const auto& compound_stmt = reinterpret_cast<const CompoundStmt&>(stmt);
-    for (std::size_t i = 0; i < compound_stmt.statement_count; ++i) {
-      print_to_string(buffer, *compound_stmt.statements[i], indentation + 2);
-    }
+    print_to_string(buffer, stmt.compound, indentation + 2);
     break;
+  }
+}
+
+void print_to_string(std::string& buffer, const CompoundStmt& compound,
+                     int indentation)
+{
+  for (std::size_t i = 0; i < compound.statement_count; ++i) {
+    print_to_string(buffer, compound.statements[i], indentation);
   }
 }
 
@@ -70,7 +76,7 @@ void print_to_string(std::string& buffer, const FunctionDecl& decl,
   indented_format_to(std::back_inserter(buffer), indentation,
                      "FunctionDecl <{}(void) -> int> {}\n", decl.name,
                      decl.source_range);
-  if (decl.body) { print_to_string(buffer, decl.body->base, indentation + 2); }
+  if (decl.body) { print_to_string(buffer, *decl.body, indentation + 2); }
 }
 
 } // namespace mcc
