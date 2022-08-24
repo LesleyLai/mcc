@@ -7,13 +7,6 @@
 
 #include "allocators.h"
 
-// Circumvent C/C++ incompatibility of compound literal
-#ifdef __cplusplus
-#define MCC_COMPOUND_LITERAL(T) T
-#else
-#define MCC_COMPOUND_LITERAL(T) (T)
-#endif
-
 typedef struct StringView {
   const char* start;
   size_t size;

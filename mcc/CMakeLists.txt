@@ -6,7 +6,7 @@ add_library(mcc_lib
         utils/allocators.h
         ast.h
         parser.h
-        parser.c utils/str.c source_location.h utils/defer.h)
+        parser.c utils/str.c source_location.h utils/defer.h utils/prelude.h)
 target_link_libraries(mcc_lib
         PUBLIC mcc::compiler_options
         PRIVATE mcc::compiler_warnings)

@@ -3,6 +3,16 @@
 
 #include "lexer.h"
 
+Lexer lexer_create(const char* source)
+{
+  return (Lexer){
+      .start = source,
+      .current = source,
+      .line = 1,
+      .column = 1,
+  };
+}
+
 static bool lexer_is_at_end(const Lexer* lexer)
 {
   return *lexer->current == '\0';

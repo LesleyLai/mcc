@@ -46,16 +46,7 @@ typedef struct Token {
   SourceLocation location;
 } Token;
 
-static inline Lexer lexer_create(const char* source)
-{
-  Lexer lexer;
-  lexer.start = source;
-  lexer.current = source;
-  lexer.line = 1;
-  lexer.column = 1;
-  return lexer;
-}
-
+Lexer lexer_create(const char* source);
 Token lexer_scan_token(Lexer* lexer);
 
 #endif // MCC_LEXER_H

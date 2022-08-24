@@ -24,17 +24,20 @@ elseif (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
             INTERFACE -Wall
             -Wextra
             -Wshadow
-            -Wnon-virtual-dtor
-            -Wold-style-cast
             -Wcast-align
             -Wunused
-            -Woverloaded-virtual
             -Wpedantic
             -Wconversion
             -Wsign-conversion
             -Wnull-dereference
             -Wdouble-promotion
-            -Wformat=2)
+            -Wformat=2
+            $<$<COMPILE_LANGUAGE:CXX>:
+            -Wnon-virtual-dtor
+            -Wold-style-cast
+            -Woverloaded-virtual
+            >
+            )
     if (MCC_WARNING_AS_ERROR)
         target_compile_options(mcc_compiler_warnings INTERFACE -Werror)
     endif ()

@@ -198,7 +198,6 @@ static void _string_buffer_append_large(StringBuffer* self, StringView rhs)
   if (new_size > old_capacity) { _string_buffer_grow_large(self, new_size); }
   memcpy(self->data_.large_.data_ + old_size, rhs.start, rhs.size);
   self->data_.large_.data_[new_size] = '\0';
-
   self->data_.large_.size_with_bit_mark_ = new_size << 1;
   _string_buffer_mark_large(self);
 }

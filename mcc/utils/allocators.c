@@ -5,6 +5,11 @@
 #include <stdint.h>
 #include <string.h>
 
+/**
+ * @brief // Allocate size bytes of uninitialized storage.
+ *
+ * The size parameter must be an integral multiple of alignment.
+ */
 void* poly_aligned_alloc(const PolyAllocator* allocator, size_t alignment,
                          size_t size)
 {
@@ -118,6 +123,16 @@ void* arena_aligned_shrink(Arena* arena, void* p, size_t new_alignment,
   arena->size_remain = arena->size_remain + old_size - new_size;
   arena->current = aligned_ptr + new_size;
   return aligned_ptr;
+}
+
+Arena arena_init(void* buffer, size_t size)
+{
+  return (Arena){
+      .begin = buffer,
+      .previous = NULL,
+      .current = (Byte*)buffer,
+      .size_remain = size,
+  };
 }
 
 // Reset the arena and the underlying buffer can be reused later
