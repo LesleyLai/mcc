@@ -3,6 +3,7 @@
 
 #include "parser.h"
 #include "utils/allocators.h"
+#include "utils/defer.h"
 #include "utils/str.h"
 
 static void compile_to_file(FILE* asm_file, const char* source)
@@ -11,7 +12,7 @@ static void compile_to_file(FILE* asm_file, const char* source)
   void* ast_buffer = malloc(ast_arena_size);
   Arena ast_arena = arena_init(ast_buffer, ast_arena_size);
 
-  FunctionDecl* main_func = parse(source, &ast_arena);
+  const FunctionDecl* main_func = parse(source, &ast_arena);
   if (main_func == NULL) {
     fprintf(stderr, "Failed to parse the program");
     return;
@@ -49,17 +50,18 @@ void compile(const char* asm_filename, const char* source)
                        string_view_from_c_str(".asm"));
 
   FILE* asm_file = fopen(string_buffer_data(&asm_filename_with_extension), "w");
+  MCC_DEFER(fclose(asm_file))
+  {
+    if (!asm_file) {
+      fprintf(stderr, "Cannot open asm file %s",
+              string_buffer_data(&asm_filename_with_extension));
+      exit(1);
+    }
 
-  if (!asm_file) {
-    fprintf(stderr, "Cannot open asm file %s",
-            string_buffer_data(&asm_filename_with_extension));
-    exit(1);
+    compile_to_file(asm_file, source);
+
+    if (ferror(asm_file)) { perror("Failed to write asm_file"); }
   }
-
-  compile_to_file(asm_file, source);
-
-  if (ferror(asm_file)) { perror("Failed to write asm_file"); }
-  fclose(asm_file);
 }
 
 void assemble(const char* asm_filename, const char* obj_filename)
@@ -104,16 +106,21 @@ char* file_to_allocated_buffer(FILE* file)
 {
   fseek(file, 0, SEEK_END);
   const long length = ftell(file);
+  if (length < 0) {
+    fprintf(stderr, "Error in ftell");
+    exit(1);
+  }
+  const size_t ulength = (size_t)length;
 
   fseek(file, 0, SEEK_SET);
-  char* buffer = malloc((unsigned long)(length + 1));
-  size_t read_res = fread(buffer, 1, (unsigned long)length,
+  char* buffer = malloc(ulength + 1);
+  size_t read_res = fread(buffer, 1, ulength,
                           file); // TODO: check result of fread
   if (read_res != (unsigned long)length) {
     fprintf(stderr, "Error during reading file");
     exit(1);
   }
-  buffer[length] = '\0';
+  buffer[ulength] = '\0';
   return buffer;
 }
 
