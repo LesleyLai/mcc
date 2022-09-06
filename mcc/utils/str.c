@@ -2,6 +2,8 @@
 
 #include <string.h>
 
+#include <stdlib.h>
+
 static bool _string_buffer_is_large(StringBuffer self)
 {
   // Is the lowest bit of the first byte 1?
@@ -54,7 +56,7 @@ StringBuffer string_buffer_from_view(StringView source,
     buffer.data_.large_ = (struct StringLargeBuffer_){
         .size_with_bit_mark_ = source.size << 1,
         .capacity_ = source.size,
-        .data_ = poly_aligned_alloc(allocator, alignof(char), source.size),
+        .data_ = poly_aligned_alloc(allocator, alignof(char), source.size + 1),
     };
     _string_buffer_mark_large(&buffer);
     data_ptr = buffer.data_.large_.data_;
@@ -78,11 +80,11 @@ static size_t _string_buffer_size_large(StringBuffer self)
 
 StringView string_view_from_buffer(const StringBuffer* buffer)
 {
-  return (StringView){.start = string_buffer_const_data(buffer),
+  return (StringView){.start = string_buffer_c_str(buffer),
                       .size = string_buffer_size(*buffer)};
 }
 
-const char* string_buffer_const_data(const StringBuffer* self)
+const char* string_buffer_c_str(const StringBuffer* self)
 {
   return _string_buffer_is_large(*self) ? self->data_.large_.data_
                                         : self->data_.small_.data_;
@@ -208,5 +210,57 @@ void string_buffer_append(StringBuffer* self, StringView rhs)
     _string_buffer_append_large(self, rhs);
   } else {
     _string_buffer_append_small(self, rhs);
+  }
+}
+
+/**
+ * @brief Resize the string buffer to contain `size` characters but does
+not write to the underlying buffer
+ * @warning Very dangerous since it break invariant of the string buffer. It
+ * should *always* be followed by an immediate write to the underlying data of
+ * the underlying buffer.
+ * @warning There are no guarantee that the result String Buffer contains
+ * null-terminated data.
+ *
+ * If count <= size()
+ */
+void string_buffer_unsafe_resize_for_overwrite(StringBuffer* self, size_t count)
+{
+  const size_t old_size = string_buffer_size(*self);
+  const size_t old_capacity = string_buffer_capacity(*self);
+  const size_t new_size = count;
+
+  if (new_size < old_size) {
+    if (_string_buffer_is_large(*self)) {
+      self->data_.large_.size_with_bit_mark_ = new_size << 1;
+      _string_buffer_mark_large(self);
+    } else {
+      self->data_.small_.size_with_bit_mark_ = (unsigned char)(new_size << 1);
+    }
+
+    return;
+  }
+
+  if (new_size <= old_capacity) { return; }
+
+  if (_string_buffer_is_large(*self)) {
+    _string_buffer_grow_large(self, new_size);
+    self->data_.large_.size_with_bit_mark_ = new_size << 1;
+    _string_buffer_mark_large(self);
+  } else {
+    if (new_size <= small_string_capacity) { // small to small
+      self->data_.small_.size_with_bit_mark_ = (unsigned char)(new_size << 1);
+    } else { // small to large
+      char* new_data =
+          poly_aligned_alloc(self->allocator, alignof(char), new_size + 1);
+      memcpy(new_data, self->data_.small_.data_, old_size);
+
+      self->data_.large_ = (struct StringLargeBuffer_){
+          .size_with_bit_mark_ = new_size << 1,
+          .capacity_ = new_size,
+          .data_ = new_data,
+      };
+      _string_buffer_mark_large(self);
+    }
   }
 }

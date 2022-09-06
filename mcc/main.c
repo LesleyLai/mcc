@@ -6,6 +6,17 @@
 #include "utils/defer.h"
 #include "utils/str.h"
 
+#include <stdarg.h>
+
+void format_to(StringBuffer* buffer, const char* restrict format, ...)
+{
+  va_list args;
+  va_start(args, format);
+  const int size_required = snprintf(NULL, 0, format, args);
+  printf("Size required: %d\n", size_required);
+  va_end(args);
+}
+
 static void compile_to_file(FILE* asm_file, const char* source)
 {
   const size_t ast_arena_size = 4000000000; // 4 GB virtual memory
@@ -27,6 +38,13 @@ static void compile_to_file(FILE* asm_file, const char* source)
 
   const int return_value =
       main_func->body->statements[0].ret.expr->const_expr.val;
+
+  /*
+    StringBuffer buffer = string_buffer_new(NULL);
+    string_buffer_append(&buffer, string_view_from_c_str("section .text\n"));
+    string_buffer_append(&buffer, string_view_from_c_str("global main\n"
+                                                     "main:\n"));
+   */
 
   fputs("section .text\n", asm_file);
   fputs("global main\n", asm_file);

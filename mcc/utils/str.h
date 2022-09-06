@@ -50,10 +50,14 @@ StringBuffer string_buffer_from_view(StringView source,
                                      PolyAllocator* allocator);
 size_t string_buffer_size(StringBuffer self);
 size_t string_buffer_capacity(StringBuffer self);
-const char* string_buffer_const_data(const StringBuffer* self);
+const char* string_buffer_c_str(const StringBuffer* self);
 char* string_buffer_data(StringBuffer* self);
 
 void string_buffer_push(StringBuffer* self, char c);
 void string_buffer_append(StringBuffer* self, StringView rhs);
+
+// Don't use it unless you know what you are doing!!!
+void string_buffer_unsafe_resize_for_overwrite(StringBuffer* self,
+                                               size_t count);
 
 #endif // MCC_STR_H
