@@ -2,6 +2,7 @@
 #define MCC_SOURCE_LOCATION_H
 
 #include <stdint.h>
+#include <stdlib.h>
 
 typedef struct SourceLocation {
   uint32_t line;

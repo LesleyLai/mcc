@@ -27,12 +27,12 @@ static SourceRange token_source_range(Token token)
               .offset = token.location.offset + token.src.size}};
 }
 
-static SourceRange source_range_union(SourceRange lhs, SourceRange rhs)
-{
-  return (SourceRange){
-      .begin = (lhs.begin.offset < rhs.begin.offset) ? lhs.begin : rhs.begin,
-      .end = (lhs.end.offset > rhs.end.offset) ? lhs.end : rhs.end};
-}
+// static SourceRange source_range_union(SourceRange lhs, SourceRange rhs)
+//{
+//   return (SourceRange){
+//       .begin = (lhs.begin.offset < rhs.begin.offset) ? lhs.begin : rhs.begin,
+//       .end = (lhs.end.offset > rhs.end.offset) ? lhs.end : rhs.end};
+// }
 
 static void parse_error_at(Parser* parser, const char* error_msg, Token token)
 {

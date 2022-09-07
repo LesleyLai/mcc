@@ -8,15 +8,6 @@
 
 #include <stdarg.h>
 
-void format_to(StringBuffer* buffer, const char* restrict format, ...)
-{
-  va_list args;
-  va_start(args, format);
-  const int size_required = snprintf(NULL, 0, format, args);
-  printf("Size required: %d\n", size_required);
-  va_end(args);
-}
-
 static void compile_to_file(FILE* asm_file, const char* source)
 {
   const size_t ast_arena_size = 4000000000; // 4 GB virtual memory
