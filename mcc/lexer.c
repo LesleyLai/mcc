@@ -7,6 +7,7 @@ Lexer lexer_create(const char* source)
 {
   return (Lexer){
       .start = source,
+      .previous = source,
       .current = source,
       .line = 1,
       .column = 1,
@@ -20,26 +21,30 @@ static bool lexer_is_at_end(const Lexer* lexer)
 
 static Token lexer_make_token(const Lexer* lexer, TokenType type)
 {
-  const size_t length = (size_t)(lexer->current - lexer->start);
-  return (Token){.src = {.start = lexer->start, .size = length},
-                 .type = type,
-                 .location = {.line = lexer->line,
-                              .column = (uint32_t)(lexer->column - length)}};
+  const size_t length = (size_t)(lexer->current - lexer->previous);
+  return (Token){
+      .src = {.start = lexer->previous, .size = length},
+      .type = type,
+      .location = {.line = lexer->line,
+                   .column = lexer->column - (uint32_t)(length),
+                   .offset = (size_t)(lexer->previous - lexer->start)}};
 }
 
 static Token lexer_error_token(const Lexer* lexer, StringView error_msg)
 {
-  return (Token){.src = error_msg,
-                 .type = TOKEN_ERROR,
-                 .location = {.line = lexer->line, .column = lexer->column}};
+  return (Token){
+      .src = error_msg,
+      .type = TOKEN_ERROR,
+      .location = {.line = lexer->line,
+                   .column = lexer->column,
+                   .offset = (size_t)(lexer->previous - lexer->start)}};
 }
 
 // consumes the current character and returns it
 static char lexer_advance(Lexer* lexer)
 {
-  const char* previous = lexer->current++;
   lexer->column++;
-  return *previous;
+  return *lexer->current++;
 }
 
 //// If current character match expected, consumes it and returns true
@@ -90,8 +95,8 @@ static Token lexer_scan_number(Lexer* lexer)
 static TokenType check_keyword(Lexer* lexer, int start_position,
                                StringView rest, TokenType type)
 {
-  if (lexer->current - lexer->start == start_position + (int)rest.size &&
-      memcmp(lexer->start + start_position, rest.start, rest.size) == 0) {
+  if (lexer->current - lexer->previous == start_position + (int)rest.size &&
+      memcmp(lexer->previous + start_position, rest.start, rest.size) == 0) {
     return type;
   }
 
@@ -100,7 +105,7 @@ static TokenType check_keyword(Lexer* lexer, int start_position,
 
 static TokenType lexer_get_identifier_type(Lexer* lexer)
 {
-  switch (lexer->start[0]) {
+  switch (lexer->previous[0]) {
   case 'v':
     return check_keyword(lexer, 1, (StringView){.start = "oid", .size = 3},
                          TOKEN_KEYWORD_VOID);
@@ -126,7 +131,7 @@ Token lexer_scan_token(Lexer* lexer)
 {
   skip_whitespace(lexer);
 
-  lexer->start = lexer->current;
+  lexer->previous = lexer->current;
 
   if (lexer_is_at_end(lexer)) return lexer_make_token(lexer, TOKEN_EOF);
 

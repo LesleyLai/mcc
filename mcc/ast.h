@@ -64,4 +64,9 @@ typedef struct FunctionDecl {
   CompoundStmt* body;
 } FunctionDecl;
 
+typedef struct TranslationUnit {
+  size_t decl_count;
+  FunctionDecl* decls;
+} TranslationUnit;
+
 #endif // MCC_AST_H

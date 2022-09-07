@@ -5,15 +5,15 @@ int main(void)
 }
 
 Tokens:
-10 1:1 "int"
-12 1:5 "main"
-0 1:9 "("
-9 1:10 "void"
-1 1:14 ")"
-2 2:1 "{"
-11 3:3 "return"
-13 3:10 "42"
-4 3:12 ";"
-3 4:1 "}"
-15 4:2 ""
+10 <line: 1 col: 1 offset: 0> "int"
+12 <line: 1 col: 5 offset: 4> "main"
+0 <line: 1 col: 9 offset: 8> "("
+9 <line: 1 col: 10 offset: 9> "void"
+1 <line: 1 col: 14 offset: 13> ")"
+2 <line: 2 col: 1 offset: 15> "{"
+11 <line: 3 col: 3 offset: 19> "return"
+13 <line: 3 col: 10 offset: 26> "42"
+4 <line: 3 col: 12 offset: 28> ";"
+3 <line: 4 col: 1 offset: 30> "}"
+15 <line: 4 col: 2 offset: 31> ""
 

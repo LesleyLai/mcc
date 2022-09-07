@@ -6,6 +6,6 @@
 
 typedef struct Arena Arena;
 
-FunctionDecl* parse(const char* source, Arena* ast_arena);
+TranslationUnit* parse(const char* source, Arena* ast_arena);
 
 #endif

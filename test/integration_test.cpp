@@ -130,5 +130,6 @@ TEST_CASE("Integration tests")
 
     ApprovalTests::Approvals::verify(verify_compilation(src, ast_arena),
                                      ApprovalTests::Options().withNamer(namer));
+    arena_reset(&ast_arena);
   }
 }

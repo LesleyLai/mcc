@@ -23,21 +23,21 @@ static void compile_to_file(FILE* asm_file, const char* source)
   void* ast_buffer = malloc(ast_arena_size);
   Arena ast_arena = arena_init(ast_buffer, ast_arena_size);
 
-  const FunctionDecl* main_func = parse(source, &ast_arena);
-  if (main_func == NULL) {
+  const TranslationUnit* tu = parse(source, &ast_arena);
+  if (tu == NULL) {
     fprintf(stderr, "Failed to parse the program");
     return;
   }
 
-  if (main_func->body->statement_count != 1 ||
-      main_func->body->statements[0].type != RETURN_STMT) {
+  if (tu->decl_count != 1 || tu->decls[0].body->statement_count != 1 ||
+      tu->decls[0].body->statements[0].type != RETURN_STMT) {
     // TODO: Not support yet
     fprintf(stderr, "MCC does not support this kind of program yet");
     return;
   }
 
   const int return_value =
-      main_func->body->statements[0].ret.expr->const_expr.val;
+      tu->decls[0].body->statements[0].ret.expr->const_expr.val;
 
   /*
     StringBuffer buffer = string_buffer_new(NULL);

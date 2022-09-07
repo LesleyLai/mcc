@@ -21,6 +21,9 @@ void print_to_string(std::string& buffer, const CompoundStmt& stmt,
 void print_to_string(std::string& buffer, const FunctionDecl& def,
                      int indentation = 0);
 
+void print_to_string(std::string& buffer, const TranslationUnit& tu,
+                     int indentation = 0);
+
 } // namespace mcc
 
 #endif // MCC_AST_PRINTER_HPP

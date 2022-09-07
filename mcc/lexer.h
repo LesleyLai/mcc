@@ -10,6 +10,7 @@
 
 typedef struct Lexer {
   const char* start;
+  const char* previous;
   const char* current;
   uint32_t line;
   uint32_t column;

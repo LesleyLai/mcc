@@ -12,8 +12,9 @@ template <> struct fmt::formatter<SourceLocation> : formatter<string_view> {
   template <typename FormatContext>
   auto format(SourceLocation source_location, FormatContext& ctx)
   {
-    return fmt::format_to(ctx.out(), "{}:{}", source_location.line,
-                          source_location.column);
+    return fmt::format_to(ctx.out(), "<line: {} col: {} offset: {}>",
+                          source_location.line, source_location.column,
+                          source_location.offset);
   }
 };
 
@@ -22,8 +23,14 @@ template <> struct fmt::formatter<SourceRange> : formatter<string_view> {
   template <typename FormatContext>
   auto format(SourceRange source_range, FormatContext& ctx)
   {
-    return fmt::format_to(ctx.out(), "from: {} to: {}", source_range.first,
-                          source_range.last);
+    if (source_range.begin.line != source_range.end.line) {
+      return fmt::format_to(ctx.out(), "line: {}..{}", source_range.begin.line,
+                            source_range.end.line);
+    }
+
+    return fmt::format_to(ctx.out(), "line:{} column: {}..{}",
+                          source_range.begin.line, source_range.begin.column,
+                          source_range.end.column);
   }
 };
 

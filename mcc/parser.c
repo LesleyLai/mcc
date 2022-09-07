@@ -18,10 +18,26 @@ typedef struct Parser {
   Token previous;
 } Parser;
 
+static SourceRange token_source_range(Token token)
+{
+  return (SourceRange){
+      .begin = token.location,
+      .end = {.line = token.location.line,
+              .column = token.location.column + (uint32_t)token.src.size,
+              .offset = token.location.offset + token.src.size}};
+}
+
+static SourceRange source_range_union(SourceRange lhs, SourceRange rhs)
+{
+  return (SourceRange){
+      .begin = (lhs.begin.offset < rhs.begin.offset) ? lhs.begin : rhs.begin,
+      .end = (lhs.end.offset > rhs.end.offset) ? lhs.end : rhs.end};
+}
+
 static void parse_error_at(Parser* parser, const char* error_msg, Token token)
 {
   if (parser->in_panic_mode) return;
-  fprintf(stderr, "Syntax error at %d:%d: %s\n", token.location.line,
+  fprintf(stderr, "Syntax error at %u:%u: %s\n", token.location.line,
           token.location.column, error_msg);
   parser->has_error = true;
   parser->in_panic_mode = true;
@@ -52,17 +68,14 @@ static Expr* parse_expr(Parser* parser);
 
 static Expr* parse_number_literal(Parser* parser)
 {
-  const SourceLocation first_location = parser->previous.location;
-  SourceLocation last_location = first_location;
-  last_location.column += (uint32_t)parser->previous.src.size;
-
   const int val = (int)strtol(parser->previous.src.start, NULL,
                               10); // TODO(llai): replace strtol
 
+  printf("%.*s\n", (int)parser->previous.src.size, parser->previous.src.start);
+
   Expr* result = ARENA_ALLOC_OBJECT(parser->ast_arena, Expr);
   *result = (Expr){.type = CONST_EXPR,
-                   .source_range = (SourceRange){.first = first_location,
-                                                 .last = last_location},
+                   .source_range = token_source_range(parser->previous),
                    .const_expr = (struct ConstExpr){.val = val}};
   return result;
 }
@@ -261,7 +274,7 @@ static void parse_stmt(Parser* parser, Stmt* out_stmt)
     parse_return_stmt(parser, &return_stmt);
     *out_stmt = (Stmt){
         .type = RETURN_STMT,
-        .source_range = {.first = first_loc, .last = parser->previous.location},
+        .source_range = {.begin = first_loc, .end = parser->previous.location},
         .ret = return_stmt};
 
     return;
@@ -273,7 +286,7 @@ static void parse_stmt(Parser* parser, Stmt* out_stmt)
     parse_compound_stmt(parser, &compound);
     *out_stmt = (Stmt){
         .type = COMPOUND_STMT,
-        .source_range = {.first = first_loc, .last = parser->previous.location},
+        .source_range = {.begin = first_loc, .end = parser->previous.location},
         .compound = compound};
     return;
   }
@@ -323,21 +336,31 @@ static FunctionDecl* parse_function_decl(Parser* parser)
   }
   if (parser->in_panic_mode) { return NULL; }
 
-  const SourceLocation last_location =
-      (body == NULL)
-          ? parser->previous.location
-          : body->statements[body->statement_count - 1].source_range.last;
+  const SourceLocation last_location = parser->current.location;
 
   FunctionDecl* decl = ARENA_ALLOC_OBJECT(parser->ast_arena, FunctionDecl);
   *decl = (FunctionDecl){
-      .source_range = {.first = first_location, .last = last_location},
+      .source_range = {.begin = first_location, .end = last_location},
       .name = function_name,
       .body = body,
   };
   return decl;
 }
 
-FunctionDecl* parse(const char* source, Arena* ast_arena)
+static TranslationUnit* parse_translation_unit(Parser* parser)
+{
+  FunctionDecl* decl = parse_function_decl(parser);
+
+  TranslationUnit* tu = ARENA_ALLOC_OBJECT(parser->ast_arena, TranslationUnit);
+  *tu = (TranslationUnit){
+      .decl_count = 1,
+      .decls = decl,
+  };
+
+  return tu;
+}
+
+TranslationUnit* parse(const char* source, Arena* ast_arena)
 {
   Parser parser = {.lexer = lexer_create(source),
                    .ast_arena = ast_arena,
@@ -346,8 +369,9 @@ FunctionDecl* parse(const char* source, Arena* ast_arena)
 
   parse_advance(&parser);
 
-  FunctionDecl* decl = parse_function_decl(&parser);
+  TranslationUnit* tu = parse_translation_unit(&parser);
+
   parse_consume(&parser, TOKEN_EOF, "Expect end of the file");
 
-  return parser.has_error ? NULL : decl;
+  return parser.has_error ? NULL : tu;
 }

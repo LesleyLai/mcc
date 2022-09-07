@@ -7,8 +7,9 @@ int main(void)
 
 AST:
 ============
-FunctionDecl <main(void) -> int> from: 1:1 to: 3:12
-  ReturnStmt from: 3:3 to: 3:12
-    Expr from: 3:10 to: 3:12
-      42
+TranslationUnit
+  FunctionDecl <line: 1..4> "int main(void)"
+    ReturnStmt <line:3 column: 3..12>
+      Expr <line:3 column: 10..12>
+        42
 
