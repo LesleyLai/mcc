@@ -71,8 +71,6 @@ static Expr* parse_number_literal(Parser* parser)
   const int val = (int)strtol(parser->previous.src.start, NULL,
                               10); // TODO(llai): replace strtol
 
-  printf("%.*s\n", (int)parser->previous.src.size, parser->previous.src.start);
-
   Expr* result = ARENA_ALLOC_OBJECT(parser->ast_arena, Expr);
   *result = (Expr){.type = CONST_EXPR,
                    .source_range = token_source_range(parser->previous),
