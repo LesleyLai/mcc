@@ -230,7 +230,7 @@ void string_buffer_unsafe_resize_for_overwrite(StringBuffer* self, size_t count)
   const size_t old_capacity = string_buffer_capacity(*self);
   const size_t new_size = count;
 
-  if (new_size < old_size) {
+  if (new_size <= old_capacity) {
     if (_string_buffer_is_large(*self)) {
       self->data_.large_.size_with_bit_mark_ = new_size << 1;
       _string_buffer_mark_large(self);
@@ -240,8 +240,6 @@ void string_buffer_unsafe_resize_for_overwrite(StringBuffer* self, size_t count)
 
     return;
   }
-
-  if (new_size <= old_capacity) { return; }
 
   if (_string_buffer_is_large(*self)) {
     _string_buffer_grow_large(self, new_size);

@@ -1,6 +1,7 @@
 #include <fmt/format.h>
 
 #include "ast_printer.hpp"
+#include "cstring_view_format.hpp"
 #include "source_location_formatter.hpp"
 
 namespace {
@@ -14,16 +15,6 @@ void indented_format_to(OutputItr out, int indent, std::string_view format_str,
 }
 
 } // anonymous namespace
-
-template <> struct fmt::formatter<StringView> : formatter<string_view> {
-  // parse is inherited from formatter<string_view>.
-  template <typename FormatContext>
-  auto format(StringView sv, FormatContext& ctx)
-  {
-    string_view name{sv.start, sv.size};
-    return formatter<string_view>::format(name, ctx);
-  }
-};
 
 namespace mcc {
 

@@ -1,12 +1,21 @@
 add_library(mcc_lib
-        lexer.h
-        lexer.c
         utils/str.h
         utils/allocators.c
         utils/allocators.h
+        utils/defer.h
+        utils/prelude.h
+        utils/format.h
+        utils/format.c
+        utils/str.c
+
+        lexer.h
+        lexer.c
         ast.h
         parser.h
-        parser.c utils/str.c source_location.h utils/defer.h utils/prelude.h utils/format.h utils/format.c)
+        parser.c
+        source_location.h
+        diagnostic.c
+        diagnostic.h)
 target_link_libraries(mcc_lib
         PUBLIC mcc::compiler_options
         PRIVATE mcc::compiler_warnings)

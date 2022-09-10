@@ -38,7 +38,7 @@ typedef enum TokenType {
   TOKEN_ERROR,
   TOKEN_EOF,
 
-  TOKEN_TYPES_COUNT
+  TOKEN_TYPES_COUNT,
 } TokenType;
 
 typedef struct Token {

@@ -19,6 +19,10 @@ typedef struct PolyAllocator {
                           size_t new_alignment, size_t new_size);
 } PolyAllocator;
 
+typedef struct Arena Arena;
+
+PolyAllocator poly_allocator_from_arena(Arena* arena);
+
 void* poly_aligned_alloc(const PolyAllocator* allocator, size_t alignment,
                          size_t size);
 void* poly_aligned_grow(const PolyAllocator* allocator, void* p,
@@ -61,7 +65,5 @@ void* arena_aligned_shrink(Arena* arena, void* p, size_t new_alignment,
 
 #define ARENA_SHRINK_ARRAY(arena, Type, p, n)                                  \
   arena_aligned_shrink((arena), (p), alignof(Type), sizeof(Type) * (n))
-
-PolyAllocator poly_allocator_from_arena(Arena* arena);
 
 #endif // MCC_ALLOCATORS_H

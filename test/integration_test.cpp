@@ -9,16 +9,27 @@
 #include <memory>
 
 extern "C" {
-#include "parser.h"
 #include "utils/allocators.h"
+
+#include "diagnostic.h"
+#include "parser.h"
 }
 
 #include "ast_printer.hpp"
+#include "cstring_view_format.hpp"
 
 // This file compiler against bunch of source files and will serialize from
 // input to all the important intermediate information for approval test
 
 using std::filesystem::path;
+
+namespace mcc {
+
+struct IOError : std::runtime_error {
+  using std::runtime_error::runtime_error;
+};
+
+} // namespace mcc
 
 namespace {
 
@@ -27,8 +38,7 @@ namespace {
   std::ifstream file{path.data()};
 
   if (!file.is_open()) {
-    fmt::print(stderr, "Cannot open file {}\n", path);
-    std::fflush(stdout);
+    throw mcc::IOError(fmt::format("Cannot open file {}\n", path));
   }
 
   std::stringstream ss;
@@ -78,6 +88,31 @@ public:
   return {std::make_unique<CFilesInDirectoryGenerator>(root)};
 }
 
+void dump_parse_errors(std::string& output, const char* file_path,
+                       const char* source, ParseErrorsView errors)
+{
+  enum { diagnostics_arena_size = 40000 }; // 40 Mb virtual memory
+  uint8_t diagnostics_buffer[diagnostics_arena_size];
+  Arena diagnostics_arena =
+      arena_init(diagnostics_buffer, diagnostics_arena_size);
+  PolyAllocator diagnostics_allocator =
+      poly_allocator_from_arena(&diagnostics_arena);
+
+  if (errors.size > 0) {
+    for (size_t i = 0; i < errors.size; ++i) {
+      const auto error = errors.data[i];
+
+      StringBuffer msg = string_buffer_new(&diagnostics_allocator);
+      write_diagnostics(&msg, file_path, source, error);
+      StringView msg_view = string_view_from_buffer(&msg);
+      fmt::format_to(std::back_inserter(output),
+                     "Diagnostics:\n============\n{}\n", msg_view);
+
+      arena_reset(&diagnostics_arena);
+    }
+  }
+}
+
 [[nodiscard]] auto verify_compilation(const std::string& source,
                                       Arena& ast_arena) -> std::string
 {
@@ -85,15 +120,16 @@ public:
   fmt::format_to(std::back_inserter(output), "Source:\n============\n");
   fmt::format_to(std::back_inserter(output), "{}\n\n", source);
 
-  const auto* result = parse(source.c_str(), &ast_arena);
+  const auto result = parse(source.c_str(), &ast_arena);
+  dump_parse_errors(output, "dummy_file_name.c", source.c_str(), result.errors);
 
-  fmt::format_to(std::back_inserter(output), "AST:\n============\n");
-  if (result == nullptr) {
-    fmt::format_to(std::back_inserter(output), "Fail to parse!");
+  if (result.ast == nullptr) {
+    fmt::format_to(std::back_inserter(output), "Fatal Error: Fail to parse!");
     return output;
   }
 
-  mcc::print_to_string(output, *result);
+  fmt::format_to(std::back_inserter(output), "AST:\n============\n");
+  mcc::print_to_string(output, *result.ast);
   return output;
 }
 

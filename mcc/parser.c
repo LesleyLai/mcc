@@ -1,11 +1,15 @@
 #include "parser.h"
+#include "diagnostic.h"
 #include "lexer.h"
+
+#include "utils/allocators.h"
+#include "utils/format.h"
 
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
 
-#include "utils/allocators.h"
+#define MAX_ERROR_COUNT 16 // TODO: use vector
 
 typedef struct Parser {
   Lexer lexer;
@@ -16,6 +20,8 @@ typedef struct Parser {
 
   Token current;
   Token previous;
+
+  ParseErrorsView errors;
 } Parser;
 
 static SourceRange token_source_range(Token token)
@@ -37,8 +43,22 @@ static SourceRange token_source_range(Token token)
 static void parse_error_at(Parser* parser, const char* error_msg, Token token)
 {
   if (parser->in_panic_mode) return;
-  fprintf(stderr, "Syntax error at %u:%u: %s\n", token.location.line,
-          token.location.column, error_msg);
+
+  // TODO: proper error handling
+  if (parser->errors.size >= MAX_ERROR_COUNT) {
+    fprintf(stderr, "Too many data for mcc to handle");
+    exit(1);
+  }
+
+  if (parser->errors.data == NULL) {
+    parser->errors.data =
+        ARENA_ALLOC_ARRAY(parser->ast_arena, ParseError, MAX_ERROR_COUNT);
+  }
+
+  parser->errors.data[parser->errors.size++] =
+      (ParseError){.msg = string_view_from_c_str(error_msg),
+                   .range = token_source_range(token)};
+
   parser->has_error = true;
   parser->in_panic_mode = true;
 }
@@ -57,8 +77,6 @@ static void parse_consume(Parser* parser, TokenType type, const char* error_msg)
 {
   if (parser->current.type != type) {
     parse_error_at(parser, error_msg, parser->current);
-    fprintf(stderr, "Gets %.*s\n", (int)parser->current.src.size,
-            parser->current.src.start);
   }
 
   parse_advance(parser);
@@ -358,12 +376,16 @@ static TranslationUnit* parse_translation_unit(Parser* parser)
   return tu;
 }
 
-TranslationUnit* parse(const char* source, Arena* ast_arena)
+ParseResult parse(const char* source, Arena* ast_arena)
 {
   Parser parser = {.lexer = lexer_create(source),
                    .ast_arena = ast_arena,
                    .has_error = false,
-                   .in_panic_mode = false};
+                   .in_panic_mode = false,
+                   .errors = {
+                       .size = 0,
+                       .data = NULL,
+                   }};
 
   parse_advance(&parser);
 
@@ -371,5 +393,6 @@ TranslationUnit* parse(const char* source, Arena* ast_arena)
 
   parse_consume(&parser, TOKEN_EOF, "Expect end of the file");
 
-  return parser.has_error ? NULL : tu;
+  return (ParseResult){.ast = parser.has_error ? NULL : tu,
+                       .errors = parser.errors};
 }

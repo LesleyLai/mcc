@@ -144,21 +144,21 @@ void arena_reset(Arena* arena)
 }
 
 // To be used as a function pointer in PolyAllocator
-static void* arena_poly_aligned_alloc(const PolyAllocator* self,
-                                      size_t alignment, size_t size)
+static void* _arena_poly_aligned_alloc(const PolyAllocator* self,
+                                       size_t alignment, size_t size)
 {
   return arena_aligned_alloc((Arena*)self->user_data, alignment, size);
 }
 
-static void* arena_poly_aligned_grow(const PolyAllocator* self, void* p,
-                                     size_t new_alignment, size_t new_size)
+static void* _arena_poly_aligned_grow(const PolyAllocator* self, void* p,
+                                      size_t new_alignment, size_t new_size)
 {
   return arena_aligned_grow((Arena*)self->user_data, p, new_alignment,
                             new_size);
 }
 
-static void* arena_poly_aligned_shrink(const PolyAllocator* self, void* p,
-                                       size_t new_alignment, size_t new_size)
+static void* _arena_poly_aligned_shrink(const PolyAllocator* self, void* p,
+                                        size_t new_alignment, size_t new_size)
 {
   return arena_aligned_shrink((Arena*)self->user_data, p, new_alignment,
                               new_size);
@@ -167,7 +167,7 @@ static void* arena_poly_aligned_shrink(const PolyAllocator* self, void* p,
 PolyAllocator poly_allocator_from_arena(Arena* arena)
 {
   return (PolyAllocator){.user_data = arena,
-                         .aligned_alloc = arena_poly_aligned_alloc,
-                         .aligned_grow = arena_poly_aligned_grow,
-                         .aligned_shrink = arena_poly_aligned_shrink};
+                         .aligned_alloc = _arena_poly_aligned_alloc,
+                         .aligned_grow = _arena_poly_aligned_grow,
+                         .aligned_shrink = _arena_poly_aligned_shrink};
 }

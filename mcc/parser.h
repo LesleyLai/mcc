@@ -2,10 +2,23 @@
 #define MCC_PARSER_H
 
 #include "ast.h"
+#include "diagnostic.h"
+
 #include "utils/str.h"
 
 typedef struct Arena Arena;
 
-TranslationUnit* parse(const char* source, Arena* ast_arena);
+// TODO: use vector
+typedef struct ParseErrorsView {
+  size_t size;
+  ParseError* data;
+} ParseErrorsView;
+
+typedef struct ParseResult {
+  TranslationUnit* ast;
+  ParseErrorsView errors;
+} ParseResult;
+
+ParseResult parse(const char* source, Arena* ast_arena);
 
 #endif

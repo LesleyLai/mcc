@@ -1,0 +1,16 @@
+Source:
+============
+int main(void)
+{
+  $ return 0;
+}
+
+Diagnostics:
+============
+dummy_file_name.c:3:4: Error: Error
+1 |     int main(void)
+2 |     {
+3 |       $ return 0;
+  |       ^~~~~~~~~~~
+4 |     }
+Fatal Error: Fail to parse!

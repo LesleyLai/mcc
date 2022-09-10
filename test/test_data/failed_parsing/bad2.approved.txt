@@ -1,0 +1,16 @@
+Source:
+============
+main(void)
+{
+  return 0;
+}
+
+Diagnostics:
+============
+dummy_file_name.c:1:1: Error: Expect keyword int
+1 |     main(void)
+  |     ^~~~      
+2 |     {
+3 |       return 0;
+4 |     }
+Fatal Error: Fail to parse!

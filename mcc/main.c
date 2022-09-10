@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "diagnostic.h"
 #include "parser.h"
 #include "utils/allocators.h"
 #include "utils/defer.h"
@@ -8,34 +9,49 @@
 
 #include <stdarg.h>
 
-static void compile_to_file(FILE* asm_file, const char* source)
+static void compile_to_file(FILE* asm_file,
+                            const char* src_filename_with_extension,
+                            const char* source)
 {
   const size_t ast_arena_size = 4000000000; // 4 GB virtual memory
   void* ast_buffer = malloc(ast_arena_size);
   Arena ast_arena = arena_init(ast_buffer, ast_arena_size);
 
-  const TranslationUnit* tu = parse(source, &ast_arena);
+  const ParseResult result = parse(source, &ast_arena);
+  const TranslationUnit* tu = result.ast;
+
+  enum { diagnostics_arena_size = 40000 }; // 40 Mb virtual memory
+  uint8_t diagnostics_buffer[diagnostics_arena_size];
+  Arena diagnostics_arena =
+      arena_init(diagnostics_buffer, diagnostics_arena_size);
+  PolyAllocator diagnostics_allocator =
+      poly_allocator_from_arena(&diagnostics_arena);
+
+  if (result.errors.size > 0) {
+    for (size_t i = 0; i < result.errors.size; ++i) {
+      StringBuffer output = string_buffer_new(&diagnostics_allocator);
+      write_diagnostics(&output, src_filename_with_extension, source,
+                        result.errors.data[i]);
+      StringView output_view = string_view_from_buffer(&output);
+      printf("%*s", (int)output_view.size, output_view.start);
+      arena_reset(&diagnostics_arena);
+    }
+  }
+
   if (tu == NULL) {
-    fprintf(stderr, "Failed to parse the program");
-    return;
+    // Failed to parse the program
+    exit(1);
   }
 
   if (tu->decl_count != 1 || tu->decls[0].body->statement_count != 1 ||
       tu->decls[0].body->statements[0].type != RETURN_STMT) {
     // TODO: Not support yet
     fprintf(stderr, "MCC does not support this kind of program yet");
-    return;
+    exit(1);
   }
 
   const int return_value =
       tu->decls[0].body->statements[0].ret.expr->const_expr.val;
-
-  /*
-    StringBuffer buffer = string_buffer_new(NULL);
-    string_buffer_append(&buffer, string_view_from_c_str("section .text\n"));
-    string_buffer_append(&buffer, string_view_from_c_str("global main\n"
-                                                     "main:\n"));
-   */
 
   fputs("section .text\n", asm_file);
   fputs("global main\n", asm_file);
@@ -44,7 +60,8 @@ static void compile_to_file(FILE* asm_file, const char* source)
   fputs("  ret", asm_file);
 }
 
-void compile(const char* asm_filename, const char* source)
+void compile(const char* src_filename_with_extension, const char* asm_filename,
+             const char* source)
 {
   enum { temp_buffer_size = 1000 };
   uint8_t* temp_buffer[temp_buffer_size];
@@ -67,7 +84,7 @@ void compile(const char* asm_filename, const char* source)
       exit(1);
     }
 
-    compile_to_file(asm_file, source);
+    compile_to_file(asm_file, src_filename_with_extension, source);
 
     if (ferror(asm_file)) { perror("Failed to write asm_file"); }
   }
@@ -151,7 +168,7 @@ int main(int argc, char* argv[])
   char* source = file_to_allocated_buffer(src_file);
 
   const char* asm_filename = "file";
-  compile(asm_filename, source);
+  compile(src_filename_with_extension, asm_filename, source);
 
   free(source);
 
