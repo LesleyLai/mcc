@@ -7,7 +7,7 @@ int main(void)
 
 Diagnostics:
 ============
-dummy_file_name.c:3:4: Error: Error
+dummy_file_name.c:3:4: Error: Unexpected character.
 1 |     int main(void)
 2 |     {
 3 |       $ return 0;

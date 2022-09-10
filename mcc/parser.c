@@ -40,7 +40,7 @@ static SourceRange token_source_range(Token token)
 //       .end = (lhs.end.offset > rhs.end.offset) ? lhs.end : rhs.end};
 // }
 
-static void parse_error_at(Parser* parser, const char* error_msg, Token token)
+static void parse_error_at(Parser* parser, StringView error_msg, Token token)
 {
   if (parser->in_panic_mode) return;
 
@@ -56,8 +56,7 @@ static void parse_error_at(Parser* parser, const char* error_msg, Token token)
   }
 
   parser->errors.data[parser->errors.size++] =
-      (ParseError){.msg = string_view_from_c_str(error_msg),
-                   .range = token_source_range(token)};
+      (ParseError){.msg = error_msg, .range = token_source_range(token)};
 
   parser->has_error = true;
   parser->in_panic_mode = true;
@@ -69,14 +68,14 @@ static void parse_advance(Parser* parser)
     parser->previous = parser->current;
     parser->current = lexer_scan_token(&parser->lexer);
     if (parser->current.type != TOKEN_ERROR) break;
-    parse_error_at(parser, "Error", parser->current);
+    parse_error_at(parser, parser->current.src, parser->current);
   }
 }
 
 static void parse_consume(Parser* parser, TokenType type, const char* error_msg)
 {
   if (parser->current.type != type) {
-    parse_error_at(parser, error_msg, parser->current);
+    parse_error_at(parser, string_view_from_c_str(error_msg), parser->current);
   }
 
   parse_advance(parser);
@@ -155,7 +154,8 @@ static Expr* parse_precedence(Parser* parser, Precedence precedence)
 
   const ParseFn prefix_rule = get_rule(parser->previous.type)->prefix;
   if (prefix_rule == NULL) {
-    parse_error_at(parser, "Expect valid expression", parser->current);
+    parse_error_at(parser, string_view_from_c_str("Expect valid expression"),
+                   parser->current);
     return NULL;
   }
 
@@ -240,7 +240,8 @@ static void parse_compound_stmt(Parser* parser, CompoundStmt* out_compount_stmt
   while (parser->current.type != TOKEN_RIGHT_BRACE) {
     if (statement_count == MAX_STMT_COUNT_IN_COMPOUND_STMT) {
       parse_error_at(parser,
-                     "Too many statement in compound statement to handle",
+                     string_view_from_c_str(
+                         "Too many statement in compound statement to handle"),
                      parser->current);
       return;
     }
@@ -307,7 +308,8 @@ static void parse_stmt(Parser* parser, Stmt* out_stmt)
     return;
   }
   default: {
-    parse_error_at(parser, "Expect statement", parser->current);
+    parse_error_at(parser, string_view_from_c_str("Expect statement"),
+                   parser->current);
     return;
   }
   }
@@ -323,7 +325,8 @@ static void parse_parameter_list(Parser* parser)
 static StringView parse_identifier(Parser* parser)
 {
   if (parser->current.type != TOKEN_IDENTIFIER) {
-    parse_error_at(parser, "Expect Identifier", parser->current);
+    parse_error_at(parser, string_view_from_c_str("Expect Identifier"),
+                   parser->current);
   }
   StringView name = parser->current.src;
   parse_advance(parser);
