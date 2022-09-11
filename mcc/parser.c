@@ -33,12 +33,12 @@ static SourceRange token_source_range(Token token)
               .offset = token.location.offset + token.src.size}};
 }
 
-// static SourceRange source_range_union(SourceRange lhs, SourceRange rhs)
-//{
-//   return (SourceRange){
-//       .begin = (lhs.begin.offset < rhs.begin.offset) ? lhs.begin : rhs.begin,
-//       .end = (lhs.end.offset > rhs.end.offset) ? lhs.end : rhs.end};
-// }
+static SourceRange source_range_union(SourceRange lhs, SourceRange rhs)
+{
+  return (SourceRange){
+      .begin = (lhs.begin.offset < rhs.begin.offset) ? lhs.begin : rhs.begin,
+      .end = (lhs.end.offset > rhs.end.offset) ? lhs.end : rhs.end};
+}
 
 static void parse_error_at(Parser* parser, StringView error_msg, Token token)
 {
@@ -67,7 +67,7 @@ static void parse_advance(Parser* parser)
   for (;;) {
     parser->previous = parser->current;
     parser->current = lexer_scan_token(&parser->lexer);
-    if (parser->current.type != TOKEN_ERROR) break;
+    if (parser->current.type != TOKEN_ERROR) return;
     parse_error_at(parser, parser->current.src, parser->current);
   }
 }
@@ -111,13 +111,14 @@ typedef enum Precedence {
 
 static Expr* parse_group(Parser* parser);
 static Expr* parse_unary_op(Parser* parser);
-static Expr* parse_binary_op(Parser* parser);
+static Expr* parse_binary_op(Parser* parser, Expr* lhs);
 
-typedef Expr* (*ParseFn)(Parser*);
+typedef Expr* (*PrefixParseFn)(Parser*);
+typedef Expr* (*InfixParseFn)(Parser*, Expr*);
 
 typedef struct ParseRule {
-  ParseFn prefix;
-  ParseFn infix;
+  PrefixParseFn prefix;
+  InfixParseFn infix;
   Precedence precedence;
 } ParseRule;
 
@@ -148,11 +149,15 @@ static ParseRule* get_rule(TokenType operator_type)
   return &rules[operator_type];
 }
 
+// starts at the current token and parses any expression at the given precedence
+// level or higher
 static Expr* parse_precedence(Parser* parser, Precedence precedence)
 {
   if (parser->in_panic_mode) { return NULL; }
 
-  const ParseFn prefix_rule = get_rule(parser->previous.type)->prefix;
+  parse_advance(parser);
+
+  const PrefixParseFn prefix_rule = get_rule(parser->previous.type)->prefix;
   if (prefix_rule == NULL) {
     parse_error_at(parser, string_view_from_c_str("Expect valid expression"),
                    parser->current);
@@ -160,11 +165,10 @@ static Expr* parse_precedence(Parser* parser, Precedence precedence)
   }
 
   Expr* expr = prefix_rule(parser);
-
   while (precedence <= get_rule(parser->current.type)->precedence) {
     parse_advance(parser);
-    // ParseFn infix_rule = get_rule(parser->previous.type)->infix;
-    //  Expr* rhs = infix_rule(parser);
+    InfixParseFn infix_rule = get_rule(parser->previous.type)->infix;
+    expr = infix_rule(parser, expr);
   }
 
   return expr;
@@ -182,29 +186,37 @@ static Expr* parse_unary_op(Parser* parser)
   TokenType operator_type = parser->previous.type;
 
   Expr* expr = parse_precedence(parser, PREC_UNARY);
-
   switch (operator_type) {
-  case TOKEN_MINUS: return expr; // TODO: should actually wrap it
-  default: return NULL;          // TODO: better error reporting for unreachable
+  case TOKEN_MINUS:
+    return expr;        // TODO: should actually wrap it with a negate parent
+  default: return NULL; // TODO: better error handling for unreachable
   }
 }
 
-static Expr* parse_binary_op(Parser* parser)
+static Expr* parse_binary_op(Parser* parser, Expr* lhs)
 {
   const TokenType operator_type = parser->previous.type;
   const ParseRule* rule = get_rule(operator_type);
-  parse_precedence(parser, (Precedence)(rule->precedence + 1));
 
-  //  BinaryOpType binary_op_type;
-  //  switch (operator_type) {
-  //  case TOKEN_PLUS: binary_op_type = BINARY_OP_PLUS; break;
-  //  case TOKEN_MINUS: binary_op_type = BINARY_OP_MINUS; break;
-  //  case TOKEN_STAR: binary_op_type = BINARY_OP_MULT; break;
-  //  case TOKEN_SLASH: binary_op_type = BINARY_OP_DIVIDE; break;
-  //  default: return NULL; // TODO: better error reporting for unreachable
-  //  }
+  Expr* rhs = parse_precedence(parser, (Precedence)(rule->precedence + 1));
 
-  return NULL;
+  BinaryOpType binary_op_type;
+  switch (operator_type) {
+  case TOKEN_PLUS: binary_op_type = BINARY_OP_PLUS; break;
+  case TOKEN_MINUS: binary_op_type = BINARY_OP_MINUS; break;
+  case TOKEN_STAR: binary_op_type = BINARY_OP_MULT; break;
+  case TOKEN_SLASH: binary_op_type = BINARY_OP_DIVIDE; break;
+  default: return NULL; // TODO: better error reporting for unreachable
+  }
+
+  Expr* result = ARENA_ALLOC_OBJECT(parser->ast_arena, Expr);
+  *result = (Expr){
+      .type = BINARY_OP_EXPR,
+      .source_range = source_range_union(lhs->source_range, rhs->source_range),
+      .binary_op = (struct BinaryOpExpr){
+          .binary_op_type = binary_op_type, .lhs = lhs, .rhs = rhs}};
+
+  return result;
 }
 
 static Expr* parse_expr(Parser* parser)
@@ -214,7 +226,6 @@ static Expr* parse_expr(Parser* parser)
 
 static void parse_return_stmt(Parser* parser, ReturnStmt* out_ret_stmt)
 {
-  parse_advance(parser);
   Expr* expr = parse_expr(parser);
   if (parser->in_panic_mode) return;
 

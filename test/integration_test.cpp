@@ -147,7 +147,8 @@ TEST_CASE("Integration tests")
 
   SECTION("Verify all c files")
   {
-    auto file_path = GENERATE_COPY(c_files_in_directory(test_data_directory));
+    const auto file_path =
+        GENERATE_COPY(c_files_in_directory(test_data_directory));
 
     const auto src = read_file_to_string(file_path.string());
 
@@ -164,8 +165,14 @@ TEST_CASE("Integration tests")
                     "{}.{{ApprovedOrReceived}}.{{FileExtension}}",
                     test_name));
 
-    ApprovalTests::Approvals::verify(verify_compilation(src, ast_arena),
-                                     ApprovalTests::Options().withNamer(namer));
+    try {
+      ApprovalTests::Approvals::verify(
+          verify_compilation(src, ast_arena),
+          ApprovalTests::Options().withNamer(namer));
+    } catch (const ApprovalTests::ApprovalMismatchException& e) {
+      CHECK(false);
+      WARN(e.what());
+    }
     arena_reset(&ast_arena);
   }
 }

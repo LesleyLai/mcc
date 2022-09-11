@@ -20,16 +20,29 @@ namespace mcc {
 
 void print_to_string(std::string& buffer, const Expr& expr, int indentation)
 {
-  indented_format_to(std::back_inserter(buffer), indentation, "Expr <{}>\n",
-                     expr.source_range);
   switch (expr.type) {
   case CONST_EXPR: {
-    indented_format_to(std::back_inserter(buffer), indentation + 2, "{}\n",
+    indented_format_to(std::back_inserter(buffer), indentation, "{}\n",
                        expr.const_expr.val);
     return;
   }
-  case BINARY_OP_EXPR:
-    // TODO: print binary operators
+  case BINARY_OP_EXPR: {
+    const std::string_view op_type_str = [&]() {
+      switch (expr.binary_op.binary_op_type) {
+      case BINARY_OP_PLUS: return "Plus";
+      case BINARY_OP_MINUS: return "Minus";
+      case BINARY_OP_MULT: return "Mult";
+      case BINARY_OP_DIVIDE: return "Divide";
+      }
+      return "Unknown";
+    }();
+
+    indented_format_to(std::back_inserter(buffer), indentation, "Binary{}\n",
+                       op_type_str);
+    print_to_string(buffer, *expr.binary_op.lhs, indentation + 2);
+    print_to_string(buffer, *expr.binary_op.rhs, indentation + 2);
+  }
+    // lhs rhs
     return;
   }
 }

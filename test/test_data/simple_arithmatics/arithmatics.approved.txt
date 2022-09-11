@@ -1,0 +1,23 @@
+Source:
+============
+int main(void)
+{
+  return 2 - (4 + 2) * 8 / 3;
+}
+
+
+AST:
+============
+TranslationUnit
+  FunctionDecl <line: 1..5> "int main(void)"
+    ReturnStmt <line:3 column: 3..29>
+      BinaryMinus
+        2
+        BinaryDivide
+          BinaryMult
+            BinaryPlus
+              4
+              2
+            8
+          3
+
