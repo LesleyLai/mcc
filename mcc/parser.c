@@ -110,8 +110,8 @@ typedef enum Precedence {
 } Precedence;
 
 static Expr* parse_group(Parser* parser);
-static Expr* parse_unary_op(Parser* parser);
-static Expr* parse_binary_op(Parser* parser, Expr* lhs);
+static Expr* parse_prefix(Parser* parser);
+static Expr* parse_infix(Parser* parser, Expr* lhs);
 
 typedef Expr* (*PrefixParseFn)(Parser*);
 typedef Expr* (*InfixParseFn)(Parser*, Expr*);
@@ -128,10 +128,10 @@ static ParseRule rules[] = {
     [TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE},
     [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
     [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE},
-    [TOKEN_PLUS] = {NULL, parse_binary_op, PREC_TERM},
-    [TOKEN_MINUS] = {parse_unary_op, parse_binary_op, PREC_TERM},
-    [TOKEN_STAR] = {NULL, parse_binary_op, PREC_FACTOR},
-    [TOKEN_SLASH] = {NULL, parse_binary_op, PREC_FACTOR},
+    [TOKEN_PLUS] = {NULL, parse_infix, PREC_TERM},
+    [TOKEN_MINUS] = {parse_prefix, parse_infix, PREC_TERM},
+    [TOKEN_STAR] = {NULL, parse_infix, PREC_FACTOR},
+    [TOKEN_SLASH] = {NULL, parse_infix, PREC_FACTOR},
     [TOKEN_KEYWORD_VOID] = {NULL, NULL, PREC_NONE},
     [TOKEN_KEYWORD_INT] = {NULL, NULL, PREC_NONE},
     [TOKEN_KEYWORD_RETURN] = {NULL, NULL, PREC_NONE},
@@ -181,7 +181,7 @@ static Expr* parse_group(Parser* parser)
   return result;
 }
 
-static Expr* parse_unary_op(Parser* parser)
+static Expr* parse_prefix(Parser* parser)
 {
   TokenType operator_type = parser->previous.type;
 
@@ -193,7 +193,7 @@ static Expr* parse_unary_op(Parser* parser)
   }
 }
 
-static Expr* parse_binary_op(Parser* parser, Expr* lhs)
+static Expr* parse_infix(Parser* parser, Expr* lhs)
 {
   const TokenType operator_type = parser->previous.type;
   const ParseRule* rule = get_rule(operator_type);
