@@ -12,11 +12,13 @@ extern "C" {
 #include "utils/allocators.h"
 
 #include "diagnostic.h"
+#include "gen_ir.h"
 #include "parser.h"
 }
 
 #include "ast_printer.hpp"
 #include "cstring_view_format.hpp"
+#include "ir_printer.hpp"
 
 // This file compiler against bunch of source files and will serialize from
 // input to all the important intermediate information for approval test
@@ -106,7 +108,7 @@ void dump_parse_errors(std::string& output, const char* file_path,
       write_diagnostics(&msg, file_path, source, error);
       StringView msg_view = string_view_from_buffer(&msg);
       fmt::format_to(std::back_inserter(output),
-                     "Diagnostics:\n============\n{}\n", msg_view);
+                     "\nDiagnostics:\n============\n{}\n", msg_view);
 
       arena_reset(&diagnostics_arena);
     }
@@ -118,7 +120,7 @@ void dump_parse_errors(std::string& output, const char* file_path,
 {
   std::string output;
   fmt::format_to(std::back_inserter(output), "Source:\n============\n");
-  fmt::format_to(std::back_inserter(output), "{}\n\n", source);
+  fmt::format_to(std::back_inserter(output), "{}\n", source);
 
   const auto result = parse(source.c_str(), &ast_arena);
   dump_parse_errors(output, "dummy_file_name.c", source.c_str(), result.errors);
@@ -128,8 +130,14 @@ void dump_parse_errors(std::string& output, const char* file_path,
     return output;
   }
 
-  fmt::format_to(std::back_inserter(output), "AST:\n============\n");
+  fmt::format_to(std::back_inserter(output), "\nAST:\n============\n");
   mcc::print_to_string(output, *result.ast);
+
+  PolyAllocator ir_allocator = poly_allocator_from_arena(&ast_arena);
+  fmt::format_to(std::back_inserter(output), "\nIR:\n============\n");
+  auto* ir_func = generate_ir(result.ast, &ir_allocator);
+  mcc::print_to_string(output, *ir_func);
+
   return output;
 }
 

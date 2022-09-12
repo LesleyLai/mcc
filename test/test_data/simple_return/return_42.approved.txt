@@ -12,3 +12,9 @@ TranslationUnit
     ReturnStmt <line:3 column: 3..12>
       42
 
+IR:
+============
+func main
+    r0: i32 = 42
+    return i32 r0
+

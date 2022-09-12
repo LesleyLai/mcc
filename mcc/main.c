@@ -57,7 +57,7 @@ static void compile_to_file(FILE* asm_file,
   fputs("global main\n", asm_file);
   fputs("main:\n", asm_file);
   fprintf(asm_file, "  mov     rax, %d\n", return_value);
-  fputs("  ret", asm_file);
+  fputs("  ir_ret", asm_file);
 }
 
 void compile(const char* src_filename_with_extension, const char* asm_filename,

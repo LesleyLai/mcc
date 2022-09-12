@@ -15,7 +15,7 @@ add_library(mcc_lib
         parser.c
         source_location.h
         diagnostic.c
-        diagnostic.h)
+        diagnostic.h ir.h gen_ir.c gen_ir.h)
 target_link_libraries(mcc_lib
         PUBLIC mcc::compiler_options
         PRIVATE mcc::compiler_warnings)
