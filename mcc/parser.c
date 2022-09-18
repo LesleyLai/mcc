@@ -212,7 +212,9 @@ static Expr* parse_infix(Parser* parser, Expr* lhs)
   default: return NULL; // TODO: better error handling for unreachable
   }
 
-  // Parser-level constant folding
+  // Trivial parser-level constant folding
+  // This is enough to deal with case like 2 + 2
+  // It won't handle more complicated cases like 2 + x + 2
   if (lhs->type == CONST_EXPR && rhs->type == CONST_EXPR) {
     return fold_binary_op(parser, lhs, rhs, &binary_op_type);
   }

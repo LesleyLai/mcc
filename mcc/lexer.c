@@ -49,13 +49,13 @@ static char lexer_advance(Lexer* lexer)
 
 //// If current character match expected, consumes it and returns true
 //// Otherwise returns false
-// static bool lexer_match(Lexer* lexer, char expected)
-//{
-//   if (lexer_is_at_end(lexer)) return false;
-//   if (*lexer->current != expected) return false;
-//   lexer_advance(lexer);
-//   return true;
-// }
+static bool lexer_match(Lexer* lexer, char expected)
+{
+  if (lexer_is_at_end(lexer)) return false;
+  if (*lexer->current != expected) return false;
+  lexer_advance(lexer);
+  return true;
+}
 
 static void skip_whitespace(Lexer* lexer)
 {
@@ -149,6 +149,34 @@ Token lexer_scan_token(Lexer* lexer)
   case '-': return lexer_make_token(lexer, TOKEN_MINUS);
   case '*': return lexer_make_token(lexer, TOKEN_STAR);
   case '/': return lexer_make_token(lexer, TOKEN_SLASH);
+  case '%': return lexer_make_token(lexer, TOKEN_PERCENT);
+  case '~': return lexer_make_token(lexer, TOKEN_TILDE);
+  case '&':
+    return lexer_make_token(lexer, lexer_match(lexer, '&')
+                                       ? TOKEN_AMPERSAND_AMPERSAND
+                                       : TOKEN_AMPERSAND);
+  case '|':
+    return lexer_make_token(lexer, lexer_match(lexer, '|') ? TOKEN_BAR_BAR
+                                                           : TOKEN_BAR);
+  case '<': {
+    const TokenType token = lexer_match(lexer, '<')   ? TOKEN_LEFT_SHIFT
+                            : lexer_match(lexer, '=') ? TOKEN_LESS_THAN_OR_EQ
+                                                      : TOKEN_LESS_THAN;
+    return lexer_make_token(lexer, token);
+  }
+  case '>': {
+    const TokenType token = lexer_match(lexer, '>')   ? TOKEN_RIGHT_SHIFT
+                            : lexer_match(lexer, '=') ? TOKEN_GREATER_THAN_OR_EQ
+                                                      : TOKEN_GREATER_THAN;
+    return lexer_make_token(lexer, token);
+  }
+  case '^': return lexer_make_token(lexer, TOKEN_XOR);
+  case '=':
+    return lexer_make_token(lexer, lexer_match(lexer, '=') ? TOKEN_EQUAL
+                                                           : TOKEN_EQUAL_EQUAL);
+  case '!':
+    return lexer_make_token(lexer, lexer_match(lexer, '=') ? TOKEN_NOT_EQUAL
+                                                           : TOKEN_NOT);
   default: break;
   }
 

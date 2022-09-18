@@ -5,15 +5,15 @@ int main(void)
 }
 
 Tokens:
-10 <line: 1 col: 1 offset: 0> "int"
-12 <line: 1 col: 5 offset: 4> "main"
-0 <line: 1 col: 9 offset: 8> "("
-9 <line: 1 col: 10 offset: 9> "void"
-1 <line: 1 col: 14 offset: 13> ")"
-2 <line: 2 col: 1 offset: 15> "{"
-11 <line: 3 col: 3 offset: 19> "return"
-13 <line: 3 col: 10 offset: 26> "42"
-4 <line: 3 col: 12 offset: 28> ";"
-3 <line: 4 col: 1 offset: 30> "}"
-15 <line: 4 col: 2 offset: 31> ""
+int      <line: 1 col: 1 offset: 0> "int"
+IDENTIFIER <line: 1 col: 5 offset: 4> "main"
+(        <line: 1 col: 9 offset: 8> "("
+void     <line: 1 col: 10 offset: 9> "void"
+)        <line: 1 col: 14 offset: 13> ")"
+{        <line: 2 col: 1 offset: 15> "{"
+return   <line: 3 col: 3 offset: 19> "return"
+INTEGER  <line: 3 col: 10 offset: 26> "42"
+;        <line: 3 col: 12 offset: 28> ";"
+}        <line: 4 col: 1 offset: 30> "}"
+EOF      <line: 4 col: 2 offset: 31> ""
 

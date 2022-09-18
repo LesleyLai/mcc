@@ -20,6 +20,51 @@ template <> struct fmt::formatter<StringView> : formatter<string_view> {
   }
 };
 
+template <> struct fmt::formatter<TokenType> : formatter<string_view> {
+  template <typename FormatContext> auto format(TokenType t, FormatContext& ctx)
+  {
+    string_view name;
+
+    switch (t) {
+    case TOKEN_LEFT_PAREN: name = "("; break;
+    case TOKEN_RIGHT_PAREN: name = ")"; break;
+    case TOKEN_LEFT_BRACE: name = "{"; break;
+    case TOKEN_RIGHT_BRACE: name = "}"; break;
+    case TOKEN_SEMICOLON: name = ";"; break;
+    case TOKEN_EQUAL: name = "="; break;
+    case TOKEN_PLUS: name = "+"; break;
+    case TOKEN_MINUS: name = "-"; break;
+    case TOKEN_STAR: name = "*"; break;
+    case TOKEN_SLASH: name = "/"; break;
+    case TOKEN_PERCENT: name = "%"; break;
+    case TOKEN_TILDE: name = "~"; break;
+    case TOKEN_AMPERSAND: name = "&"; break;
+    case TOKEN_BAR: name = "|"; break;
+    case TOKEN_LEFT_SHIFT: name = "<<"; break;
+    case TOKEN_RIGHT_SHIFT: name = ">>"; break;
+    case TOKEN_XOR: name = "^"; break;
+    case TOKEN_NOT: name = "!"; break;
+    case TOKEN_AMPERSAND_AMPERSAND: name = "&&"; break;
+    case TOKEN_BAR_BAR: name = "||"; break;
+    case TOKEN_EQUAL_EQUAL: name = "=="; break;
+    case TOKEN_NOT_EQUAL: name = "!+"; break;
+    case TOKEN_LESS_THAN: name = "<"; break;
+    case TOKEN_GREATER_THAN: name = ">"; break;
+    case TOKEN_LESS_THAN_OR_EQ: name = "<="; break;
+    case TOKEN_GREATER_THAN_OR_EQ: name = ">="; break;
+    case TOKEN_KEYWORD_VOID: name = "void"; break;
+    case TOKEN_KEYWORD_INT: name = "int"; break;
+    case TOKEN_KEYWORD_RETURN: name = "return"; break;
+    case TOKEN_IDENTIFIER: name = "IDENTIFIER"; break;
+    case TOKEN_INTEGER: name = "INTEGER"; break;
+    case TOKEN_ERROR: name = "ERROR"; break;
+    case TOKEN_EOF: name = "EOF"; break;
+    }
+
+    return formatter<string_view>::format(name, ctx);
+  }
+};
+
 template <> struct fmt::formatter<Token> {
   constexpr auto parse(format_parse_context& ctx) -> decltype(ctx.begin())
   {
@@ -30,8 +75,8 @@ template <> struct fmt::formatter<Token> {
 
   auto format(Token token, auto& ctx)
   {
-    return fmt::format_to(ctx.out(), "{} {} \"{}\"", token.type, token.location,
-                          token.src);
+    return fmt::format_to(ctx.out(), "{:<8} {} \"{}\"", token.type,
+                          token.location, token.src);
   }
 };
 
