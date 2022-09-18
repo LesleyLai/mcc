@@ -11,27 +11,11 @@ AST:
 TranslationUnit
   FunctionDecl <line: 1..5> "int main(void)"
     ReturnStmt <line:3 column: 3..29>
-      BinaryMinus
-        2
-        BinaryDivide
-          BinaryMult
-            BinaryPlus
-              4
-              2
-            8
-          3
+      -14
 
 IR:
 ============
 func main
-    r0: i32 = 2
-    r1: i32 = 4
-    r2: i32 = 2
-    r3 = r1 + r2
-    r4: i32 = 8
-    r5 = r3 * r4
-    r6: i32 = 3
-    r7 = r5 / r6
-    r8 = r0 - r7
-    return i32 r8
+    r0: i32 = -14
+    return i32 r0
 

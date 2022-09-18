@@ -193,6 +193,9 @@ static Expr* parse_prefix(Parser* parser)
   }
 }
 
+static Expr* fold_binary_op(const Parser* parser, Expr* lhs, Expr* rhs,
+                            BinaryOpType* binary_op_type);
+
 static Expr* parse_infix(Parser* parser, Expr* lhs)
 {
   const TokenType operator_type = parser->previous.type;
@@ -206,7 +209,12 @@ static Expr* parse_infix(Parser* parser, Expr* lhs)
   case TOKEN_MINUS: binary_op_type = BINARY_OP_MINUS; break;
   case TOKEN_STAR: binary_op_type = BINARY_OP_MULT; break;
   case TOKEN_SLASH: binary_op_type = BINARY_OP_DIVIDE; break;
-  default: return NULL; // TODO: better error reporting for unreachable
+  default: return NULL; // TODO: better error handling for unreachable
+  }
+
+  // Parser-level constant folding
+  if (lhs->type == CONST_EXPR && rhs->type == CONST_EXPR) {
+    return fold_binary_op(parser, lhs, rhs, &binary_op_type);
   }
 
   Expr* result = ARENA_ALLOC_OBJECT(parser->ast_arena, Expr);
@@ -216,6 +224,25 @@ static Expr* parse_infix(Parser* parser, Expr* lhs)
       .binary_op = (struct BinaryOpExpr){
           .binary_op_type = binary_op_type, .lhs = lhs, .rhs = rhs}};
 
+  return result;
+}
+
+static Expr* fold_binary_op(const Parser* parser, Expr* lhs, Expr* rhs,
+                            BinaryOpType* binary_op_type)
+{
+  const int l = lhs->const_expr.val, r = rhs->const_expr.val;
+  int val;
+  switch ((*binary_op_type)) {
+  case BINARY_OP_PLUS: val = l + r; break;
+  case BINARY_OP_MINUS: val = l - r; break;
+  case BINARY_OP_MULT: val = l * r; break;
+  case BINARY_OP_DIVIDE: val = l / r; break;
+  }
+  Expr* result = ARENA_ALLOC_OBJECT(parser->ast_arena, Expr);
+  *result = (Expr){.type = CONST_EXPR,
+                   .source_range =
+                       source_range_union(lhs->source_range, rhs->source_range),
+                   .const_expr = (struct ConstExpr){.val = val}};
   return result;
 }
 
