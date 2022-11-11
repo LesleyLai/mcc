@@ -233,7 +233,7 @@ static Expr* fold_binary_op(const Parser* parser, Expr* lhs, Expr* rhs,
                             BinaryOpType* binary_op_type)
 {
   const int l = lhs->const_expr.val, r = rhs->const_expr.val;
-  int val;
+  int val = 0;
   switch ((*binary_op_type)) {
   case BINARY_OP_PLUS: val = l + r; break;
   case BINARY_OP_MINUS: val = l - r; break;
@@ -329,6 +329,7 @@ static void parse_stmt(Parser* parser, Stmt* out_stmt)
     // Stmt* stmt = ARENA_ALLOC_OBJECT(parser->ast_arena, Stmt);
     ReturnStmt return_stmt;
     parse_return_stmt(parser, &return_stmt);
+    if (parser->in_panic_mode) return;
     *out_stmt = (Stmt){
         .type = RETURN_STMT,
         .source_range = {.begin = first_loc, .end = parser->previous.location},

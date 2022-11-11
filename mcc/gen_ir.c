@@ -24,7 +24,7 @@ static IR_Instruction ir_load_i32(Register rdest, int32_t value)
 static IR_Instruction ir_binary_op(enum IR_Opcode opcode, Register r1,
                                    Register r2, Register rdest)
 {
-  return (IR_Instruction){.opcode = opcode,
+  return (IR_Instruction){.opcode = (uint8_t)opcode,
                           .optype = IR_Type_I32,
                           .data.binary_op = {
                               .r1 = r1,

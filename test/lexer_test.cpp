@@ -59,6 +59,7 @@ template <> struct fmt::formatter<TokenType> : formatter<string_view> {
     case TOKEN_INTEGER: name = "INTEGER"; break;
     case TOKEN_ERROR: name = "ERROR"; break;
     case TOKEN_EOF: name = "EOF"; break;
+    case TOKEN_TYPES_COUNT: /* shouldn't happen*/ break;
     }
 
     return formatter<string_view>::format(name, ctx);
