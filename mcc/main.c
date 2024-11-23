@@ -53,11 +53,11 @@ static void compile_to_file(FILE* asm_file,
   const int return_value =
       tu->decls[0].body->statements[0].ret.expr->const_expr.val;
 
-  fputs("section .text\n", asm_file);
-  fputs("global main\n", asm_file);
+  // fputs("section .text\n", asm_file);
+  fputs(".globl main\n", asm_file);
   fputs("main:\n", asm_file);
   fprintf(asm_file, "  mov     rax, %d\n", return_value);
-  fputs("  ret", asm_file);
+  fputs("  ret\n", asm_file);
 }
 
 void compile(const char* src_filename_with_extension, const char* asm_filename,
@@ -95,13 +95,9 @@ void assemble(const char* asm_filename, const char* obj_filename)
   enum { buffer_size = 10000 };
   char buffer[buffer_size];
 
-#ifdef _WIN32
-  snprintf(buffer, buffer_size, "yasm -fwin64 %s.asm -o %s.obj", asm_filename,
+  snprintf(buffer, buffer_size,
+           "as -c %s.asm -o %s.o -msyntax=intel -mnaked-reg", asm_filename,
            obj_filename);
-#else // linux
-  snprintf(buffer, buffer_size, "yasm -felf64 %s.asm -o %s.o", asm_filename,
-           obj_filename);
-#endif
 
   if (system(buffer)) {
     fprintf(stderr, "Failed to call the assembler");
@@ -113,15 +109,9 @@ void link(const char* obj_filename, const char* executable_name)
 {
   enum { buffer_size = 10000 };
   char buffer[buffer_size];
-#ifdef _WIN32
-  snprintf(buffer, buffer_size,
-           "link.exe /SUBSYSTEM:CONSOLE /ENTRY:main %s.obj /OUT:%s.exe 1>NUL",
-           obj_filename, executable_name);
-#else // linux
-  snprintf(buffer, buffer_size,
-           "ld -lc %s.o -o %s -I /lib64/ld-linux-x86-64.so.2", obj_filename,
+
+  snprintf(buffer, buffer_size, "gcc %s.o -o %s", obj_filename,
            executable_name);
-#endif
   if (system(buffer)) {
     fprintf(stderr, "Failed to call the linker");
     exit(1);
@@ -133,7 +123,7 @@ char* file_to_allocated_buffer(FILE* file)
   fseek(file, 0, SEEK_END);
   const long length = ftell(file);
   if (length < 0) {
-    fprintf(stderr, "Error in ftell");
+    (void)fprintf(stderr, "Error in ftell");
     exit(1);
   }
   const size_t ulength = (size_t)length;
@@ -143,7 +133,7 @@ char* file_to_allocated_buffer(FILE* file)
   size_t read_res = fread(buffer, 1, ulength,
                           file); // TODO: check result of fread
   if (read_res != (unsigned long)length) {
-    fprintf(stderr, "Error during reading file");
+    (void)fprintf(stderr, "Error during reading file");
     exit(1);
   }
   buffer[ulength] = '\0';
@@ -153,19 +143,21 @@ char* file_to_allocated_buffer(FILE* file)
 int main(int argc, char* argv[])
 {
   if (argc != 2) {
-    puts("Usage: mcc <asm_filename>");
+    puts("Usage: mcc <filename>");
     return 1;
   }
   const char* src_filename_with_extension = argv[1];
 
   FILE* src_file = fopen(src_filename_with_extension, "rb");
   if (!src_file) {
-    fprintf(stderr, "Mcc: fatal error: %s: No such file",
-            src_filename_with_extension);
+    (void)fprintf(stderr, "Mcc: fatal error: %s: No such file",
+                  src_filename_with_extension);
     exit(1);
   }
 
   char* source = file_to_allocated_buffer(src_file);
+
+  fclose(src_file);
 
   const char* asm_filename = "file";
   compile(src_filename_with_extension, asm_filename, source);

@@ -13,7 +13,8 @@ readability-misplaced-array-index,
 readability-non-const-parameter,
 readability-redundant-*,
 readability-simplify-*,
--modernize-deprecated-headers
+-modernize-deprecated-headers,
+-*-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
 '
 HeaderFilterRegex: 'catch.hpp'
 FormatStyle: 'file'
