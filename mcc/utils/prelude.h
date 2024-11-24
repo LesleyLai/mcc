@@ -14,4 +14,6 @@
 #define MCC_COMPOUND_LITERAL(T) (T)
 #endif
 
+#define MCC_ARRAY_SIZE(arr) (sizeof(arr) / sizeof(arr[0]))
+
 #endif // MCC_PRELUDE_H

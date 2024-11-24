@@ -1,3 +1,5 @@
+#include "cli_args.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -8,6 +10,7 @@
 #include "utils/str.h"
 
 #include <stdarg.h>
+#include <string.h>
 
 static void compile_to_file(FILE* asm_file,
                             const char* src_filename_with_extension,
@@ -142,11 +145,9 @@ char* file_to_allocated_buffer(FILE* file)
 
 int main(int argc, char* argv[])
 {
-  if (argc != 2) {
-    puts("Usage: mcc <filename>");
-    return 1;
-  }
-  const char* src_filename_with_extension = argv[1];
+  const CliArgs args = parse_cli_args(argc, argv);
+
+  const char* src_filename_with_extension = args.source_filename;
 
   FILE* src_file = fopen(src_filename_with_extension, "rb");
   if (!src_file) {

@@ -15,13 +15,15 @@ add_library(mcc_lib
         parser.c
         source_location.h
         diagnostic.c
-        diagnostic.h)
+        diagnostic.h
+        cli_args.c
+        cli_args.h)
 target_link_libraries(mcc_lib
         PUBLIC mcc::compiler_options
         PRIVATE mcc::compiler_warnings)
 target_include_directories(mcc_lib
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
-        )
+)
 
 add_executable(mcc main.c)
 target_link_libraries(mcc PRIVATE mcc_lib mcc::compiler_warnings)
