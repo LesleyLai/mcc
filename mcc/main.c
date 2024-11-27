@@ -27,12 +27,10 @@ static void compile_to_file(FILE* asm_file,
   uint8_t diagnostics_buffer[diagnostics_arena_size];
   Arena diagnostics_arena =
       arena_init(diagnostics_buffer, diagnostics_arena_size);
-  PolyAllocator diagnostics_allocator =
-      poly_allocator_from_arena(&diagnostics_arena);
 
   if (result.errors.size > 0) {
     for (size_t i = 0; i < result.errors.size; ++i) {
-      StringBuffer output = string_buffer_new(&diagnostics_allocator);
+      StringBuffer output = string_buffer_new(&diagnostics_arena);
       write_diagnostics(&output, src_filename_with_extension, source,
                         result.errors.data[i]);
       StringView output_view = string_view_from_buffer(&output);
@@ -69,12 +67,11 @@ void compile(const char* src_filename_with_extension, const char* asm_filename,
   enum { temp_buffer_size = 1000 };
   uint8_t* temp_buffer[temp_buffer_size];
   Arena temp_arena = arena_init(temp_buffer, temp_buffer_size);
-  PolyAllocator allocator = poly_allocator_from_arena(&temp_arena);
 
   const StringView src_filename_sv = string_view_from_c_str(asm_filename);
 
   StringBuffer asm_filename_with_extension =
-      string_buffer_from_view(src_filename_sv, &allocator);
+      string_buffer_from_view(src_filename_sv, &temp_arena);
   string_buffer_append(&asm_filename_with_extension,
                        string_view_from_c_str(".asm"));
 

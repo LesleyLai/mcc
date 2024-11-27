@@ -4,29 +4,6 @@
 #include <stdint.h>
 #include <string.h>
 
-/**
- * @brief // Allocate size bytes of uninitialized storage.
- *
- * The size parameter must be an integral multiple of alignment.
- */
-void* poly_aligned_alloc(const PolyAllocator* allocator, size_t alignment,
-                         size_t size)
-{
-  return allocator->aligned_alloc(allocator, alignment, size);
-}
-
-void* poly_aligned_grow(const PolyAllocator* allocator, void* p,
-                        size_t new_alignment, size_t new_size)
-{
-  return allocator->aligned_grow(allocator, p, new_alignment, new_size);
-}
-
-void* poly_aligned_shrink(const PolyAllocator* allocator, void* p,
-                          size_t new_alignment, size_t new_size)
-{
-  return allocator->aligned_shrink(allocator, p, new_alignment, new_size);
-}
-
 // Given a pointer current, returns a pointer aligned by the specified alignment
 // The returned pointer always have higher address than the original pointer
 static Byte* align_forward(Byte* ptr, size_t alignment)
@@ -141,33 +118,4 @@ void arena_reset(Arena* arena)
   arena->size_remain += (size_t)(arena->current - begin);
   arena->current = begin;
   arena->previous = NULL;
-}
-
-// To be used as a function pointer in PolyAllocator
-static void* _arena_poly_aligned_alloc(const PolyAllocator* self,
-                                       size_t alignment, size_t size)
-{
-  return arena_aligned_alloc((Arena*)self->user_data, alignment, size);
-}
-
-static void* _arena_poly_aligned_grow(const PolyAllocator* self, void* p,
-                                      size_t new_alignment, size_t new_size)
-{
-  return arena_aligned_grow((Arena*)self->user_data, p, new_alignment,
-                            new_size);
-}
-
-static void* _arena_poly_aligned_shrink(const PolyAllocator* self, void* p,
-                                        size_t new_alignment, size_t new_size)
-{
-  return arena_aligned_shrink((Arena*)self->user_data, p, new_alignment,
-                              new_size);
-}
-
-PolyAllocator poly_allocator_from_arena(Arena* arena)
-{
-  return (PolyAllocator){.user_data = arena,
-                         .aligned_alloc = _arena_poly_aligned_alloc,
-                         .aligned_grow = _arena_poly_aligned_grow,
-                         .aligned_shrink = _arena_poly_aligned_shrink};
 }

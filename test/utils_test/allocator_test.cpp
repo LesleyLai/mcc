@@ -179,29 +179,3 @@ TEST_CASE("Arena shrinking")
     REQUIRE(arena.current == buffer + total_old_alloc_size);
   }
 }
-
-void test_poly_allocator(PolyAllocator poly_allocator)
-{
-  auto* p = static_cast<uint8_t*>(POLY_ALLOC_OBJECT(&poly_allocator, uint8_t));
-  *p = 42;
-  REQUIRE(p != NULL);
-
-  auto* p2 =
-      static_cast<uint8_t*>(POLY_ALLOC_OBJECT(&poly_allocator, uint32_t));
-  REQUIRE(p2 == p + sizeof(uint32_t));
-
-  auto* p3 =
-      poly_aligned_alloc(&poly_allocator, alignof(std::max_align_t), 200);
-  REQUIRE(p3 == nullptr);
-}
-
-TEST_CASE("PolyAllocator arena allocation")
-{
-  constexpr auto size = 100;
-  std::uint8_t buffer[size];
-
-  Arena arena = arena_init(buffer, size);
-  PolyAllocator poly_allocator = poly_allocator_from_arena(&arena);
-
-  test_poly_allocator(poly_allocator);
-}

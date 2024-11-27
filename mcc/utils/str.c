@@ -30,20 +30,18 @@ bool string_view_eq(StringView lhs, StringView rhs)
   return true;
 }
 
-StringBuffer string_buffer_new(PolyAllocator* allocator)
+StringBuffer string_buffer_new(Arena* allocator)
 {
   return (StringBuffer){.data_ = {.small_ = {.size_with_bit_mark_ = 0}},
                         .allocator = allocator};
 }
 
-StringBuffer string_buffer_from_c_str(const char* source,
-                                      PolyAllocator* allocator)
+StringBuffer string_buffer_from_c_str(const char* source, Arena* allocator)
 {
   return string_buffer_from_view(string_view_from_c_str(source), allocator);
 }
 
-StringBuffer string_buffer_from_view(StringView source,
-                                     PolyAllocator* allocator)
+StringBuffer string_buffer_from_view(StringView source, Arena* allocator)
 {
   StringBuffer buffer = {.allocator = allocator};
   char* data_ptr = NULL;
@@ -56,7 +54,7 @@ StringBuffer string_buffer_from_view(StringView source,
     buffer.data_.large_ = (struct StringLargeBuffer_){
         .size_with_bit_mark_ = source.size << 1,
         .capacity_ = source.size,
-        .data_ = poly_aligned_alloc(allocator, alignof(char), source.size + 1),
+        .data_ = arena_aligned_alloc(allocator, alignof(char), source.size + 1),
     };
     _string_buffer_mark_large(&buffer);
     data_ptr = buffer.data_.large_.data_;
@@ -115,8 +113,8 @@ static void _string_buffer_grow_large(StringBuffer* self, size_t new_capacity)
          new_capacity > small_string_capacity);
   self->data_.large_.capacity_ = new_capacity;
   self->data_.large_.data_ =
-      poly_aligned_grow(self->allocator, self->data_.large_.data_,
-                        alignof(char), new_capacity + 1);
+      arena_aligned_grow(self->allocator, self->data_.large_.data_,
+                         alignof(char), new_capacity + 1);
 }
 
 static void _string_buffer_push_small(StringBuffer* self, char c)
@@ -131,7 +129,7 @@ static void _string_buffer_push_small(StringBuffer* self, char c)
     // small to large
     size_t new_capacity = small_string_capacity * 2;
     char* new_start =
-        poly_aligned_alloc(self->allocator, alignof(char), new_capacity + 1);
+        arena_aligned_alloc(self->allocator, alignof(char), new_capacity + 1);
     memcpy(new_start, self->data_.small_.data_, small_string_capacity);
     new_start[small_string_capacity] = c;
     new_start[small_string_capacity + 1] = '\0';
@@ -178,7 +176,7 @@ static void _string_buffer_append_small(StringBuffer* self, StringView rhs)
     self->data_.small_.data_[new_size] = '\0';
   } else {
     char* new_data =
-        poly_aligned_alloc(self->allocator, alignof(char), new_size + 1);
+        arena_aligned_alloc(self->allocator, alignof(char), new_size + 1);
     memcpy(new_data, self->data_.small_.data_,
            _string_buffer_size_small(*self));
     memcpy(new_data + old_size, rhs.start, rhs.size);
@@ -250,7 +248,7 @@ void string_buffer_unsafe_resize_for_overwrite(StringBuffer* self, size_t count)
       self->data_.small_.size_with_bit_mark_ = (unsigned char)(new_size << 1);
     } else { // small to large
       char* new_data =
-          poly_aligned_alloc(self->allocator, alignof(char), new_size + 1);
+          arena_aligned_alloc(self->allocator, alignof(char), new_size + 1);
       memcpy(new_data, self->data_.small_.data_, old_size);
 
       self->data_.large_ = (struct StringLargeBuffer_){

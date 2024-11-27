@@ -15,11 +15,10 @@ TEST_CASE("String Buffer")
   std::uint8_t buffer[buffer_size];
 
   Arena arena = arena_init(buffer, buffer_size);
-  PolyAllocator poly_allocator = poly_allocator_from_arena(&arena);
 
   SECTION("String buffer push")
   {
-    auto string = string_buffer_new(&poly_allocator);
+    auto string = string_buffer_new(&arena);
     REQUIRE(string_buffer_size(string) == 0);
 
     string_buffer_push(&string, 'a');
@@ -34,7 +33,7 @@ TEST_CASE("String Buffer")
 
   SECTION("StringBuffer can grow from small to large")
   {
-    auto string = string_buffer_new(&poly_allocator);
+    auto string = string_buffer_new(&arena);
     std::string expected;
 
     static constexpr std::size_t size = 30;
@@ -55,7 +54,7 @@ TEST_CASE("String Buffer")
   {
     SECTION("Small to small")
     {
-      auto string = string_buffer_from_c_str("Hello, ", &poly_allocator);
+      auto string = string_buffer_from_c_str("Hello, ", &arena);
       string_buffer_append(&string, string_view_from_c_str("world!"));
 
       REQUIRE(string_view_eq(string_view_from_buffer(&string),
@@ -64,7 +63,7 @@ TEST_CASE("String Buffer")
 
     SECTION("Small to large")
     {
-      auto string = string_buffer_from_c_str("Hello ", &poly_allocator);
+      auto string = string_buffer_from_c_str("Hello ", &arena);
       string_buffer_append(&string,
                            string_view_from_c_str(
                                "from this really really really weird string!"));
@@ -78,7 +77,7 @@ TEST_CASE("String Buffer")
     SECTION("Large to large")
     {
       auto string = string_buffer_from_c_str(
-          "Hello from this really really really ", &poly_allocator);
+          "Hello from this really really really ", &arena);
       string_buffer_append(&string, string_view_from_c_str("weird string!"));
 
       REQUIRE(string_view_eq(
@@ -95,25 +94,24 @@ TEST_CASE("String Buffer formatting")
   std::uint8_t buffer[buffer_size];
 
   Arena arena = arena_init(buffer, buffer_size);
-  PolyAllocator poly_allocator = poly_allocator_from_arena(&arena);
 
   SECTION("Formatting to a new string")
   {
-    StringBuffer sb = string_buffer_new(&poly_allocator);
+    StringBuffer sb = string_buffer_new(&arena);
     string_buffer_printf(&sb, "Hello, %s in %d!", "world", 2022);
     REQUIRE(string_buffer_c_str(&sb) == "Hello, world in 2022!"sv);
   }
 
   SECTION("Append formatted string to an existing string")
   {
-    StringBuffer sb = string_buffer_from_c_str("Hello, ", &poly_allocator);
+    StringBuffer sb = string_buffer_from_c_str("Hello, ", &arena);
     string_buffer_printf(&sb, "%s in %d!", "world", 2022);
     REQUIRE(string_buffer_c_str(&sb) == "Hello, world in 2022!"sv);
   }
 
   SECTION("Append large formatted string to an existing string")
   {
-    StringBuffer sb = string_buffer_from_c_str("Hello, ", &poly_allocator);
+    StringBuffer sb = string_buffer_from_c_str("Hello, ", &arena);
     string_buffer_printf(&sb, "%s in %d! %s", "world", 2022, "La la la la!");
     REQUIRE(string_buffer_c_str(&sb) == "Hello, world in 2022! La la la la!"sv);
 
