@@ -47,6 +47,7 @@ static void parse_error_at(Parser* parser, StringView error_msg, Token token)
   // TODO: proper error handling
   if (parser->errors.size >= MAX_ERROR_COUNT) {
     fprintf(stderr, "Too many data for mcc to handle");
+    fflush(stderr);
     exit(1);
   }
 

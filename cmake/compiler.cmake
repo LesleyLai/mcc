@@ -18,7 +18,7 @@ if (MSVC)
             /W3
             " /permissive-"
             " /wd4146" # C4146: unary minus operator applied to unsigned type, result still unsigned
-            )
+    )
     target_compile_definitions(mcc_compiler_warnings INTERFACE _CRT_SECURE_NO_DEPRECATE)
     if (MCC_WARNING_AS_ERROR)
         target_compile_options(mcc_compiler_warnings INTERFACE " /WX")
@@ -38,10 +38,9 @@ elseif (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
             -Wformat=2
             $<$<COMPILE_LANGUAGE:CXX>:
             -Wnon-virtual-dtor
-            -Wold-style-cast
             -Woverloaded-virtual
             >
-            )
+    )
     if (MCC_WARNING_AS_ERROR)
         target_compile_options(mcc_compiler_warnings INTERFACE -Werror)
     endif ()
@@ -53,7 +52,7 @@ elseif (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
                 -Wduplicated-cond
                 -Wduplicated-branches
                 -Wlogical-op
-                )
+        )
     endif ()
 endif ()
 

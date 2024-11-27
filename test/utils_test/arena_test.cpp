@@ -17,7 +17,7 @@ TEST_CASE("Arena allocation")
   REQUIRE(nullptr == arena.previous);
 
   {
-    auto* p = static_cast<uint8_t*>(ARENA_ALLOC_OBJECT(&arena, uint8_t));
+    auto* p = ARENA_ALLOC_OBJECT(&arena, uint8_t);
     *p = 42;
     REQUIRE(p == buffer);
     REQUIRE(arena.previous == buffer);
@@ -25,19 +25,11 @@ TEST_CASE("Arena allocation")
   }
 
   {
-    auto* p2 = static_cast<uint8_t*>(ARENA_ALLOC_OBJECT(&arena, uint32_t));
-    REQUIRE(p2 == buffer + sizeof(uint32_t));
+    auto* p2 = ARENA_ALLOC_OBJECT(&arena, uint32_t);
+    REQUIRE((void*)p2 == buffer + sizeof(uint32_t));
     REQUIRE(arena.previous == buffer + 1);
     REQUIRE(arena.current == buffer + 8);
     REQUIRE(arena.size_remain == size - 2 * sizeof(uint32_t));
-  }
-
-  {
-    auto* p3 = static_cast<uint8_t*>(arena_aligned_alloc(
-        &arena, alignof(std::max_align_t), arena.size_remain + 1));
-    REQUIRE(p3 == nullptr);
-    REQUIRE(arena.previous == buffer + 1);
-    REQUIRE(arena.current == buffer + 8);
   }
 
   arena_reset(&arena);
@@ -47,7 +39,7 @@ TEST_CASE("Arena allocation")
   REQUIRE(size == arena.size_remain);
 
   {
-    auto* p = static_cast<uint8_t*>(ARENA_ALLOC_OBJECT(&arena, uint8_t));
+    auto* p = ARENA_ALLOC_OBJECT(&arena, uint8_t);
     *p = 42;
     REQUIRE(p == buffer);
   }
@@ -65,18 +57,16 @@ TEST_CASE("Arena growing")
   static constexpr std::size_t total_old_alloc_size =
       first_alloc_size + second_alloc_size;
 
-  auto* p0 = static_cast<uint8_t*>(ARENA_ALLOC_OBJECT(&arena, uint8_t));
+  auto* p0 = ARENA_ALLOC_OBJECT(&arena, uint8_t);
   p0[0] = 'x';
-  auto* p1 = static_cast<uint8_t*>(
-      ARENA_ALLOC_ARRAY(&arena, uint8_t, second_alloc_size));
+  auto* p1 = ARENA_ALLOC_ARRAY(&arena, uint8_t, second_alloc_size);
   p1[0] = '4';
   p1[1] = '2';
 
   SECTION("Inplace grow")
   {
     static constexpr std::size_t new_alloc_size = 32;
-    auto* p2 = static_cast<uint8_t*>(
-        ARENA_GROW_ARRAY(&arena, uint8_t, p1, new_alloc_size));
+    auto* p2 = ARENA_GROW_ARRAY(&arena, uint8_t, p1, new_alloc_size);
     REQUIRE(p2 == p1);
     REQUIRE(arena.current == buffer + first_alloc_size + new_alloc_size);
     REQUIRE(p2[0] == '4');
@@ -94,30 +84,5 @@ TEST_CASE("Arena growing")
     REQUIRE(p2[1] == '2');
     REQUIRE(arena.current ==
             buffer + total_old_alloc_size + 1 + new_alloc_size);
-  }
-
-  SECTION("Calling grow where the pointer is not arena's last allocation "
-          "returns NULL")
-  {
-    static constexpr std::size_t new_alloc_size = 8;
-    auto* p2 = static_cast<uint8_t*>(
-        ARENA_GROW_ARRAY(&arena, uint8_t, p0, new_alloc_size));
-    REQUIRE(p2 == nullptr);
-    REQUIRE(p1[0] == '4');
-    REQUIRE(p1[1] == '2');
-    REQUIRE(arena.current == buffer + total_old_alloc_size);
-  }
-
-  SECTION("Calling grow when the arena doesn't have enough memory should "
-          "returns NULL")
-  {
-    auto* p2 =
-        static_cast<uint8_t*>(ARENA_GROW_ARRAY(&arena, uint8_t, p1, 200));
-    REQUIRE(p2 == nullptr);
-    REQUIRE(p0[0] == 'x');
-    REQUIRE(p1[0] == '4');
-    REQUIRE(p1[1] == '2');
-    REQUIRE(arena.previous == buffer + first_alloc_size);
-    REQUIRE(arena.current == buffer + total_old_alloc_size);
   }
 }

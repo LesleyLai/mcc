@@ -2,6 +2,8 @@
 
 #include <assert.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 // Given a pointer current, returns a pointer aligned by the specified alignment
@@ -24,7 +26,8 @@ void* arena_aligned_alloc(Arena* arena, size_t alignment, size_t size)
   Byte* aligned_ptr = align_forward(arena->current, alignment);
   const size_t size_for_alignment = (size_t)(aligned_ptr - arena->current);
   const size_t bump_size = size_for_alignment + size;
-  if (arena->size_remain < bump_size) { return NULL; }
+
+  MCC_ASSERT_MSG(arena->size_remain >= bump_size, "arena is too small");
 
   arena->previous = arena->current;
   arena->current = aligned_ptr + size;
@@ -38,7 +41,7 @@ static void* _arena_reallocate(Arena* arena, size_t new_alignment,
 {
   const void* old_p = arena->previous;
   void* new_p = arena_aligned_alloc(arena, new_alignment, new_size);
-  if (new_p != NULL) { memcpy(new_p, old_p, old_size); }
+  memcpy(new_p, old_p, old_size);
   return new_p;
 }
 
@@ -66,7 +69,12 @@ static void* _arena_reallocate(Arena* arena, size_t new_alignment,
 void* arena_aligned_grow(Arena* arena, void* p, size_t new_alignment,
                          size_t new_size)
 {
-  if (p != arena->previous || arena->size_remain < new_size) return NULL;
+  MCC_ASSERT_MSG(p == arena->previous,
+                 "Can't grow a point that does not point to the most recent "
+                 "allocated block of the arena");
+
+  MCC_ASSERT_MSG(arena->size_remain >= new_size, "arena is too small");
+
   Byte* aligned_ptr = align_forward(arena->previous, new_alignment);
   const size_t old_size = (size_t)(arena->current - arena->previous);
   assert(old_size < new_size);

@@ -5,7 +5,7 @@
 
 #include "diagnostic.h"
 #include "parser.h"
-#include "utils/allocators.h"
+#include "utils/arena.h"
 #include "utils/defer.h"
 #include "utils/str.h"
 

@@ -18,17 +18,22 @@ typedef struct Arena {
 
 Arena arena_init(void* buffer, size_t size);
 void arena_reset(Arena* arena);
+
+#if defined(__GNUC__) || defined(__clang__)
+__attribute((malloc))
+#endif
 void* arena_aligned_alloc(Arena* arena, size_t alignment, size_t size);
+
 void* arena_aligned_grow(Arena* arena, void* p, size_t new_alignment,
                          size_t new_size);
 
 #define ARENA_ALLOC_OBJECT(arena, Type)                                        \
-  arena_aligned_alloc((arena), alignof(Type), sizeof(Type))
+  (Type*)arena_aligned_alloc((arena), alignof(Type), sizeof(Type))
 
 #define ARENA_ALLOC_ARRAY(arena, Type, n)                                      \
-  arena_aligned_alloc((arena), alignof(Type), sizeof(Type) * (n))
+  (Type*)arena_aligned_alloc((arena), alignof(Type), sizeof(Type) * (n))
 
 #define ARENA_GROW_ARRAY(arena, Type, p, n)                                    \
-  arena_aligned_grow((arena), (p), alignof(Type), sizeof(Type) * (n))
+  (Type*)arena_aligned_grow((arena), (p), alignof(Type), sizeof(Type) * (n))
 
 #endif // MCC_ARENA_H
