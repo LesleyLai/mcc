@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "allocators.h"
+#include "arena.h"
 
 typedef struct StringView {
   const char* start;

@@ -1,5 +1,5 @@
-#ifndef MCC_ALLOCATORS_H
-#define MCC_ALLOCATORS_H
+#ifndef MCC_ARENA_H
+#define MCC_ARENA_H
 
 #include "prelude.h"
 #include <stddef.h>
@@ -21,8 +21,6 @@ void arena_reset(Arena* arena);
 void* arena_aligned_alloc(Arena* arena, size_t alignment, size_t size);
 void* arena_aligned_grow(Arena* arena, void* p, size_t new_alignment,
                          size_t new_size);
-void* arena_aligned_shrink(Arena* arena, void* p, size_t new_alignment,
-                           size_t new_size);
 
 #define ARENA_ALLOC_OBJECT(arena, Type)                                        \
   arena_aligned_alloc((arena), alignof(Type), sizeof(Type))
@@ -33,7 +31,4 @@ void* arena_aligned_shrink(Arena* arena, void* p, size_t new_alignment,
 #define ARENA_GROW_ARRAY(arena, Type, p, n)                                    \
   arena_aligned_grow((arena), (p), alignof(Type), sizeof(Type) * (n))
 
-#define ARENA_SHRINK_ARRAY(arena, Type, p, n)                                  \
-  arena_aligned_shrink((arena), (p), alignof(Type), sizeof(Type) * (n))
-
-#endif // MCC_ALLOCATORS_H
+#endif // MCC_ARENA_H

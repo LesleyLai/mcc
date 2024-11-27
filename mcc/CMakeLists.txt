@@ -1,7 +1,7 @@
 add_library(mcc_lib
         utils/str.h
-        utils/allocators.c
-        utils/allocators.h
+        utils/arena.c
+        utils/arena.h
         utils/defer.h
         utils/prelude.h
         utils/format.h

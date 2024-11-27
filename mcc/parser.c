@@ -2,7 +2,7 @@
 #include "diagnostic.h"
 #include "lexer.h"
 
-#include "utils/allocators.h"
+#include "utils/arena.h"
 #include "utils/format.h"
 
 #include <assert.h>

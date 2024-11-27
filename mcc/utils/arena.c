@@ -1,4 +1,4 @@
-#include "allocators.h"
+#include "arena.h"
 
 #include <assert.h>
 #include <stdint.h>
@@ -73,27 +73,6 @@ void* arena_aligned_grow(Arena* arena, void* p, size_t new_alignment,
 
   if (p != aligned_ptr) {
     return _arena_reallocate(arena, new_alignment, old_size, new_size);
-  }
-
-  arena->size_remain = arena->size_remain + old_size - new_size;
-  arena->current = aligned_ptr + new_size;
-  return aligned_ptr;
-}
-
-/**
- * @brief Similar to grow but will never reallocate (instead return NULL in
- * those cases)
- * @pre The old size is greater than or equal to the new size
- */
-void* arena_aligned_shrink(Arena* arena, void* p, size_t new_alignment,
-                           size_t new_size)
-{
-  Byte* aligned_ptr = align_forward(arena->previous, new_alignment);
-  const size_t old_size = (size_t)(arena->current - arena->previous);
-
-  assert(old_size >= new_size);
-  if (p != arena->previous || old_size < new_size || p != aligned_ptr) {
-    return NULL;
   }
 
   arena->size_remain = arena->size_remain + old_size - new_size;
