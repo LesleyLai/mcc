@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 #include "diagnostic.h"
+#include "lexer.h"
 #include "parser.h"
 #include "utils/arena.h"
 #include "utils/defer.h"
@@ -118,7 +119,7 @@ void link(const char* obj_filename, const char* executable_name)
   }
 }
 
-char* file_to_allocated_buffer(FILE* file)
+char* string_from_file(FILE* file, Arena* permanent_arena)
 {
   fseek(file, 0, SEEK_END);
   const long length = ftell(file);
@@ -129,7 +130,8 @@ char* file_to_allocated_buffer(FILE* file)
   const size_t ulength = (size_t)length;
 
   fseek(file, 0, SEEK_SET);
-  char* buffer = malloc(ulength + 1);
+
+  char* buffer = ARENA_ALLOC_ARRAY(permanent_arena, char, ulength + 1);
   size_t read_res = fread(buffer, 1, ulength,
                           file); // TODO: check result of fread
   if (read_res != (unsigned long)length) {
@@ -142,6 +144,15 @@ char* file_to_allocated_buffer(FILE* file)
 
 int main(int argc, char* argv[])
 {
+  const size_t permanent_arena_size = 4000000000; // 4 GB virtual memory
+  void* permanent_arena_buffer = malloc(permanent_arena_size);
+  Arena permanent_arena =
+      arena_init(permanent_arena_buffer, permanent_arena_size);
+
+  const size_t scratch_arena_size = 400000000; // 400 MB virtual memory
+  void* scratch_arena_buffer = malloc(scratch_arena_size);
+  Arena scratch_arena = arena_init(scratch_arena_buffer, scratch_arena_size);
+
   const CliArgs args = parse_cli_args(argc, argv);
 
   const char* src_filename_with_extension = args.source_filename;
@@ -153,18 +164,22 @@ int main(int argc, char* argv[])
     exit(1);
   }
 
-  char* source = file_to_allocated_buffer(src_file);
-
+  const char* source = string_from_file(src_file, &permanent_arena);
   fclose(src_file);
 
-  const char* asm_filename = "file";
-  compile(src_filename_with_extension, asm_filename, source);
+  Tokens tokens = lex(source, &permanent_arena, scratch_arena);
 
-  free(source);
+  if (args.stop_after_lexer) {
+    print_tokens(&tokens);
+    exit(0);
+  }
 
-  const char* obj_filename = asm_filename;
-  assemble(asm_filename, obj_filename);
+  // const char* asm_filename = "file";
+  //  compile(src_filename_with_extension, asm_filename, source);
 
-  const char* executable_name = obj_filename;
-  link(obj_filename, executable_name);
+  // const char* obj_filename = asm_filename;
+  // assemble(asm_filename, obj_filename);
+  //
+  // const char* executable_name = obj_filename;
+  // link(obj_filename, executable_name);
 }

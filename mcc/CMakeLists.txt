@@ -17,7 +17,9 @@ add_library(mcc_lib
         diagnostic.c
         diagnostic.h
         cli_args.c
-        cli_args.h)
+        cli_args.h
+        token.c
+        token.h)
 target_link_libraries(mcc_lib
         PUBLIC mcc::compiler_options
         PRIVATE mcc::compiler_warnings)

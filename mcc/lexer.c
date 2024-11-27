@@ -47,16 +47,6 @@ static char lexer_advance(Lexer* lexer)
   return *lexer->current++;
 }
 
-//// If current character match expected, consumes it and returns true
-//// Otherwise returns false
-// static bool lexer_match(Lexer* lexer, char expected)
-//{
-//   if (lexer_is_at_end(lexer)) return false;
-//   if (*lexer->current != expected) return false;
-//   lexer_advance(lexer);
-//   return true;
-// }
-
 static void skip_whitespace(Lexer* lexer)
 {
   for (;;) {
@@ -154,4 +144,38 @@ Token lexer_scan_token(Lexer* lexer)
 
   return lexer_error_token(lexer,
                            string_view_from_c_str("Unexpected character."));
+}
+
+Tokens lex(const char* source, Arena* permanent_arena, Arena scratch_arena)
+{
+  Lexer lexer = lexer_create(source);
+
+  // Accumulate tokens to a temporary linked list, and then flatten it to an
+  // array
+  typedef struct Node {
+    Token token;
+    struct Node* previous;
+  } Node;
+
+  Node* current = NULL;
+
+  ptrdiff_t token_count = 0;
+  while (true) {
+    Token token = lexer_scan_token(&lexer);
+    if (token.type == TOKEN_EOF) { break; }
+
+    Node* previous = current;
+    current = ARENA_ALLOC_OBJECT(&scratch_arena, Node);
+    *current = (Node){.token = token, .previous = previous};
+    ++token_count;
+  }
+
+  Token* tokens =
+      ARENA_ALLOC_ARRAY(permanent_arena, Token, (size_t)token_count);
+  for (ptrdiff_t i = token_count - 1; i >= 0; --i) {
+    tokens[i] = current->token;
+    current = current->previous;
+  }
+
+  return (Tokens){.begin = tokens, .end = tokens + token_count};
 }

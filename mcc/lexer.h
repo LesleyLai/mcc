@@ -3,8 +3,7 @@
 
 #include <stdint.h>
 
-#include "source_location.h"
-#include "utils/str.h"
+#include "token.h"
 
 // The lexer consumes source code and produces tokens lazily
 
@@ -16,38 +15,10 @@ typedef struct Lexer {
   uint32_t column;
 } Lexer;
 
-typedef enum TokenType {
-  TOKEN_LEFT_PAREN,  // (
-  TOKEN_RIGHT_PAREN, // )
-  TOKEN_LEFT_BRACE,  // {
-  TOKEN_RIGHT_BRACE, // }
-  TOKEN_SEMICOLON,   // ;
-
-  TOKEN_PLUS,  // +
-  TOKEN_MINUS, // -
-  TOKEN_STAR,  // *
-  TOKEN_SLASH, // /
-
-  TOKEN_KEYWORD_VOID,
-  TOKEN_KEYWORD_INT,
-  TOKEN_KEYWORD_RETURN,
-
-  TOKEN_IDENTIFIER,
-  TOKEN_INTEGER,
-
-  TOKEN_ERROR,
-  TOKEN_EOF,
-
-  TOKEN_TYPES_COUNT,
-} TokenType;
-
-typedef struct Token {
-  StringView src;
-  TokenType type;
-  SourceLocation location;
-} Token;
-
 Lexer lexer_create(const char* source);
 Token lexer_scan_token(Lexer* lexer);
+
+// @brief Scan the source file and generate a list of tokens
+Tokens lex(const char* source, Arena* permanent_arena, Arena scratch_arena);
 
 #endif // MCC_LEXER_H
