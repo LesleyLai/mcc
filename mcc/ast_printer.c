@@ -57,7 +57,7 @@ static void ast_print_function_decl(FunctionDecl* decl, int indent)
 void ast_print_translation_unit(TranslationUnit* tu)
 {
   printf("TranslationUnit\n");
-  for (int i = 0; i < tu->decl_count; ++i) {
+  for (size_t i = 0; i < tu->decl_count; ++i) {
     ast_print_function_decl(&tu->decls[i], 2);
   }
 }

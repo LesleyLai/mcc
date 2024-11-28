@@ -6,12 +6,6 @@ on:
     branches:
       - '**' # every branches
 
-env:
-  # Conan cache environment variables
-  CONAN_SYSREQUIRES_MODE: enabled
-  CONAN_USER_HOME: "${{ github.workspace }}/conan-cache"
-  CONAN_USER_HOME_SHORT: "${{ github.workspace }}/conan-cache/short"
-
 jobs:
   Test:
     runs-on: ${{ matrix.os }}
@@ -58,43 +52,10 @@ jobs:
             gcov_executable: gcov
             developer_mode: On
 
-          # Windows msvc builds
-          - os: windows-2022
-            compiler: msvc
-            generator: "Visual Studio 17 2022"
-            build_type: Debug
-            developer_mode: On
-
-          - os: windows-2022
-            compiler: msvc
-            generator: "Visual Studio 17 2022"
-            build_type: Release
-            developer_mode: On
-
-          - os: windows-2022
-            compiler: msvc
-            generator: "Visual Studio 17 2022"
-            build_type: Debug
-            developer_mode: Off
-
-          - os: windows-2022
-            compiler: msvc
-            generator: "Visual Studio 17 2022"
-            build_type: Release
-            developer_mode: Off
-            package_generator: ZIP
 
 
     steps:
       - uses: actions/checkout@v2
-
-      - name: Setup Cache
-        uses: ./.github/actions/setup_cache
-        with:
-          compiler: ${{ matrix.compiler }}
-          build_type: ${{ matrix.build_type }}
-          developer_mode: ${{ matrix.developer_mode }}
-          generator: ${{ matrix.generator }}
 
       - name: Setup Cpp
         uses: aminya/setup-cpp@v1
@@ -103,15 +64,11 @@ jobs:
           vcvarsall: ${{ contains(matrix.os, 'windows' )}}
           cmake: true
           ninja: true
-          conan: true
+          conan: false
           vcpkg: false
           ccache: true
           gcovr: true
           opencppcoverage: true
-
-      - name: Cleanup Conan system packages (they are not properly cached)
-        run: |
-          conan remove -f '*/system'
 
         # make sure coverage is only enabled for Debug builds, since it sets -O0 to make sure coverage
         # has meaningful results
@@ -132,12 +89,6 @@ jobs:
         run: |
           ctest -C ${{matrix.build_type}} --output-on-failure
           gcovr -j ${{env.nproc}} --delete --root ../ --print-summary --xml-pretty --xml coverage.xml . --gcov-executable '${{ matrix.gcov_executable }}'
-
-      - name: Windows - Test and coverage
-        if: runner.os == 'Windows'
-        working-directory: ./build
-        run: |
-          OpenCppCoverage.exe --export_type cobertura:coverage.xml --cover_children -- ctest -C ${{matrix.build_type}}
 
       - name: Publish to codecov
         uses: codecov/codecov-action@v2

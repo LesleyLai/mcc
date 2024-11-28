@@ -29,4 +29,4 @@ target_include_directories(mcc_lib
 )
 
 add_executable(mcc main.c)
-target_link_libraries(mcc PRIVATE mcc_lib mcc::compiler_warnings)
+target_link_libraries(mcc PRIVATE mcc::compiler_options mcc_lib mcc::compiler_warnings)

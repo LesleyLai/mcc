@@ -6,42 +6,47 @@ extern "C" {
 #include "utils/arena.h"
 }
 
+static void require_ptr_equal(const void* ptr1, const void* ptr2)
+{
+  REQUIRE(ptr1 == ptr2);
+}
+
 TEST_CASE("Arena allocation")
 {
   constexpr auto size = 100;
-  std::uint8_t buffer[size] = {};
+  std::byte buffer[size] = {};
 
   Arena arena = arena_init(buffer, size);
-  REQUIRE(buffer == arena.begin);
-  REQUIRE(buffer == arena.current);
-  REQUIRE(nullptr == arena.previous);
+  require_ptr_equal(buffer, arena.begin);
+  require_ptr_equal(buffer, arena.current);
+  require_ptr_equal(nullptr, arena.previous);
 
   {
     auto* p = ARENA_ALLOC_OBJECT(&arena, uint8_t);
     *p = 42;
-    REQUIRE(p == buffer);
-    REQUIRE(arena.previous == buffer);
-    REQUIRE(arena.current == buffer + 1);
+    require_ptr_equal(p, buffer);
+    require_ptr_equal(arena.previous, buffer);
+    require_ptr_equal(arena.current, buffer + 1);
   }
 
   {
     auto* p2 = ARENA_ALLOC_OBJECT(&arena, uint32_t);
-    REQUIRE((void*)p2 == buffer + sizeof(uint32_t));
-    REQUIRE(arena.previous == buffer + 1);
-    REQUIRE(arena.current == buffer + 8);
+    require_ptr_equal(p2, buffer + sizeof(uint32_t));
+    require_ptr_equal(arena.previous, buffer + 1);
+    require_ptr_equal(arena.current, buffer + 8);
     REQUIRE(arena.size_remain == size - 2 * sizeof(uint32_t));
   }
 
   arena_reset(&arena);
-  REQUIRE(buffer == arena.begin);
-  REQUIRE(buffer == arena.current);
-  REQUIRE(NULL == arena.previous);
+  require_ptr_equal(buffer, arena.begin);
+  require_ptr_equal(buffer, arena.current);
+  require_ptr_equal(nullptr, arena.previous);
   REQUIRE(size == arena.size_remain);
 
   {
     auto* p = ARENA_ALLOC_OBJECT(&arena, uint8_t);
     *p = 42;
-    REQUIRE(p == buffer);
+    require_ptr_equal(buffer, p);
   }
 }
 
