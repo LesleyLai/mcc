@@ -7,7 +7,6 @@
 
 void string_buffer_printf(StringBuffer* str, const char* restrict format, ...)
 {
-
   va_list args;
   va_start(args, format);
   va_list args_copy;

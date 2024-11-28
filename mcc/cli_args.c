@@ -40,6 +40,8 @@ CliArgs parse_cli_args(int argc, char** argv)
       exit(0);
     } else if (!strcmp(arg, "--lex")) {
       result.stop_after_lexer = true;
+    } else if (!strcmp(arg, "--parse")) {
+      result.stop_after_parser = true;
     } else {
       // TODO: support more than one source file
       result.source_filename = arg;

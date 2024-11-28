@@ -13,85 +13,6 @@
 #include <stdarg.h>
 #include <string.h>
 
-// static void compile_to_file(FILE* asm_file,
-//                             const char* src_filename_with_extension,
-//                             const char* source)
-// {
-//   const size_t ast_arena_size = 4000000000; // 4 GB virtual memory
-//   void* ast_buffer = malloc(ast_arena_size);
-//   Arena ast_arena = arena_init(ast_buffer, ast_arena_size);
-//
-//   const ParseResult result = parse(source, &ast_arena);
-//   const TranslationUnit* tu = result.ast;
-//
-//   enum { diagnostics_arena_size = 40000 }; // 40 Mb virtual memory
-//   uint8_t diagnostics_buffer[diagnostics_arena_size];
-//   Arena diagnostics_arena =
-//       arena_init(diagnostics_buffer, diagnostics_arena_size);
-//
-//   if (result.errors.size > 0) {
-//     for (size_t i = 0; i < result.errors.size; ++i) {
-//       StringBuffer output = string_buffer_new(&diagnostics_arena);
-//       write_diagnostics(&output, src_filename_with_extension, source,
-//                         result.errors.data[i]);
-//       StringView output_view = string_view_from_buffer(&output);
-//       printf("%*s", (int)output_view.size, output_view.start);
-//       arena_reset(&diagnostics_arena);
-//     }
-//   }
-//
-//   if (tu == NULL) {
-//     // Failed to parse the program
-//     exit(1);
-//   }
-//
-//   if (tu->decl_count != 1 || tu->decls[0].body->statement_count != 1 ||
-//       tu->decls[0].body->statements[0].type != RETURN_STMT) {
-//     // TODO: Not support yet
-//     fprintf(stderr, "MCC does not support this kind of program yet");
-//     exit(1);
-//   }
-//
-//   const int return_value =
-//       tu->decls[0].body->statements[0].ret.expr->const_expr.val;
-//
-//   // fputs("section .text\n", asm_file);
-//   fputs(".globl main\n", asm_file);
-//   fputs("main:\n", asm_file);
-//   fprintf(asm_file, "  mov     rax, %d\n", return_value);
-//   fputs("  ret\n", asm_file);
-// }
-
-// void compile(const char* src_filename_with_extension, const char*
-// asm_filename,
-//              const char* source)
-// {
-//   enum { temp_buffer_size = 1000 };
-//   uint8_t* temp_buffer[temp_buffer_size];
-//   Arena temp_arena = arena_init(temp_buffer, temp_buffer_size);
-//
-//   const StringView src_filename_sv = string_view_from_c_str(asm_filename);
-//
-//   StringBuffer asm_filename_with_extension =
-//       string_buffer_from_view(src_filename_sv, &temp_arena);
-//   string_buffer_append(&asm_filename_with_extension,
-//                        string_view_from_c_str(".asm"));
-//
-//   FILE* asm_file = fopen(string_buffer_data(&asm_filename_with_extension),
-//   "w"); MCC_DEFER(fclose(asm_file))
-//   {
-//     if (!asm_file) {
-//       fprintf(stderr, "Cannot open asm file %s",
-//               string_buffer_data(&asm_filename_with_extension));
-//       exit(1);
-//     }
-//
-//     compile_to_file(asm_file, src_filename_with_extension, source);
-//
-//     if (ferror(asm_file)) { perror("Failed to write asm_file"); }
-//   }
-// }
-
 void assemble(const char* asm_filename, const char* obj_filename)
 {
   enum { buffer_size = 10000 };
@@ -143,6 +64,54 @@ char* string_from_file(FILE* file, Arena* permanent_arena)
   return buffer;
 }
 
+void print_parse_diagnostics(ParseErrorsView errors, const char* src_filename,
+                             const char* source)
+{
+  enum { diagnostics_arena_size = 40000 }; // 40 Mb virtual memory
+  uint8_t diagnostics_buffer[diagnostics_arena_size];
+  Arena diagnostics_arena =
+      arena_init(diagnostics_buffer, diagnostics_arena_size);
+
+  if (errors.size > 0) {
+    for (size_t i = 0; i < errors.size; ++i) {
+      StringBuffer output = string_buffer_new(&diagnostics_arena);
+      write_diagnostics(&output, src_filename, source, errors.data[i]);
+      StringView output_view = string_view_from_buffer(&output);
+      printf("%*s", (int)output_view.size, output_view.start);
+      arena_reset(&diagnostics_arena);
+    }
+  }
+}
+
+static void generate_assembly(TranslationUnit* tu)
+{
+  if (tu->decl_count != 1 || tu->decls[0].body->statement_count != 1 ||
+      tu->decls[0].body->statements[0].type != RETURN_STMT) {
+    // TODO: Not support yet
+    fprintf(stderr, "MCC does not support this kind of program yet");
+    exit(1);
+  }
+
+  FILE* asm_file = fopen("a.asm", "w");
+  MCC_DEFER(fclose(asm_file))
+  {
+    if (!asm_file) {
+      fprintf(stderr, "Cannot open asm file %s", "a.asm");
+      exit(1);
+    }
+
+    const int return_value =
+        tu->decls[0].body->statements[0].ret.expr->const_expr.val;
+
+    fputs(".globl main\n", asm_file);
+    fputs("main:\n", asm_file);
+    fprintf(asm_file, "  mov     rax, %d\n", return_value);
+    fputs("  ret\n", asm_file);
+
+    if (ferror(asm_file)) { perror("Failed to write asm_file"); }
+  }
+}
+
 int main(int argc, char* argv[])
 {
   const size_t permanent_arena_size = 4000000000; // 4 GB virtual memory
@@ -162,7 +131,7 @@ int main(int argc, char* argv[])
   if (!src_file) {
     (void)fprintf(stderr, "Mcc: fatal error: %s: No such file",
                   src_filename_with_extension);
-    exit(1);
+    return 1;
   }
 
   const char* source = string_from_file(src_file, &permanent_arena);
@@ -175,18 +144,26 @@ int main(int argc, char* argv[])
   }
 
   ParseResult parse_result = parse(tokens, &permanent_arena, scratch_arena);
+  print_parse_diagnostics(parse_result.errors, src_filename_with_extension,
+                          source);
 
   if (parse_result.ast == NULL) {
     // Failed to parse program
-    exit(1);
+    return 1;
   }
 
-  // const char* asm_filename = "file";
-  //  compile(src_filename_with_extension, asm_filename, source);
+  if (args.stop_after_parser) {
+    ast_print_translation_unit(parse_result.ast);
+    return 0;
+  }
 
-  // const char* obj_filename = asm_filename;
-  // assemble(asm_filename, obj_filename);
-  //
-  // const char* executable_name = obj_filename;
-  // link(obj_filename, executable_name);
+  const char* asm_filename = "a";
+
+  generate_assembly(parse_result.ast);
+
+  const char* obj_filename = asm_filename;
+  assemble(asm_filename, obj_filename);
+
+  const char* executable_name = obj_filename;
+  link(obj_filename, executable_name);
 }

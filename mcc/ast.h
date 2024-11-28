@@ -69,4 +69,6 @@ typedef struct TranslationUnit {
   FunctionDecl* decls;
 } TranslationUnit;
 
+void ast_print_translation_unit(TranslationUnit* tu);
+
 #endif // MCC_AST_H

@@ -19,7 +19,8 @@ add_library(mcc_lib
         cli_args.c
         cli_args.h
         token.c
-        token.h)
+        token.h
+        ast_printer.c)
 target_link_libraries(mcc_lib
         PUBLIC mcc::compiler_options
         PRIVATE mcc::compiler_warnings)

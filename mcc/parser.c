@@ -1,7 +1,5 @@
 #include "parser.h"
-#include "diagnostic.h"
 
-#include "utils/arena.h"
 #include "utils/format.h"
 
 #include <assert.h>
@@ -126,7 +124,7 @@ static void parse_consume(Parser* parser, TokenType type, const char* error_msg)
 
 static Expr* parse_number_literal(Parser* parser)
 {
-  const Token token = parser_current_token(parser);
+  const Token token = parser_previous_token(parser);
 
   const int val =
       (int)strtol(token.src.start, NULL, 10); // TODO(llai): replace strtol

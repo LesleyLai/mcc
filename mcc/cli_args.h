@@ -5,6 +5,7 @@
 typedef struct CliArgs {
   const char* source_filename; // Filename of the source file (with extension)
   bool stop_after_lexer;
+  bool stop_after_parser;
 } CliArgs;
 
 CliArgs parse_cli_args(int argc, char** argv);
