@@ -35,7 +35,7 @@ typedef struct Token {
   SourceLocation location;
 } Token;
 
-/// @brief Tokens
+/// @brief A view of tokens
 typedef struct Tokens {
   Token* begin; // Points to the first element of the token array
   Token* end;   // Points to one plus the last element of the token array

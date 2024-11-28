@@ -1,6 +1,5 @@
 #include "parser.h"
 #include "diagnostic.h"
-#include "lexer.h"
 
 #include "utils/arena.h"
 #include "utils/format.h"
@@ -12,14 +11,14 @@
 #define MAX_ERROR_COUNT 16 // TODO: use vector
 
 typedef struct Parser {
-  Lexer lexer;
-  Arena* ast_arena;
+  Arena* permanent_arena;
+  Arena scratch_arena;
+
+  Tokens tokens;
+  int current_token_index;
 
   bool has_error;
   bool in_panic_mode;
-
-  Token current;
-  Token previous;
 
   ParseErrorsView errors;
 } Parser;
@@ -53,7 +52,7 @@ static void parse_error_at(Parser* parser, StringView error_msg, Token token)
 
   if (parser->errors.data == NULL) {
     parser->errors.data =
-        ARENA_ALLOC_ARRAY(parser->ast_arena, ParseError, MAX_ERROR_COUNT);
+        ARENA_ALLOC_ARRAY(parser->permanent_arena, ParseError, MAX_ERROR_COUNT);
   }
 
   parser->errors.data[parser->errors.size++] =
@@ -63,39 +62,86 @@ static void parse_error_at(Parser* parser, StringView error_msg, Token token)
   parser->in_panic_mode = true;
 }
 
-static void parse_advance(Parser* parser)
+static void assert_in_range(Parser* parser, int token_index)
 {
-  for (;;) {
-    parser->previous = parser->current;
-    parser->current = lexer_scan_token(&parser->lexer);
-    if (parser->current.type != TOKEN_ERROR) break;
-    parse_error_at(parser, parser->current.src, parser->current);
+  if (token_index < 0) {
+    fprintf(stderr, "Negative token index %i!\n", token_index);
+    exit(1);
+  }
+
+  if (parser->tokens.begin + token_index >= parser->tokens.end) {
+    fprintf(stderr, "Token index out of bound: %i (total %li)!\n", token_index,
+            parser->tokens.end - parser->tokens.begin);
+    exit(1);
   }
 }
 
+// gets the current token
+static Token parser_current_token(Parser* parser)
+{
+  assert_in_range(parser, parser->current_token_index);
+  return parser->tokens.begin[parser->current_token_index];
+}
+
+// gets the current token
+static Token parser_previous_token(Parser* parser)
+{
+  int previous_token_index = parser->current_token_index - 1;
+  assert_in_range(parser, previous_token_index);
+  return parser->tokens.begin[previous_token_index];
+}
+
+// whether we are at the end
+static bool is_at_end(Parser* parser)
+{
+  return parser_current_token(parser).type == TOKEN_EOF;
+}
+
+// Advance tokens by one
+// Also skip any error tokens
+static void parse_advance(Parser* parser)
+{
+  if (is_at_end(parser)) { return; }
+
+  for (;;) {
+    parser->current_token_index++;
+    Token current = parser_current_token(parser);
+    if (current.type != TOKEN_ERROR) break;
+    parse_error_at(parser, current.src, current);
+  }
+}
+
+// Consume the current token. If the token doesn't have specified type, generate
+// an error.
 static void parse_consume(Parser* parser, TokenType type, const char* error_msg)
 {
-  if (parser->current.type != type) {
-    parse_error_at(parser, string_view_from_c_str(error_msg), parser->current);
+  const Token current = parser_current_token(parser);
+
+  if (current.type != type) {
+    parse_error_at(parser, string_view_from_c_str(error_msg), current);
   }
 
   parse_advance(parser);
 }
 
-static Expr* parse_expr(Parser* parser);
-
 static Expr* parse_number_literal(Parser* parser)
 {
-  const int val = (int)strtol(parser->previous.src.start, NULL,
-                              10); // TODO(llai): replace strtol
+  const Token token = parser_current_token(parser);
 
-  Expr* result = ARENA_ALLOC_OBJECT(parser->ast_arena, Expr);
+  const int val =
+      (int)strtol(token.src.start, NULL, 10); // TODO(llai): replace strtol
+
+  Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
   *result = (Expr){.type = CONST_EXPR,
-                   .source_range = token_source_range(parser->previous),
+                   .source_range = token_source_range(token),
                    .const_expr = (struct ConstExpr){.val = val}};
   return result;
 }
 
+/* =============================================================================
+ * Pratt Parsing for expressions
+ * =============================================================================
+ */
 typedef enum Precedence {
   PREC_NONE = 0,
   PREC_ASSIGNMENT, // =
@@ -110,6 +156,7 @@ typedef enum Precedence {
   PREC_PRIMARY
 } Precedence;
 
+static Expr* parse_expr(Parser* parser);
 static Expr* parse_group(Parser* parser);
 static Expr* parse_unary_op(Parser* parser);
 static Expr* parse_binary_op(Parser* parser);
@@ -153,16 +200,18 @@ static Expr* parse_precedence(Parser* parser, Precedence precedence)
 {
   if (parser->in_panic_mode) { return NULL; }
 
-  const ParseFn prefix_rule = get_rule(parser->previous.type)->prefix;
+  const ParseFn prefix_rule =
+      get_rule(parser_previous_token(parser).type)->prefix;
   if (prefix_rule == NULL) {
     parse_error_at(parser, string_view_from_c_str("Expect valid expression"),
-                   parser->current);
+                   parser_current_token(parser));
     return NULL;
   }
 
   Expr* expr = prefix_rule(parser);
 
-  while (precedence <= get_rule(parser->current.type)->precedence) {
+  while (precedence <=
+         get_rule(parser_current_token(parser).type)->precedence) {
     parse_advance(parser);
     // ParseFn infix_rule = get_rule(parser->previous.type)->infix;
     //  Expr* rhs = infix_rule(parser);
@@ -180,7 +229,7 @@ static Expr* parse_group(Parser* parser)
 
 static Expr* parse_unary_op(Parser* parser)
 {
-  TokenType operator_type = parser->previous.type;
+  TokenType operator_type = parser_previous_token(parser).type;
 
   Expr* expr = parse_precedence(parser, PREC_UNARY);
 
@@ -192,7 +241,7 @@ static Expr* parse_unary_op(Parser* parser)
 
 static Expr* parse_binary_op(Parser* parser)
 {
-  const TokenType operator_type = parser->previous.type;
+  const TokenType operator_type = parser_previous_token(parser).type;
   const ParseRule* rule = get_rule(operator_type);
   parse_precedence(parser, (Precedence)(rule->precedence + 1));
 
@@ -233,17 +282,17 @@ static void parse_stmt(Parser* parser, Stmt* out_stmt);
 static void parse_compound_stmt(Parser* parser, CompoundStmt* out_compount_stmt
                                 /*SourceLocation first_loc*/)
 {
-  Stmt* statements = ARENA_ALLOC_ARRAY(parser->ast_arena, Stmt,
+  Stmt* statements = ARENA_ALLOC_ARRAY(parser->permanent_arena, Stmt,
                                        MAX_STMT_COUNT_IN_COMPOUND_STMT);
   size_t statement_count = 0;
 
   bool encounter_error = false;
-  while (parser->current.type != TOKEN_RIGHT_BRACE) {
+  while (parser_current_token(parser).type != TOKEN_RIGHT_BRACE) {
     if (statement_count == MAX_STMT_COUNT_IN_COMPOUND_STMT) {
       parse_error_at(parser,
                      string_view_from_c_str(
                          "Too many statement in compound statement to handle"),
-                     parser->current);
+                     parser_current_token(parser));
       return;
     }
 
@@ -255,7 +304,7 @@ static void parse_compound_stmt(Parser* parser, CompoundStmt* out_compount_stmt
     ++statement_count;
   }
   if (encounter_error) {
-    while (parser->current.type != TOKEN_RIGHT_BRACE) {
+    while (parser_current_token(parser).type != TOKEN_RIGHT_BRACE) {
       parse_advance(parser);
     }
   }
@@ -265,35 +314,38 @@ static void parse_compound_stmt(Parser* parser, CompoundStmt* out_compount_stmt
   *out_compount_stmt = (CompoundStmt){.statements = statements,
                                       .statement_count = statement_count};
 
-  //  const SourceLocation last_loc = {
-  //      .line = parser->previous.location.line,
-  //      .column = (uint32_t)(parser->previous.location.column +
-  //                           parser->previous.src.size - 1),
-  //  };
+  // const Token previous_token = parser_previous_token(parser);
+  // const SourceLocation last_loc = {
+  //     .line = previous_token.location.line,
+  //     .column = (uint32_t)(previous_token.location.column +
+  //                          previous_token.src.size - 1),
+  // };
 
-  // Stmt* result = ARENA_ALLOC_OBJECT(parser->ast_arena, Stmt);
-  //  *result = (Stmt){.type = COMPOUND_STMT,
-  //                   .source_range = {.first = first_loc, .last = last_loc},
-  //                   .compound = {.statements = statements,
-  //                                .statement_count = statement_count}};
-  //  return result;
+  // Stmt* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Stmt);
+  // *result = (Stmt){.type = COMPOUND_STMT,
+  //                  .source_range = {.first = first_loc, .last = last_loc},
+  //                  .compound = {.statements = statements,
+  //                               .statement_count = statement_count}};
+  // return result;
 }
 
 static void parse_stmt(Parser* parser, Stmt* out_stmt)
 {
-  const SourceLocation first_loc = parser->current.location;
+  const Token current_token = parser_current_token(parser);
+  const SourceLocation first_loc = current_token.location;
 
-  switch (parser->current.type) {
+  switch (current_token.type) {
   case TOKEN_KEYWORD_RETURN: {
     parse_advance(parser);
 
     // Stmt* stmt = ARENA_ALLOC_OBJECT(parser->ast_arena, Stmt);
     ReturnStmt return_stmt;
     parse_return_stmt(parser, &return_stmt);
-    *out_stmt = (Stmt){
-        .type = RETURN_STMT,
-        .source_range = {.begin = first_loc, .end = parser->previous.location},
-        .ret = return_stmt};
+    *out_stmt =
+        (Stmt){.type = RETURN_STMT,
+               .source_range = {.begin = first_loc,
+                                .end = parser_previous_token(parser).location},
+               .ret = return_stmt};
 
     return;
   }
@@ -302,15 +354,16 @@ static void parse_stmt(Parser* parser, Stmt* out_stmt)
 
     CompoundStmt compound;
     parse_compound_stmt(parser, &compound);
-    *out_stmt = (Stmt){
-        .type = COMPOUND_STMT,
-        .source_range = {.begin = first_loc, .end = parser->previous.location},
-        .compound = compound};
+    *out_stmt =
+        (Stmt){.type = COMPOUND_STMT,
+               .source_range = {.begin = first_loc,
+                                .end = parser_previous_token(parser).location},
+               .compound = compound};
     return;
   }
   default: {
     parse_error_at(parser, string_view_from_c_str("Expect statement"),
-                   parser->current);
+                   current_token);
     return;
   }
   }
@@ -325,20 +378,21 @@ static void parse_parameter_list(Parser* parser)
 
 static StringView parse_identifier(Parser* parser)
 {
-  if (parser->current.type != TOKEN_IDENTIFIER) {
+  const Token current_token = parser_current_token(parser);
+
+  if (current_token.type != TOKEN_IDENTIFIER) {
     parse_error_at(parser, string_view_from_c_str("Expect Identifier"),
-                   parser->current);
+                   current_token);
   }
-  StringView name = parser->current.src;
   parse_advance(parser);
-  return name;
+  return current_token.src;
 }
 
 static FunctionDecl* parse_function_decl(Parser* parser)
 {
   if (parser->in_panic_mode) { return NULL; }
 
-  const SourceLocation first_location = parser->current.location;
+  const SourceLocation first_location = parser_current_token(parser).location;
 
   parse_consume(parser, TOKEN_KEYWORD_INT, "Expect keyword int");
   StringView function_name = parse_identifier(parser);
@@ -347,18 +401,19 @@ static FunctionDecl* parse_function_decl(Parser* parser)
 
   CompoundStmt* body = NULL;
 
-  if (parser->current.type == TOKEN_LEFT_BRACE) { // is definition
+  if (parser_current_token(parser).type == TOKEN_LEFT_BRACE) { // is definition
     parse_advance(parser);
-    body = ARENA_ALLOC_OBJECT(parser->ast_arena, CompoundStmt);
+    body = ARENA_ALLOC_OBJECT(parser->permanent_arena, CompoundStmt);
     parse_compound_stmt(parser, body);
   } else {
     parse_consume(parser, TOKEN_SEMICOLON, "Expect ;");
   }
   if (parser->in_panic_mode) { return NULL; }
 
-  const SourceLocation last_location = parser->current.location;
+  const SourceLocation last_location = parser_current_token(parser).location;
 
-  FunctionDecl* decl = ARENA_ALLOC_OBJECT(parser->ast_arena, FunctionDecl);
+  FunctionDecl* decl =
+      ARENA_ALLOC_OBJECT(parser->permanent_arena, FunctionDecl);
   *decl = (FunctionDecl){
       .source_range = {.begin = first_location, .end = last_location},
       .name = function_name,
@@ -371,19 +426,23 @@ static TranslationUnit* parse_translation_unit(Parser* parser)
 {
   FunctionDecl* decl = parse_function_decl(parser);
 
-  TranslationUnit* tu = ARENA_ALLOC_OBJECT(parser->ast_arena, TranslationUnit);
+  TranslationUnit* tu =
+      ARENA_ALLOC_OBJECT(parser->permanent_arena, TranslationUnit);
   *tu = (TranslationUnit){
       .decl_count = 1,
       .decls = decl,
   };
+  parse_consume(parser, TOKEN_EOF, "Expect end of the file");
 
   return tu;
 }
 
-ParseResult parse(const char* source, Arena* ast_arena)
+ParseResult parse(Tokens tokens, Arena* permanent_arena, Arena scratch_arena)
 {
-  Parser parser = {.lexer = lexer_create(source),
-                   .ast_arena = ast_arena,
+  Parser parser = {.permanent_arena = permanent_arena,
+                   .scratch_arena = scratch_arena,
+                   .tokens = tokens,
+                   .current_token_index = 0,
                    .has_error = false,
                    .in_panic_mode = false,
                    .errors = {
@@ -391,11 +450,7 @@ ParseResult parse(const char* source, Arena* ast_arena)
                        .data = NULL,
                    }};
 
-  parse_advance(&parser);
-
   TranslationUnit* tu = parse_translation_unit(&parser);
-
-  parse_consume(&parser, TOKEN_EOF, "Expect end of the file");
 
   return (ParseResult){.ast = parser.has_error ? NULL : tu,
                        .errors = parser.errors};

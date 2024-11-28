@@ -48,6 +48,8 @@ static void* _arena_reallocate(Arena* arena, size_t new_alignment,
 /**
  * @brief Attempts to extends the memory block pointed by `p`
  * @pre The old size is smaller than the new size
+ * @pre The arena has enough memory to allocate
+ * @pre `p` point to the most recent allocated block of the arena
  *
  * The growth is done either by:
  * - extending the existing area of `p` when possible. The content of the
@@ -61,10 +63,6 @@ static void* _arena_reallocate(Arena* arena, size_t new_alignment,
  *
  * If successful, returns a pointer to the new allocated block. The memory
  * pointed by `p` should be considered inaccessible afterward.
- *
- * If the arena does not have enough memory, or if `p` does not point to the
- * most recent allocated block of the arena, the function returns NULL and
- * the arena is unchanged.
  */
 void* arena_aligned_grow(Arena* arena, void* p, size_t new_alignment,
                          size_t new_size)

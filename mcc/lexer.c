@@ -162,12 +162,12 @@ Tokens lex(const char* source, Arena* permanent_arena, Arena scratch_arena)
   ptrdiff_t token_count = 0;
   while (true) {
     Token token = lexer_scan_token(&lexer);
-    if (token.type == TOKEN_EOF) { break; }
-
     Node* previous = current;
     current = ARENA_ALLOC_OBJECT(&scratch_arena, Node);
     *current = (Node){.token = token, .previous = previous};
     ++token_count;
+
+    if (token.type == TOKEN_EOF) { break; }
   }
 
   Token* tokens =

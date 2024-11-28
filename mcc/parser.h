@@ -3,12 +3,11 @@
 
 #include "ast.h"
 #include "diagnostic.h"
+#include "token.h"
 
+#include "utils/arena.h"
 #include "utils/str.h"
 
-typedef struct Arena Arena;
-
-// TODO: use vector
 typedef struct ParseErrorsView {
   size_t size;
   ParseError* data;
@@ -19,6 +18,6 @@ typedef struct ParseResult {
   ParseErrorsView errors;
 } ParseResult;
 
-ParseResult parse(const char* source, Arena* ast_arena);
+ParseResult parse(Tokens tokens, Arena* permanent_arena, Arena scratch_arena);
 
 #endif
