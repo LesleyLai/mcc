@@ -77,7 +77,7 @@ void print_parse_diagnostics(ParseErrorsView errors, const char* src_filename,
       StringBuffer output = string_buffer_new(&diagnostics_arena);
       write_diagnostics(&output, src_filename, source, errors.data[i]);
       StringView output_view = string_view_from_buffer(&output);
-      printf("%*s", (int)output_view.size, output_view.start);
+      fprintf(stderr, "%*s", (int)output_view.size, output_view.start);
       arena_reset(&diagnostics_arena);
     }
   }
