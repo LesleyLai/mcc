@@ -200,8 +200,6 @@ static ParseRule* get_rule(TokenType operator_type)
 
 static Expr* parse_precedence(Parser* parser, Precedence precedence)
 {
-  if (parser->in_panic_mode) { return NULL; }
-
   const ParseFn prefix_rule =
       get_rule(parser_previous_token(parser).type)->prefix;
   if (prefix_rule == NULL) {
@@ -268,7 +266,6 @@ static void parse_return_stmt(Parser* parser, ReturnStmt* out_ret_stmt)
 {
   parse_advance(parser);
   Expr* expr = parse_expr(parser);
-  if (parser->in_panic_mode) return;
 
   assert(expr != NULL);
 
@@ -288,7 +285,6 @@ static void parse_compound_stmt(Parser* parser, CompoundStmt* out_compount_stmt
                                        MAX_STMT_COUNT_IN_COMPOUND_STMT);
   size_t statement_count = 0;
 
-  bool encounter_error = false;
   while (parser_current_token(parser).type != TOKEN_RIGHT_BRACE) {
     if (statement_count == MAX_STMT_COUNT_IN_COMPOUND_STMT) {
       parse_error_at(parser,
@@ -299,36 +295,13 @@ static void parse_compound_stmt(Parser* parser, CompoundStmt* out_compount_stmt
     }
 
     parse_stmt(parser, &statements[statement_count]);
-    if (parser->in_panic_mode) {
-      encounter_error = true;
-      break;
-    }
     ++statement_count;
-  }
-  if (encounter_error) {
-    while (parser_current_token(parser).type != TOKEN_RIGHT_BRACE) {
-      parse_advance(parser);
-    }
   }
 
   parse_consume(parser, TOKEN_RIGHT_BRACE, "Expect }");
 
   *out_compount_stmt = (CompoundStmt){.statements = statements,
                                       .statement_count = statement_count};
-
-  // const Token previous_token = parser_previous_token(parser);
-  // const SourceLocation last_loc = {
-  //     .line = previous_token.location.line,
-  //     .column = (uint32_t)(previous_token.location.column +
-  //                          previous_token.src.size - 1),
-  // };
-
-  // Stmt* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Stmt);
-  // *result = (Stmt){.type = COMPOUND_STMT,
-  //                  .source_range = {.first = first_loc, .last = last_loc},
-  //                  .compound = {.statements = statements,
-  //                               .statement_count = statement_count}};
-  // return result;
 }
 
 static void parse_stmt(Parser* parser, Stmt* out_stmt)
@@ -340,9 +313,9 @@ static void parse_stmt(Parser* parser, Stmt* out_stmt)
   case TOKEN_KEYWORD_RETURN: {
     parse_advance(parser);
 
-    // Stmt* stmt = ARENA_ALLOC_OBJECT(parser->ast_arena, Stmt);
     ReturnStmt return_stmt;
     parse_return_stmt(parser, &return_stmt);
+
     *out_stmt =
         (Stmt){.type = RETURN_STMT,
                .source_range = {.begin = first_loc,
@@ -356,6 +329,7 @@ static void parse_stmt(Parser* parser, Stmt* out_stmt)
 
     CompoundStmt compound;
     parse_compound_stmt(parser, &compound);
+
     *out_stmt =
         (Stmt){.type = COMPOUND_STMT,
                .source_range = {.begin = first_loc,
@@ -366,7 +340,7 @@ static void parse_stmt(Parser* parser, Stmt* out_stmt)
   default: {
     parse_error_at(parser, string_view_from_c_str("Expect statement"),
                    current_token);
-    return;
+    break;
   }
   }
 }
@@ -392,8 +366,6 @@ static StringView parse_identifier(Parser* parser)
 
 static FunctionDecl* parse_function_decl(Parser* parser)
 {
-  if (parser->in_panic_mode) { return NULL; }
-
   const SourceLocation first_location = parser_current_token(parser).location;
 
   parse_consume(parser, TOKEN_KEYWORD_INT, "Expect keyword int");
@@ -410,7 +382,6 @@ static FunctionDecl* parse_function_decl(Parser* parser)
   } else {
     parse_consume(parser, TOKEN_SEMICOLON, "Expect ;");
   }
-  if (parser->in_panic_mode) { return NULL; }
 
   const SourceLocation last_location = parser_current_token(parser).location;
 
