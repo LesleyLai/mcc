@@ -126,8 +126,12 @@ static Expr* parse_number_literal(Parser* parser)
 {
   const Token token = parser_previous_token(parser);
 
+  char* end_ptr;
   const int val =
-      (int)strtol(token.src.start, NULL, 10); // TODO(llai): replace strtol
+      (int)strtol(token.src.start, &end_ptr, 10); // TODO(llai): replace strtol
+
+  MCC_ASSERT_MSG(end_ptr == token.src.start + token.src.size,
+                 "Not used all characters for numbers");
 
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
   *result = (Expr){.type = CONST_EXPR,

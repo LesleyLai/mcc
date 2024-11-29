@@ -125,8 +125,15 @@ static bool can_start_identifier(char c)
 
 static Token lexer_scan_number(Lexer* lexer)
 {
-  while (is_digit(*lexer->current))
+  while (is_digit(*lexer->current) || can_start_identifier(*lexer->current))
     lexer_advance(lexer);
+
+  // Check integer pattern
+  for (const char* cursor = lexer->previous; cursor != lexer->current;
+       ++cursor) {
+    if (!is_digit(*cursor)) { return lexer_make_token(lexer, TOKEN_ERROR); }
+  }
+
   return lexer_make_token(lexer, TOKEN_INTEGER);
 }
 
