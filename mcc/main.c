@@ -140,7 +140,13 @@ int main(int argc, char* argv[])
   Tokens tokens = lex(source, &permanent_arena, scratch_arena);
   if (args.stop_after_lexer) {
     print_tokens(&tokens);
-    exit(0);
+
+    bool has_error = false;
+    for (Token* token_itr = tokens.begin; token_itr != tokens.end;
+         ++token_itr) {
+      if (token_itr->type == TOKEN_ERROR) { has_error = true; }
+    }
+    exit(has_error ? 1 : 0);
   }
 
   ParseResult parse_result = parse(tokens, &permanent_arena, scratch_arena);

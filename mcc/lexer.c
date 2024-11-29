@@ -43,23 +43,71 @@ static Token lexer_error_token(const Lexer* lexer, StringView error_msg)
 // consumes the current character and returns it
 static char lexer_advance(Lexer* lexer)
 {
-  lexer->column++;
+  if (*lexer->current == '\n') {
+    ++lexer->line;
+    lexer->column = 1;
+  } else {
+    lexer->column++;
+  }
+
   return *lexer->current++;
 }
 
-static void skip_whitespace(Lexer* lexer)
+// Look at the next character
+static char lexer_peek_next(const Lexer* lexer)
+{
+  if (lexer_is_at_end(lexer)) { return '\0'; }
+  return lexer->current[1];
+}
+
+static void lexer_skip_c_style_comments(Lexer* lexer)
+{
+  lexer_advance(lexer);
+  lexer_advance(lexer);
+  while (true) {
+    if (*lexer->current == '*' && lexer_peek_next(lexer) == '/') {
+      lexer_advance(lexer);
+      lexer_advance(lexer);
+      break;
+    }
+    if (lexer_is_at_end(lexer)) {
+      // TODO: Properly handle unclosed C comments
+      fprintf(stderr, "mcc fatal error: Unclosed comment");
+      exit(1);
+    }
+    lexer_advance(lexer);
+  }
+}
+
+static void lexer_skip_cpp_style_comments(Lexer* lexer)
+{
+  while (*lexer->current != '\n' && !lexer_is_at_end(lexer)) {
+    lexer_advance(lexer);
+  }
+}
+
+static void lexer_skip_whitespace(Lexer* lexer)
 {
   for (;;) {
     char c = *lexer->current;
     switch (c) {
     case ' ':
     case '\r':
-    case '\t': lexer_advance(lexer); break;
-    case '\n':
-      ++lexer->current;
-      ++lexer->line;
-      lexer->column = 1;
-      break;
+    case '\t':
+    case '\n': lexer_advance(lexer); break;
+    case '/': // Comments
+    {
+      const char next_char = lexer_peek_next(lexer);
+      if (next_char == '/') {
+        lexer_skip_cpp_style_comments(lexer);
+        break;
+      } else if (next_char == '*') {
+        lexer_skip_c_style_comments(lexer);
+        break;
+      } else {
+        return;
+      }
+    }
     default: return;
     }
   }
@@ -119,7 +167,7 @@ static Token lexer_scan_identifier(Lexer* lexer)
 
 Token lexer_scan_token(Lexer* lexer)
 {
-  skip_whitespace(lexer);
+  lexer_skip_whitespace(lexer);
 
   lexer->previous = lexer->current;
 
