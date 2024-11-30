@@ -13,14 +13,14 @@
 #include <stdarg.h>
 #include <string.h>
 
-void assemble(const char* asm_filename, const char* obj_filename)
+void assemble(StringView asm_filename, StringView obj_filename)
 {
   enum { buffer_size = 10000 };
   char buffer[buffer_size];
 
-  snprintf(buffer, buffer_size,
-           "as -c %s.asm -o %s.o -msyntax=intel -mnaked-reg", asm_filename,
-           obj_filename);
+  snprintf(buffer, buffer_size, "as -c %.*s -o %.*s -msyntax=intel -mnaked-reg",
+           (int)asm_filename.size, asm_filename.start, (int)obj_filename.size,
+           obj_filename.start);
 
   if (system(buffer)) {
     fprintf(stderr, "Failed to call the assembler");
@@ -33,8 +33,7 @@ void link(const char* obj_filename, const char* executable_name)
   enum { buffer_size = 10000 };
   char buffer[buffer_size];
 
-  snprintf(buffer, buffer_size, "gcc %s.o -o %s", obj_filename,
-           executable_name);
+  snprintf(buffer, buffer_size, "gcc %s -o %s", obj_filename, executable_name);
   if (system(buffer)) {
     fprintf(stderr, "Failed to call the linker");
     exit(1);
@@ -83,7 +82,7 @@ void print_parse_diagnostics(ParseErrorsView errors, const char* src_filename,
   }
 }
 
-static void generate_assembly(TranslationUnit* tu)
+static void generate_assembly(TranslationUnit* tu, const char* filename)
 {
   if (tu->decl_count != 1 || tu->decls[0].body->statement_count != 1 ||
       tu->decls[0].body->statements[0].type != RETURN_STMT) {
@@ -92,14 +91,13 @@ static void generate_assembly(TranslationUnit* tu)
     exit(1);
   }
 
-  FILE* asm_file = fopen("a.asm", "w");
+  FILE* asm_file = fopen(filename, "w");
+  if (!asm_file) {
+    fprintf(stderr, "Cannot open asm file %s", "a.asm");
+    exit(1);
+  }
   MCC_DEFER(fclose(asm_file))
   {
-    if (!asm_file) {
-      fprintf(stderr, "Cannot open asm file %s", "a.asm");
-      exit(1);
-    }
-
     const int return_value =
         tu->decls[0].body->statements[0].ret.expr->const_expr.val;
 
@@ -110,6 +108,20 @@ static void generate_assembly(TranslationUnit* tu)
 
     if (ferror(asm_file)) { perror("Failed to write asm_file"); }
   }
+}
+
+StringBuffer replace_extension(const char* filename, const char* ext,
+                               Arena* permanent_arena)
+{
+  const char* dot = strrchr(filename, '.');
+
+  StringView name_without_ext = (StringView){filename, dot - filename};
+
+  StringBuffer output = string_buffer_new(permanent_arena);
+  string_buffer_append(&output, name_without_ext);
+  string_buffer_append(&output, string_view_from_c_str(ext));
+
+  return output;
 }
 
 int main(int argc, char* argv[])
@@ -125,12 +137,11 @@ int main(int argc, char* argv[])
 
   const CliArgs args = parse_cli_args(argc, argv);
 
-  const char* src_filename_with_extension = args.source_filename;
+  const char* src_filename = args.source_filename;
 
-  FILE* src_file = fopen(src_filename_with_extension, "rb");
+  FILE* src_file = fopen(src_filename, "rb");
   if (!src_file) {
-    (void)fprintf(stderr, "Mcc: fatal error: %s: No such file",
-                  src_filename_with_extension);
+    (void)fprintf(stderr, "Mcc: fatal error: %s: No such file", src_filename);
     return 1;
   }
 
@@ -150,8 +161,7 @@ int main(int argc, char* argv[])
   }
 
   ParseResult parse_result = parse(tokens, &permanent_arena, scratch_arena);
-  print_parse_diagnostics(parse_result.errors, src_filename_with_extension,
-                          source);
+  print_parse_diagnostics(parse_result.errors, src_filename, source);
 
   if (parse_result.ast == NULL) {
     // Failed to parse program
@@ -163,13 +173,22 @@ int main(int argc, char* argv[])
     return 0;
   }
 
-  const char* asm_filename = "a";
+  const StringBuffer asm_filename =
+      replace_extension(src_filename, ".s", &permanent_arena);
 
-  generate_assembly(parse_result.ast);
+  generate_assembly(parse_result.ast, string_buffer_c_str(&asm_filename));
 
-  const char* obj_filename = asm_filename;
-  assemble(asm_filename, obj_filename);
+  if (args.compile_only) { return 0; }
 
-  const char* executable_name = obj_filename;
-  link(obj_filename, executable_name);
+  const StringBuffer obj_filename =
+      replace_extension(src_filename, ".o", &permanent_arena);
+  assemble(string_view_from_buffer(&asm_filename),
+           string_view_from_buffer(&obj_filename));
+
+  if (args.stop_before_linker) { return 0; }
+
+  const StringBuffer executable_name =
+      replace_extension(src_filename, "", &permanent_arena);
+  link(string_buffer_c_str(&obj_filename),
+       string_buffer_c_str(&executable_name));
 }

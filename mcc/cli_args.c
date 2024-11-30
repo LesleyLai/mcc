@@ -13,7 +13,10 @@ typedef struct Option {
 
 static const Option options[] = {
     {"--help, -h", "prints this help message"},
-    {"--lex", "stops afer lexing and dump the result tokens"}};
+    {"--lex", "lexing only and then dump the result tokens"},
+    {"--parse", "lex and parse, and then dump the result AST"},
+    {"-S", "Compile only; do not assemble or link."},
+    {"-c", "Compile and assemble, but do not link."}};
 
 void print_usage()
 {
@@ -42,6 +45,10 @@ CliArgs parse_cli_args(int argc, char** argv)
       result.stop_after_lexer = true;
     } else if (!strcmp(arg, "--parse")) {
       result.stop_after_parser = true;
+    } else if (!strcmp(arg, "-S")) {
+      result.compile_only = true;
+    } else if (!strcmp(arg, "-c")) {
+      result.stop_before_linker = true;
     } else {
       // TODO: support more than one source file
       result.source_filename = arg;
