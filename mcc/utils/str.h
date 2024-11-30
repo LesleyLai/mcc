@@ -7,29 +7,18 @@
 
 #include "arena.h"
 
+// A view of a slice of string
 typedef struct StringView {
   const char* start;
   size_t size;
 } StringView;
 
-enum { small_string_capacity = 3 * sizeof(void*) - 2 };
-struct StringSmallBuffer_ {
-  unsigned char size_with_bit_mark_;
-  char data_[small_string_capacity + 1];
-};
-
-struct StringLargeBuffer_ {
-  size_t size_with_bit_mark_;
+// A dynamic array of characters used to build strings
+// Like C++'s std::string, the underlying buffer is always null-terminated
+typedef struct StringBuffer {
+  size_t size_;
   size_t capacity_;
   char* data_;
-};
-
-typedef struct StringBuffer {
-  union {
-    struct StringSmallBuffer_ small_;
-    struct StringLargeBuffer_ large_;
-  } data_;
-
   Arena* allocator;
 } StringBuffer;
 

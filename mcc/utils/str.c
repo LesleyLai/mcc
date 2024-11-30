@@ -4,18 +4,6 @@
 
 #include <stdlib.h>
 
-static bool _string_buffer_is_large(StringBuffer self)
-{
-  // Is the lowest bit of the first byte 1?
-  return (self.data_.small_.size_with_bit_mark_ & 1) != 0;
-}
-
-static void _string_buffer_mark_large(StringBuffer* self)
-{
-  // Sets the lowest bit of the first byte to 1
-  self->data_.large_.size_with_bit_mark_ |= 1;
-}
-
 StringView string_view_from_c_str(const char* source)
 {
   return (StringView){.start = source, .size = strlen(source)};
@@ -32,8 +20,7 @@ bool string_view_eq(StringView lhs, StringView rhs)
 
 StringBuffer string_buffer_new(Arena* allocator)
 {
-  return (StringBuffer){.data_ = {.small_ = {.size_with_bit_mark_ = 0}},
-                        .allocator = allocator};
+  return (StringBuffer){.allocator = allocator};
 }
 
 StringBuffer string_buffer_from_c_str(const char* source, Arena* allocator)
@@ -43,37 +30,16 @@ StringBuffer string_buffer_from_c_str(const char* source, Arena* allocator)
 
 StringBuffer string_buffer_from_view(StringView source, Arena* allocator)
 {
-  StringBuffer buffer = {.allocator = allocator};
-  char* data_ptr = NULL;
-
-  if (source.size <= small_string_capacity) {
-    buffer.data_.small_ = (struct StringSmallBuffer_){
-        .size_with_bit_mark_ = (unsigned char)(source.size << 1)};
-    data_ptr = buffer.data_.small_.data_;
-  } else {
-    buffer.data_.large_ = (struct StringLargeBuffer_){
-        .size_with_bit_mark_ = source.size << 1,
-        .capacity_ = source.size,
-        .data_ = arena_aligned_alloc(allocator, alignof(char), source.size + 1),
-    };
-    _string_buffer_mark_large(&buffer);
-    data_ptr = buffer.data_.large_.data_;
-  }
-
-  memcpy(data_ptr, source.start, source.size);
-  data_ptr[source.size] = '\0';
+  StringBuffer buffer = (StringBuffer){
+      .allocator = allocator,
+      .capacity_ = source.size,
+      .size_ = source.size,
+      .data_ = ARENA_ALLOC_ARRAY(allocator, char, source.size + 1),
+  };
+  memcpy(buffer.data_, source.start, source.size);
+  buffer.data_[source.size] = '\0';
 
   return buffer;
-}
-
-static size_t _string_buffer_size_small(StringBuffer self)
-{
-  return self.data_.small_.size_with_bit_mark_ >> 1;
-}
-
-static size_t _string_buffer_size_large(StringBuffer self)
-{
-  return self.data_.large_.size_with_bit_mark_ >> 1;
 }
 
 StringView string_view_from_buffer(const StringBuffer* buffer)
@@ -84,131 +50,56 @@ StringView string_view_from_buffer(const StringBuffer* buffer)
 
 const char* string_buffer_c_str(const StringBuffer* self)
 {
-  return _string_buffer_is_large(*self) ? self->data_.large_.data_
-                                        : self->data_.small_.data_;
+  return self->data_;
 }
 
 char* string_buffer_data(StringBuffer* self)
 {
-  return _string_buffer_is_large(*self) ? self->data_.large_.data_
-                                        : self->data_.small_.data_;
+  return self->data_;
 }
 
 size_t string_buffer_size(StringBuffer self)
 {
-  return _string_buffer_is_large(self) ? _string_buffer_size_large(self)
-                                       : _string_buffer_size_small(self);
+  return self.size_;
 }
 
 size_t string_buffer_capacity(StringBuffer self)
 {
-  return _string_buffer_is_large(self) ? (self.data_.large_.capacity_)
-                                       : small_string_capacity;
+  return self.capacity_;
 }
 
-static void _string_buffer_grow_large(StringBuffer* self, size_t new_capacity)
+static void string_buffer_grow(StringBuffer* self, size_t new_capacity)
 {
   // No need to free old memory since we only use arena allocation
-  assert(new_capacity > self->data_.large_.capacity_ ||
-         new_capacity > small_string_capacity);
-  self->data_.large_.capacity_ = new_capacity;
-  self->data_.large_.data_ =
-      arena_aligned_grow(self->allocator, self->data_.large_.data_,
-                         alignof(char), new_capacity + 1);
-}
-
-static void _string_buffer_push_small(StringBuffer* self, char c)
-{
-  const size_t old_size = _string_buffer_size_small(*self);
-  if (old_size < small_string_capacity) {
-    // If still small
-    self->data_.small_.data_[old_size] = c;
-    self->data_.small_.data_[old_size + 1] = '\0';
-    self->data_.small_.size_with_bit_mark_ += 2;
-  } else {
-    // small to large
-    size_t new_capacity = small_string_capacity * 2;
-    char* new_start =
-        arena_aligned_alloc(self->allocator, alignof(char), new_capacity + 1);
-    memcpy(new_start, self->data_.small_.data_, small_string_capacity);
-    new_start[small_string_capacity] = c;
-    new_start[small_string_capacity + 1] = '\0';
-
-    self->data_.large_ = (struct StringLargeBuffer_){
-        .size_with_bit_mark_ = (small_string_capacity + 1) << 1,
-        .capacity_ = new_capacity,
-        .data_ = new_start,
-    };
-    _string_buffer_mark_large(self);
-  }
-}
-
-static void _string_buffer_push_large(StringBuffer* self, char c)
-{
-  const size_t old_size = _string_buffer_size_large(*self);
-  const size_t old_capacity = self->data_.large_.capacity_;
-  if (old_size > old_capacity) {
-    _string_buffer_grow_large(self, old_capacity * 2);
-  }
-
-  self->data_.large_.data_[old_size] = c;
-  self->data_.large_.data_[old_size + 1] = '\0';
-  self->data_.large_.size_with_bit_mark_ += 2;
-  assert(_string_buffer_is_large(*self));
+  assert(new_capacity > self->capacity_);
+  self->capacity_ = new_capacity;
+  self->data_ = arena_aligned_grow(self->allocator, self->data_, alignof(char),
+                                   new_capacity + 1);
 }
 
 void string_buffer_push(StringBuffer* self, char c)
 {
-  if (_string_buffer_is_large(*self)) {
-    _string_buffer_push_large(self, c);
-  } else {
-    _string_buffer_push_small(self, c);
+  const size_t old_size = self->size_;
+  const size_t old_capacity = self->capacity_;
+  if (old_size >= old_capacity) {
+    const size_t double_capacity = old_capacity * 2;
+    string_buffer_grow(self, 16 > double_capacity ? 16 : double_capacity);
   }
-}
 
-static void _string_buffer_append_small(StringBuffer* self, StringView rhs)
-{
-  const size_t old_size = _string_buffer_size_small(*self);
-  const size_t new_size = old_size + rhs.size;
-  if (new_size <= small_string_capacity) {
-    self->data_.small_.size_with_bit_mark_ = (unsigned char)(new_size << 1);
-    memcpy(self->data_.small_.data_ + old_size, rhs.start, rhs.size);
-    self->data_.small_.data_[new_size] = '\0';
-  } else {
-    char* new_data =
-        arena_aligned_alloc(self->allocator, alignof(char), new_size + 1);
-    memcpy(new_data, self->data_.small_.data_,
-           _string_buffer_size_small(*self));
-    memcpy(new_data + old_size, rhs.start, rhs.size);
-
-    self->data_.large_ = (struct StringLargeBuffer_){
-        .size_with_bit_mark_ = (unsigned char)(new_size << 1),
-        .capacity_ = new_size,
-        .data_ = new_data};
-    _string_buffer_mark_large(self);
-    new_data[new_size] = '\0';
-  }
-}
-
-static void _string_buffer_append_large(StringBuffer* self, StringView rhs)
-{
-  const size_t old_size = _string_buffer_size_large(*self);
-  const size_t new_size = old_size + rhs.size;
-  const size_t old_capacity = self->data_.large_.capacity_;
-  if (new_size > old_capacity) { _string_buffer_grow_large(self, new_size); }
-  memcpy(self->data_.large_.data_ + old_size, rhs.start, rhs.size);
-  self->data_.large_.data_[new_size] = '\0';
-  self->data_.large_.size_with_bit_mark_ = new_size << 1;
-  _string_buffer_mark_large(self);
+  self->data_[old_size] = c;
+  self->data_[old_size + 1] = '\0';
+  self->size_ += 1;
 }
 
 void string_buffer_append(StringBuffer* self, StringView rhs)
 {
-  if (_string_buffer_is_large(*self)) {
-    _string_buffer_append_large(self, rhs);
-  } else {
-    _string_buffer_append_small(self, rhs);
-  }
+  const size_t old_size = self->size_;
+  const size_t new_size = old_size + rhs.size;
+  const size_t old_capacity = self->capacity_;
+  if (new_size > old_capacity) { string_buffer_grow(self, new_size); }
+  memcpy(self->data_ + old_size, rhs.start, rhs.size);
+  self->data_[new_size] = '\0';
+  self->size_ = new_size;
 }
 
 /**
@@ -229,34 +120,10 @@ void string_buffer_unsafe_resize_for_overwrite(StringBuffer* self, size_t count)
   const size_t new_size = count;
 
   if (new_size <= old_capacity) {
-    if (_string_buffer_is_large(*self)) {
-      self->data_.large_.size_with_bit_mark_ = new_size << 1;
-      _string_buffer_mark_large(self);
-    } else {
-      self->data_.small_.size_with_bit_mark_ = (unsigned char)(new_size << 1);
-    }
-
+    self->size_ = new_size;
     return;
   }
 
-  if (_string_buffer_is_large(*self)) {
-    _string_buffer_grow_large(self, new_size);
-    self->data_.large_.size_with_bit_mark_ = new_size << 1;
-    _string_buffer_mark_large(self);
-  } else {
-    if (new_size <= small_string_capacity) { // small to small
-      self->data_.small_.size_with_bit_mark_ = (unsigned char)(new_size << 1);
-    } else { // small to large
-      char* new_data =
-          arena_aligned_alloc(self->allocator, alignof(char), new_size + 1);
-      memcpy(new_data, self->data_.small_.data_, old_size);
-
-      self->data_.large_ = (struct StringLargeBuffer_){
-          .size_with_bit_mark_ = new_size << 1,
-          .capacity_ = new_size,
-          .data_ = new_data,
-      };
-      _string_buffer_mark_large(self);
-    }
-  }
+  string_buffer_grow(self, new_size);
+  self->size_ = new_size;
 }

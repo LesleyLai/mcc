@@ -22,7 +22,6 @@ TEST_CASE("String Buffer")
     REQUIRE(string_buffer_size(string) == 0);
 
     string_buffer_push(&string, 'a');
-    REQUIRE(string_buffer_capacity(string) == small_string_capacity);
     REQUIRE(string_buffer_size(string) == 1);
     REQUIRE(string_buffer_data(&string)[0] == 'a');
     REQUIRE(string_view_eq(string_view_from_buffer(&string),
@@ -37,7 +36,6 @@ TEST_CASE("String Buffer")
     std::string expected;
 
     static constexpr std::size_t size = 30;
-    static_assert(size > small_string_capacity);
     for (std::size_t i = 0; i < size; ++i) {
       string_buffer_push(&string, 'b');
       expected.push_back('b');

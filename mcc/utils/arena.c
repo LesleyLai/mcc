@@ -46,10 +46,11 @@ static void* _arena_reallocate(Arena* arena, size_t new_alignment,
 }
 
 /**
- * @brief Attempts to extends the memory block pointed by `p`
+ * @brief Attempts to extends the memory block pointed by `p`, or allocate a new
+ * memory block if `p` is null
  * @pre The old size is smaller than the new size
  * @pre The arena has enough memory to allocate
- * @pre `p` point to the most recent allocated block of the arena
+ * @pre `p` point to either the most recent allocated block of the arena or null
  *
  * The growth is done either by:
  * - extending the existing area of `p` when possible. The content of the
@@ -67,6 +68,10 @@ static void* _arena_reallocate(Arena* arena, size_t new_alignment,
 void* arena_aligned_grow(Arena* arena, void* p, size_t new_alignment,
                          size_t new_size)
 {
+  // TODO: test this
+  // If p is null, allocate a new memory block
+  if (p == NULL) { return arena_aligned_alloc(arena, new_alignment, new_size); }
+
   MCC_ASSERT_MSG(p == arena->previous,
                  "Can't grow a point that does not point to the most recent "
                  "allocated block of the arena");
