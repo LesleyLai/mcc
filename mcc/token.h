@@ -16,6 +16,8 @@ typedef enum TokenType {
   TOKEN_STAR,  // *
   TOKEN_SLASH, // /
 
+  TOKEN_TILDE, // ~
+
   TOKEN_KEYWORD_VOID,
   TOKEN_KEYWORD_INT,
   TOKEN_KEYWORD_RETURN,

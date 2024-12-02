@@ -194,6 +194,7 @@ Token lexer_scan_token(Lexer* lexer)
   case '-': return lexer_make_token(lexer, TOKEN_MINUS);
   case '*': return lexer_make_token(lexer, TOKEN_STAR);
   case '/': return lexer_make_token(lexer, TOKEN_SLASH);
+  case '~': return lexer_make_token(lexer, TOKEN_TILDE);
   default: break;
   }
 
