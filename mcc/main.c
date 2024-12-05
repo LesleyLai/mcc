@@ -85,7 +85,7 @@ void print_parse_diagnostics(ParseErrorsView errors, const char* src_filename,
 static void generate_assembly(TranslationUnit* tu, const char* filename)
 {
   if (tu->decl_count != 1 || tu->decls[0].body->statement_count != 1 ||
-      tu->decls[0].body->statements[0].type != RETURN_STMT) {
+      tu->decls[0].body->statements[0].type != STMT_TYPE_RETURN) {
     // TODO: Not support yet
     fprintf(stderr, "MCC does not support this kind of program yet");
     exit(1);

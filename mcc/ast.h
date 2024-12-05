@@ -6,19 +6,33 @@
 
 #include <stdlib.h>
 
-typedef enum ExprType { CONST_EXPR, BINARY_OP_EXPR } ExprType;
+typedef enum ExprType {
+  EXPR_TYPE_CONST,
+  EXPR_TYPE_UNARY,
+  EXPR_TYPE_BINARY
+} ExprType;
+
+typedef enum UnaryOpType {
+  UNARY_OP_TYPE_MINUS,              // -
+  UNARY_OP_BITWISE_TYPE_COMPLEMENT, // ~
+} UnaryOpType;
 
 typedef enum BinaryOpType {
-  BINARY_OP_PLUS,
-  BINARY_OP_MINUS,
-  BINARY_OP_MULT,
-  BINARY_OP_DIVIDE
+  BINARY_OP_TYPE_PLUS,
+  BINARY_OP_TYPE_MINUS,
+  BINARY_OP_TYPE_MULT,
+  BINARY_OP_TYPE_DIVIDE
 } BinaryOpType;
 
 typedef struct Expr Expr;
 
 struct ConstExpr {
   int val;
+};
+
+struct UnaryOpExpr {
+  UnaryOpType unary_op_type;
+  Expr* expr;
 };
 
 struct BinaryOpExpr {
@@ -32,11 +46,15 @@ typedef struct Expr {
   ExprType type;
   union {
     struct ConstExpr const_expr;
+    struct UnaryOpExpr unary_op;
     struct BinaryOpExpr binary_op;
   };
 } Expr;
 
-typedef enum StatementType { COMPOUND_STMT, RETURN_STMT } StatementType;
+typedef enum StatementType {
+  STMT_TYPE_COMPOUND,
+  STMT_TYPE_RETURN
+} StatementType;
 
 typedef struct Stmt Stmt;
 

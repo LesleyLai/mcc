@@ -12,11 +12,27 @@ static void print_source_range(SourceRange range)
   }
 }
 
+static const char* unary_op_name(UnaryOpType unary_op_type)
+{
+  switch (unary_op_type) {
+  case UNARY_OP_TYPE_MINUS: return "-";
+  case UNARY_OP_BITWISE_TYPE_COMPLEMENT: return "~";
+  }
+  MCC_ASSERT_MSG(false, "invalid enum");
+}
+
 static void ast_print_expr(Expr* expr, int indent)
 {
   switch (expr->type) {
-  case CONST_EXPR: printf("%*s%i\n", indent, "", expr->const_expr.val); break;
-  case BINARY_OP_EXPR:
+  case EXPR_TYPE_CONST:
+    printf("%*s%i\n", indent, "", expr->const_expr.val);
+    break;
+  case EXPR_TYPE_UNARY:
+    printf("%*sUnaryOPExpr <", indent, "");
+    print_source_range(expr->source_range);
+    printf("> operator: %s\n", unary_op_name(expr->unary_op.unary_op_type));
+    ast_print_expr(expr->unary_op.expr, indent + 2);
+  case EXPR_TYPE_BINARY:
     // TODO
     break;
   }
@@ -27,10 +43,10 @@ static void ast_print_compound_stmt(CompoundStmt* stmt, int indent);
 static void ast_print_stmt(Stmt* stmt, int indent)
 {
   switch (stmt->type) {
-  case COMPOUND_STMT:
+  case STMT_TYPE_COMPOUND:
     ast_print_compound_stmt(&stmt->compound, indent + 2);
     break;
-  case RETURN_STMT: {
+  case STMT_TYPE_RETURN: {
     printf("%*sReturnStmt <", indent, "");
     print_source_range(stmt->source_range);
     printf(">\n");

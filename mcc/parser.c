@@ -30,12 +30,12 @@ static SourceRange token_source_range(Token token)
               .offset = token.location.offset + token.src.size}};
 }
 
-// static SourceRange source_range_union(SourceRange lhs, SourceRange rhs)
-//{
-//   return (SourceRange){
-//       .begin = (lhs.begin.offset < rhs.begin.offset) ? lhs.begin : rhs.begin,
-//       .end = (lhs.end.offset > rhs.end.offset) ? lhs.end : rhs.end};
-// }
+static SourceRange source_range_union(SourceRange lhs, SourceRange rhs)
+{
+  return (SourceRange){
+      .begin = (lhs.begin.offset < rhs.begin.offset) ? lhs.begin : rhs.begin,
+      .end = (lhs.end.offset > rhs.end.offset) ? lhs.end : rhs.end};
+}
 
 static void parse_error_at(Parser* parser, StringView error_msg, Token token)
 {
@@ -79,6 +79,19 @@ static Token parser_current_token(Parser* parser)
 {
   assert_in_range(parser, parser->current_token_index);
   return parser->tokens.begin[parser->current_token_index];
+}
+
+// gets the next token
+static Token parser_next_token(Parser* parser)
+{
+  MCC_ASSERT_MSG(parser->current_token_index >= 0,
+                 "Current token index need ot be positive");
+
+  if (parser->tokens.begin + parser->current_token_index + 1 >=
+      parser->tokens.end) {
+    return (Token){.type = TOKEN_EOF};
+  }
+  return parser->tokens.begin[parser->current_token_index + 1];
 }
 
 // gets the current token
@@ -134,7 +147,7 @@ static Expr* parse_number_literal(Parser* parser)
                  "Not used all characters for numbers");
 
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
-  *result = (Expr){.type = CONST_EXPR,
+  *result = (Expr){.type = EXPR_TYPE_CONST,
                    .source_range = token_source_range(token),
                    .const_expr = (struct ConstExpr){.val = val}};
   return result;
@@ -151,7 +164,7 @@ typedef enum Precedence {
   PREC_AND,        // and
   PREC_EQUALITY,   // == !=
   PREC_COMPARISON, // < > <= >=
-  PREC_TERM,       // + -
+  PREC_TERM,       // + - ! ~
   PREC_FACTOR,     // * /
   PREC_UNARY,      // ! -
   PREC_CALL,       // . ()
@@ -179,6 +192,7 @@ static ParseRule rules[] = {
     [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE},
     [TOKEN_PLUS] = {NULL, parse_binary_op, PREC_TERM},
     [TOKEN_MINUS] = {parse_unary_op, parse_binary_op, PREC_TERM},
+    [TOKEN_TILDE] = {parse_unary_op, NULL, PREC_TERM},
     [TOKEN_STAR] = {NULL, parse_binary_op, PREC_FACTOR},
     [TOKEN_SLASH] = {NULL, parse_binary_op, PREC_FACTOR},
     [TOKEN_KEYWORD_VOID] = {NULL, NULL, PREC_NONE},
@@ -200,22 +214,24 @@ static ParseRule* get_rule(TokenType operator_type)
 
 static Expr* parse_precedence(Parser* parser, Precedence precedence)
 {
+  parse_advance(parser);
+
   const ParseFn prefix_rule =
       get_rule(parser_previous_token(parser).type)->prefix;
   if (prefix_rule == NULL) {
     parse_error_at(parser, string_view_from_c_str("Expect valid expression"),
-                   parser_current_token(parser));
+                   parser_previous_token(parser));
     return NULL;
   }
 
   Expr* expr = prefix_rule(parser);
 
-  while (precedence <=
-         get_rule(parser_current_token(parser).type)->precedence) {
-    parse_advance(parser);
-    // ParseFn infix_rule = get_rule(parser->previous.type)->infix;
-    //  Expr* rhs = infix_rule(parser);
-  }
+  // while (precedence <=
+  //        get_rule(parser_current_token(parser).type)->precedence) {
+  //   parse_advance(parser);
+  //   ParseFn infix_rule = get_rule(parser_previous_token(parser).type)->infix;
+  //   Expr* rhs = infix_rule(parser);
+  // }
 
   return expr;
 }
@@ -229,14 +245,32 @@ static Expr* parse_group(Parser* parser)
 
 static Expr* parse_unary_op(Parser* parser)
 {
-  TokenType operator_type = parser_previous_token(parser).type;
+  Token operator_token = parser_previous_token(parser);
 
+  UnaryOpType operator_type = 0xdeadbeef;
+  switch (operator_token.type) {
+  case TOKEN_MINUS: operator_type = UNARY_OP_TYPE_MINUS; break;
+  case TOKEN_TILDE: operator_type = UNARY_OP_BITWISE_TYPE_COMPLEMENT; break;
+  default: MCC_ASSERT_MSG(false, "Unexpected operator");
+  }
+
+  // Inner expression
   Expr* expr = parse_precedence(parser, PREC_UNARY);
 
-  switch (operator_type) {
-  case TOKEN_MINUS: return expr; // TODO: should actually wrap it
-  default: return NULL;          // TODO: better error reporting for unreachable
-  }
+  // build result
+  // TODO: better way to handle the case where expr == NULL
+  SourceRange result_source_range =
+      expr == NULL ? token_source_range(operator_token)
+                   : source_range_union(token_source_range(operator_token),
+                                        expr->source_range);
+
+  Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
+  *result = (Expr){.type = EXPR_TYPE_UNARY,
+                   .source_range = result_source_range,
+                   .unary_op = (struct UnaryOpExpr){
+                       .unary_op_type = operator_type, .expr = expr}};
+
+  return result;
 }
 
 static Expr* parse_binary_op(Parser* parser)
@@ -264,7 +298,6 @@ static Expr* parse_expr(Parser* parser)
 
 static void parse_return_stmt(Parser* parser, ReturnStmt* out_ret_stmt)
 {
-  parse_advance(parser);
   Expr* expr = parse_expr(parser);
 
   assert(expr != NULL);
@@ -278,14 +311,14 @@ static void parse_stmt(Parser* parser, Stmt* out_stmt);
 // TODO: Implement proper vector and use it for compound statement
 #define MAX_STMT_COUNT_IN_COMPOUND_STMT 16
 
-static void parse_compound_stmt(Parser* parser, CompoundStmt* out_compount_stmt
-                                /*SourceLocation first_loc*/)
+static void parse_compound_stmt(Parser* parser, CompoundStmt* out_compount_stmt)
 {
   Stmt* statements = ARENA_ALLOC_ARRAY(parser->permanent_arena, Stmt,
                                        MAX_STMT_COUNT_IN_COMPOUND_STMT);
   size_t statement_count = 0;
 
   while (parser_current_token(parser).type != TOKEN_RIGHT_BRACE) {
+    // TODO: proper handle the case with more compound statements
     if (statement_count == MAX_STMT_COUNT_IN_COMPOUND_STMT) {
       parse_error_at(parser,
                      string_view_from_c_str(
@@ -317,7 +350,7 @@ static void parse_stmt(Parser* parser, Stmt* out_stmt)
     parse_return_stmt(parser, &return_stmt);
 
     *out_stmt =
-        (Stmt){.type = RETURN_STMT,
+        (Stmt){.type = STMT_TYPE_RETURN,
                .source_range = {.begin = first_loc,
                                 .end = parser_previous_token(parser).location},
                .ret = return_stmt};
@@ -331,7 +364,7 @@ static void parse_stmt(Parser* parser, Stmt* out_stmt)
     parse_compound_stmt(parser, &compound);
 
     *out_stmt =
-        (Stmt){.type = COMPOUND_STMT,
+        (Stmt){.type = STMT_TYPE_COMPOUND,
                .source_range = {.begin = first_loc,
                                 .end = parser_previous_token(parser).location},
                .compound = compound};

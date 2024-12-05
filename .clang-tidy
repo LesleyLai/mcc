@@ -16,6 +16,7 @@ readability-simplify-*,
 -modernize-deprecated-headers,
 -*-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
 -*-easily-swappable-parameters,
+-*-no-recursion,
 '
 HeaderFilterRegex: 'catch.hpp'
 FormatStyle: 'file'
