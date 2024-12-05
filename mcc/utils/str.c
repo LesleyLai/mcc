@@ -115,7 +115,6 @@ not write to the underlying buffer
  */
 void string_buffer_unsafe_resize_for_overwrite(StringBuffer* self, size_t count)
 {
-  const size_t old_size = string_buffer_size(*self);
   const size_t old_capacity = string_buffer_capacity(*self);
   const size_t new_size = count;
 

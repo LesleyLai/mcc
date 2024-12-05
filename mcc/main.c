@@ -115,7 +115,8 @@ StringBuffer replace_extension(const char* filename, const char* ext,
 {
   const char* dot = strrchr(filename, '.');
 
-  StringView name_without_ext = (StringView){filename, dot - filename};
+  StringView name_without_ext =
+      (StringView){filename, (size_t)(dot - filename)};
 
   StringBuffer output = string_buffer_new(permanent_arena);
   string_buffer_append(&output, name_without_ext);

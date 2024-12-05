@@ -18,6 +18,7 @@ static const char* token_type_string(TokenType type)
   case TOKEN_MINUS: return "-";
   case TOKEN_STAR: return "*";
   case TOKEN_SLASH: return "/";
+  case TOKEN_TILDE: return "~";
   case TOKEN_KEYWORD_VOID: return "void";
   case TOKEN_KEYWORD_INT: return "int";
   case TOKEN_KEYWORD_RETURN: return "return";

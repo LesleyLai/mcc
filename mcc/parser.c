@@ -81,19 +81,6 @@ static Token parser_current_token(Parser* parser)
   return parser->tokens.begin[parser->current_token_index];
 }
 
-// gets the next token
-static Token parser_next_token(Parser* parser)
-{
-  MCC_ASSERT_MSG(parser->current_token_index >= 0,
-                 "Current token index need ot be positive");
-
-  if (parser->tokens.begin + parser->current_token_index + 1 >=
-      parser->tokens.end) {
-    return (Token){.type = TOKEN_EOF};
-  }
-  return parser->tokens.begin[parser->current_token_index + 1];
-}
-
 // gets the current token
 static Token parser_previous_token(Parser* parser)
 {
@@ -226,6 +213,7 @@ static Expr* parse_precedence(Parser* parser, Precedence precedence)
 
   Expr* expr = prefix_rule(parser);
 
+  (void)precedence;
   // while (precedence <=
   //        get_rule(parser_current_token(parser).type)->precedence) {
   //   parse_advance(parser);
