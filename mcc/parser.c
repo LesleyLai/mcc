@@ -152,7 +152,7 @@ typedef enum Precedence {
   PREC_EQUALITY,   // == !=
   PREC_COMPARISON, // < > <= >=
   PREC_TERM,       // + - ! ~
-  PREC_FACTOR,     // * /
+  PREC_FACTOR,     // * / %
   PREC_UNARY,      // ! -
   PREC_CALL,       // . ()
   PREC_PRIMARY
@@ -161,13 +161,14 @@ typedef enum Precedence {
 static Expr* parse_expr(Parser* parser);
 static Expr* parse_group(Parser* parser);
 static Expr* parse_unary_op(Parser* parser);
-static Expr* parse_binary_op(Parser* parser);
+static Expr* parse_binary_op_left_associative(Parser* parser, Expr* lhs_expr);
 
-typedef Expr* (*ParseFn)(Parser*);
+typedef Expr* (*PrefixParseFn)(Parser*);
+typedef Expr* (*InfixParseFn)(Parser*, Expr*);
 
 typedef struct ParseRule {
-  ParseFn prefix;
-  ParseFn infix;
+  PrefixParseFn prefix;
+  InfixParseFn infix;
   Precedence precedence;
 } ParseRule;
 
@@ -177,11 +178,13 @@ static ParseRule rules[] = {
     [TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE},
     [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
     [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE},
-    [TOKEN_PLUS] = {NULL, parse_binary_op, PREC_TERM},
-    [TOKEN_MINUS] = {parse_unary_op, parse_binary_op, PREC_TERM},
+    [TOKEN_PLUS] = {NULL, parse_binary_op_left_associative, PREC_TERM},
+    [TOKEN_MINUS] = {parse_unary_op, parse_binary_op_left_associative,
+                     PREC_TERM},
+    [TOKEN_STAR] = {NULL, parse_binary_op_left_associative, PREC_FACTOR},
+    [TOKEN_SLASH] = {NULL, parse_binary_op_left_associative, PREC_FACTOR},
+    [TOKEN_PERCENT] = {NULL, parse_binary_op_left_associative, PREC_FACTOR},
     [TOKEN_TILDE] = {parse_unary_op, NULL, PREC_TERM},
-    [TOKEN_STAR] = {NULL, parse_binary_op, PREC_FACTOR},
-    [TOKEN_SLASH] = {NULL, parse_binary_op, PREC_FACTOR},
     [TOKEN_KEYWORD_VOID] = {NULL, NULL, PREC_NONE},
     [TOKEN_KEYWORD_INT] = {NULL, NULL, PREC_NONE},
     [TOKEN_KEYWORD_RETURN] = {NULL, NULL, PREC_NONE},
@@ -203,7 +206,7 @@ static Expr* parse_precedence(Parser* parser, Precedence precedence)
 {
   parse_advance(parser);
 
-  const ParseFn prefix_rule =
+  const PrefixParseFn prefix_rule =
       get_rule(parser_previous_token(parser).type)->prefix;
   if (prefix_rule == NULL) {
     parse_error_at(parser, string_view_from_c_str("Expect valid expression"),
@@ -213,13 +216,13 @@ static Expr* parse_precedence(Parser* parser, Precedence precedence)
 
   Expr* expr = prefix_rule(parser);
 
-  (void)precedence;
-  // while (precedence <=
-  //        get_rule(parser_current_token(parser).type)->precedence) {
-  //   parse_advance(parser);
-  //   ParseFn infix_rule = get_rule(parser_previous_token(parser).type)->infix;
-  //   Expr* rhs = infix_rule(parser);
-  // }
+  while (precedence <=
+         get_rule(parser_current_token(parser).type)->precedence) {
+    parse_advance(parser);
+    InfixParseFn infix_rule =
+        get_rule(parser_previous_token(parser).type)->infix;
+    expr = infix_rule(parser, expr);
+  }
 
   return expr;
 }
@@ -261,22 +264,37 @@ static Expr* parse_unary_op(Parser* parser)
   return result;
 }
 
-static Expr* parse_binary_op(Parser* parser)
+static Expr* parse_binary_op_left_associative(Parser* parser, Expr* lhs_expr)
 {
-  const TokenType operator_type = parser_previous_token(parser).type;
+  Token operator_token = parser_previous_token(parser);
+
+  const TokenType operator_type = operator_token.type;
   const ParseRule* rule = get_rule(operator_type);
-  parse_precedence(parser, (Precedence)(rule->precedence + 1));
+  Expr* rhs_expr = parse_precedence(parser, (Precedence)(rule->precedence + 1));
 
-  //  BinaryOpType binary_op_type;
-  //  switch (operator_type) {
-  //  case TOKEN_PLUS: binary_op_type = BINARY_OP_PLUS; break;
-  //  case TOKEN_MINUS: binary_op_type = BINARY_OP_MINUS; break;
-  //  case TOKEN_STAR: binary_op_type = BINARY_OP_MULT; break;
-  //  case TOKEN_SLASH: binary_op_type = BINARY_OP_DIVIDE; break;
-  //  default: return NULL; // TODO: better error reporting for unreachable
-  //  }
+  BinaryOpType binary_op_type;
+  switch (operator_type) {
+  case TOKEN_PLUS: binary_op_type = BINARY_OP_TYPE_PLUS; break;
+  case TOKEN_MINUS: binary_op_type = BINARY_OP_TYPE_MINUS; break;
+  case TOKEN_STAR: binary_op_type = BINARY_OP_TYPE_MULT; break;
+  case TOKEN_SLASH: binary_op_type = BINARY_OP_TYPE_DIVIDE; break;
+  case TOKEN_PERCENT: binary_op_type = BINARY_OP_TYPE_MOD; break;
+  default: return NULL; // TODO: better error reporting for unreachable
+  }
 
-  return NULL;
+  // build result
+  // TODO: Fix this
+  SourceRange result_source_range = token_source_range(operator_token);
+
+  Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
+  *result = (Expr){.type = EXPR_TYPE_BINARY,
+                   .source_range = result_source_range,
+                   .binary_op = (struct BinaryOpExpr){
+                       .binary_op_type = binary_op_type,
+                       .lhs = lhs_expr,
+                       .rhs = rhs_expr,
+                   }};
+  return result;
 }
 
 static Expr* parse_expr(Parser* parser)

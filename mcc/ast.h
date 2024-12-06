@@ -21,7 +21,8 @@ typedef enum BinaryOpType {
   BINARY_OP_TYPE_PLUS,
   BINARY_OP_TYPE_MINUS,
   BINARY_OP_TYPE_MULT,
-  BINARY_OP_TYPE_DIVIDE
+  BINARY_OP_TYPE_DIVIDE,
+  BINARY_OP_TYPE_MOD,
 } BinaryOpType;
 
 typedef struct Expr Expr;

@@ -21,6 +21,18 @@ static const char* unary_op_name(UnaryOpType unary_op_type)
   MCC_ASSERT_MSG(false, "invalid enum");
 }
 
+static const char* binary_op_name(BinaryOpType binary_op_type)
+{
+  switch (binary_op_type) {
+  case BINARY_OP_TYPE_PLUS: return "+";
+  case BINARY_OP_TYPE_MINUS: return "-";
+  case BINARY_OP_TYPE_MULT: return "*";
+  case BINARY_OP_TYPE_DIVIDE: return "/";
+  case BINARY_OP_TYPE_MOD: return "%";
+  }
+  MCC_ASSERT_MSG(false, "invalid enum");
+}
+
 static void ast_print_expr(Expr* expr, int indent)
 {
   switch (expr->type) {
@@ -32,8 +44,13 @@ static void ast_print_expr(Expr* expr, int indent)
     print_source_range(expr->source_range);
     printf("> operator: %s\n", unary_op_name(expr->unary_op.unary_op_type));
     ast_print_expr(expr->unary_op.expr, indent + 2);
+    break;
   case EXPR_TYPE_BINARY:
-    // TODO
+    printf("%*sBinaryOPExpr <", indent, "");
+    print_source_range(expr->source_range);
+    printf("> operator: %s\n", binary_op_name(expr->binary_op.binary_op_type));
+    ast_print_expr(expr->binary_op.lhs, indent + 2);
+    ast_print_expr(expr->binary_op.rhs, indent + 2);
     break;
   }
 }
