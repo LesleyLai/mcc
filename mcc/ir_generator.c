@@ -107,7 +107,7 @@ IRProgram* generate_ir(TranslationUnit* ast, Arena* permanent_arena,
 
   IRProgram* program = ARENA_ALLOC_OBJECT(permanent_arena, IRProgram);
   *program = (IRProgram){
-      .size = ir_function_count,
+      .function_count = ir_function_count,
       .functions = ir_functions,
   };
 

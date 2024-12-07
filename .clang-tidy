@@ -18,6 +18,7 @@ readability-simplify-*,
 -*-easily-swappable-parameters,
 -*-no-recursion,
 -*-use-nullptr,
+-*-use-anonymous-namespace,
 '
 HeaderFilterRegex: 'catch.hpp'
 FormatStyle: 'file'

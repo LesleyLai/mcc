@@ -7,6 +7,8 @@ typedef struct CliArgs {
   bool stop_after_lexer;
   bool stop_after_parser;
 
+  bool gen_ir_only;        // Stop after generating the IR
+  bool codegen_only;       // generate assembly; but does not save to a file
   bool compile_only;       // Compile only; do not assemble or link
   bool stop_before_linker; // Compile and assemble, do not run linker
 } CliArgs;

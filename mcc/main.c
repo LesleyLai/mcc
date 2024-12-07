@@ -10,6 +10,7 @@
 #include "utils/arena.h"
 #include "utils/defer.h"
 #include "utils/str.h"
+#include "x86.h"
 
 #include <stdarg.h>
 #include <string.h>
@@ -83,34 +84,6 @@ void print_parse_diagnostics(ParseErrorsView errors, const char* src_filename,
   }
 }
 
-static void generate_assembly(TranslationUnit* tu, const char* filename)
-{
-  if (tu->decl_count != 1 || tu->decls[0].body->statement_count != 1 ||
-      tu->decls[0].body->statements[0].type != STMT_TYPE_RETURN) {
-    // TODO: Not support yet
-    fprintf(stderr, "MCC does not support this kind of program yet");
-    exit(1);
-  }
-
-  FILE* asm_file = fopen(filename, "w");
-  if (!asm_file) {
-    fprintf(stderr, "Cannot open asm file %s", "a.asm");
-    exit(1);
-  }
-  MCC_DEFER(fclose(asm_file))
-  {
-    const int return_value =
-        tu->decls[0].body->statements[0].ret.expr->const_expr.val;
-
-    fputs(".globl main\n", asm_file);
-    fputs("main:\n", asm_file);
-    fprintf(asm_file, "  mov     rax, %d\n", return_value);
-    fputs("  ret\n", asm_file);
-
-    if (ferror(asm_file)) { perror("Failed to write asm_file"); }
-  }
-}
-
 StringBuffer replace_extension(const char* filename, const char* ext,
                                Arena* permanent_arena)
 {
@@ -124,6 +97,20 @@ StringBuffer replace_extension(const char* filename, const char* ext,
   string_buffer_append(&output, string_view_from_c_str(ext));
 
   return output;
+}
+
+static void save_x86_asm_file(const char* filename, const X86Program* program)
+{
+  FILE* asm_file = fopen(filename, "w");
+  if (!asm_file) {
+    fprintf(stderr, "Cannot open asm file %s", "a.asm");
+    exit(1);
+  }
+  MCC_DEFER(fclose(asm_file))
+  {
+    dump_x86_assembly(program, asm_file);
+    if (ferror(asm_file)) { perror("Failed to write asm_file"); }
+  }
 }
 
 int main(int argc, char* argv[])
@@ -177,12 +164,21 @@ int main(int argc, char* argv[])
 
   IRProgram* ir =
       generate_ir(parse_result.ast, &permanent_arena, scratch_arena);
-  dump_ir(ir);
+
+  if (args.gen_ir_only) {
+    dump_ir(ir);
+    return 0;
+  }
+
+  const X86Program x86 = generate_x86_assembly(ir, &permanent_arena);
+  if (args.codegen_only) {
+    dump_x86_assembly(&x86, stdout);
+    return 0;
+  }
 
   const StringBuffer asm_filename =
       replace_extension(src_filename, ".s", &permanent_arena);
-
-  generate_assembly(parse_result.ast, string_buffer_c_str(&asm_filename));
+  save_x86_asm_file(string_buffer_c_str(&asm_filename), &x86);
 
   if (args.compile_only) { return 0; }
 

@@ -15,6 +15,9 @@ static const Option options[] = {
     {"--help, -h", "prints this help message"},
     {"--lex", "lexing only and then dump the result tokens"},
     {"--parse", "lex and parse, and then dump the result AST"},
+    {"--ir", "generate the IR, and then dump the result AST"},
+    {"--codegen", "generate the assembly, and then dump the result rather than "
+                  "saving to a file"},
     {"-S", "Compile only; do not assemble or link."},
     {"-c", "Compile and assemble, but do not link."}};
 
@@ -49,6 +52,12 @@ CliArgs parse_cli_args(int argc, char** argv)
       result.compile_only = true;
     } else if (!strcmp(arg, "-c")) {
       result.stop_before_linker = true;
+    } else if (!strcmp(arg, "--ir") || !strcmp(arg, "--tacky")) {
+      // The --tacky command is used for "Writing a compiler" book's test cases
+      result.gen_ir_only = true;
+    } else if (!strcmp(arg, "--codegen")) {
+      // The --tacky command is used for "Writing a compiler" book's test cases
+      result.codegen_only = true;
     } else {
       // TODO: support more than one source file
       result.source_filename = arg;

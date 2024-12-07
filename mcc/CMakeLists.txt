@@ -23,7 +23,11 @@ add_library(mcc_lib
         token.h
         ir.h
         ir_generator.c
-        ir_printer.c)
+        ir_printer.c
+        x86_generator.c
+        x86.h
+        x86_printer.c
+)
 target_link_libraries(mcc_lib
         PUBLIC mcc::compiler_options
         PRIVATE mcc::compiler_warnings)

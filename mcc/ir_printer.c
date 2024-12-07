@@ -22,7 +22,7 @@ static void print_unary_op(IRValue dest, IRValue src, const char* op_name)
 
 void dump_ir(const IRProgram* ir)
 {
-  for (size_t i = 0; i < ir->size; i++) {
+  for (size_t i = 0; i < ir->function_count; i++) {
     const IRFunctionDef ir_function = ir->functions[i];
     const StringView name = ir_function.name;
     printf("func %.*s():\n", (int)name.size, name.start);

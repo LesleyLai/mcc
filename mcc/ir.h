@@ -2,6 +2,7 @@
 #define MCC_IR_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 #include "utils/str.h"
 
@@ -18,7 +19,7 @@ IRProgram* generate_ir(TranslationUnit* ast, Arena* permanent_arena,
 void dump_ir(const IRProgram* ir);
 
 struct IRProgram {
-  size_t size;
+  size_t function_count;
   IRFunctionDef* functions;
 };
 
@@ -37,7 +38,7 @@ typedef enum IRValueType {
 typedef struct IRValue {
   IRValueType typ;
   union {
-    int constant;
+    int32_t constant;
     StringView name; // variable
   };
 } IRValue;

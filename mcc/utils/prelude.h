@@ -2,6 +2,7 @@
 #define MCC_PRELUDE_H
 
 #include <stdio.h>
+#include <stdlib.h>
 
 // Polyfill for missing stdalign.h in msvc
 #if !defined(__cplusplus) && !defined(alignof)

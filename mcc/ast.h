@@ -4,6 +4,7 @@
 #include "source_location.h"
 #include "utils/str.h"
 
+#include <stdint.h>
 #include <stdlib.h>
 
 typedef enum ExprType {
@@ -28,7 +29,7 @@ typedef enum BinaryOpType {
 typedef struct Expr Expr;
 
 struct ConstExpr {
-  int val;
+  int32_t val;
 };
 
 struct UnaryOpExpr {
