@@ -11,6 +11,7 @@ add_library(mcc_lib
         lexer.h
         lexer.c
         ast.h
+        ast_printer.c
         parser.h
         parser.c
         source_location.h
@@ -20,9 +21,8 @@ add_library(mcc_lib
         cli_args.h
         token.c
         token.h
-        ast_printer.c
-        ir.c
         ir.h
+        ir_generator.c
         ir_printer.c)
 target_link_libraries(mcc_lib
         PUBLIC mcc::compiler_options

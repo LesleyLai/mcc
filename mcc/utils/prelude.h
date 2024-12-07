@@ -27,4 +27,17 @@
     }                                                                          \
   } while (0)
 
+#define MCC_UNIMPLEMENTED()                                                    \
+  do {                                                                         \
+    printf("mcc fatal error:\n[%s:%i]: Unimplemented\n\n", __FILE__,           \
+           __LINE__);                                                          \
+    abort();                                                                   \
+  } while (0)
+
+#define MCC_UNREACHABLE()                                                      \
+  do {                                                                         \
+    printf("mcc fatal error:\n[%s:%i]: unreachable\n\n", __FILE__, __LINE__);  \
+    abort();                                                                   \
+  } while (0)
+
 #endif // MCC_PRELUDE_H

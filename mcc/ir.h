@@ -55,4 +55,28 @@ struct IRInstruction {
   IRValue value3;
 };
 
+/*
+ * =============================================================================
+ * Convenient "constructors"
+ * =============================================================================
+ */
+static inline IRInstruction ir_single_operand_instr(IRInstructionType typ,
+                                                    IRValue operand)
+{
+  return MCC_COMPOUND_LITERAL(IRInstruction){.typ = typ, .value1 = operand};
+}
+
+static inline IRInstruction ir_unary_instr(IRInstructionType typ, IRValue dst,
+                                           IRValue src)
+{
+  return MCC_COMPOUND_LITERAL(IRInstruction){
+      .typ = typ, .value1 = dst, .value2 = src};
+}
+
+static inline IRValue ir_variable(StringView name)
+{
+  return MCC_COMPOUND_LITERAL(IRValue){.typ = IR_VALUE_TYPE_VARIABLE,
+                                       .name = name};
+}
+
 #endif // MCC_IR_H

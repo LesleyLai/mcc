@@ -42,11 +42,8 @@ static void parse_error_at(Parser* parser, StringView error_msg, Token token)
   if (parser->in_panic_mode) return;
 
   // TODO: proper error handling
-  if (parser->errors.size >= MAX_ERROR_COUNT) {
-    fprintf(stderr, "Too many data for mcc to handle");
-    fflush(stderr);
-    exit(1);
-  }
+  MCC_ASSERT_MSG(parser->errors.size < MAX_ERROR_COUNT,
+                 "Too many data for mcc to handle");
 
   if (parser->errors.data == NULL) {
     parser->errors.data =
@@ -63,13 +60,13 @@ static void parse_error_at(Parser* parser, StringView error_msg, Token token)
 static void assert_in_range(Parser* parser, int token_index)
 {
   if (token_index < 0) {
-    fprintf(stderr, "Negative token index %i!\n", token_index);
+    (void)fprintf(stderr, "Negative token index %i!\n", token_index);
     exit(1);
   }
 
   if (parser->tokens.begin + token_index >= parser->tokens.end) {
-    fprintf(stderr, "Token index out of bound: %i (total %li)!\n", token_index,
-            parser->tokens.end - parser->tokens.begin);
+    (void)fprintf(stderr, "Token index out of bound: %i (total %li)!\n",
+                  token_index, parser->tokens.end - parser->tokens.begin);
     exit(1);
   }
 }
@@ -305,9 +302,6 @@ static Expr* parse_expr(Parser* parser)
 static void parse_return_stmt(Parser* parser, ReturnStmt* out_ret_stmt)
 {
   Expr* expr = parse_expr(parser);
-
-  assert(expr != NULL);
-
   parse_consume(parser, TOKEN_SEMICOLON, "Expect ;");
   *out_ret_stmt = (ReturnStmt){.expr = expr};
 }

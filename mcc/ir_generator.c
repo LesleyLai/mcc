@@ -7,7 +7,7 @@ static IRInstructionType instruction_typ_from_unary_op(UnaryOpType op_type)
   case UNARY_OP_TYPE_MINUS: return IR_NEG;
   case UNARY_OP_BITWISE_TYPE_COMPLEMENT: return IR_COMPLEMENT;
   }
-  MCC_ASSERT_MSG(false, "unreachable");
+  MCC_UNREACHABLE();
 }
 
 typedef struct IRGenContext {
@@ -44,22 +44,19 @@ static IRValue emit_ir_instructions_from_expr(const Expr* expr,
         emit_ir_instructions_from_expr(expr->unary_op.inner_expr, context);
 
     const StringView dst_name = create_fresh_variable_name(context);
-    const IRValue dst =
-        (IRValue){.typ = IR_VALUE_TYPE_VARIABLE, .name = dst_name};
+    const IRValue dst = ir_variable(dst_name);
 
     const IRInstructionType instruction_type =
         instruction_typ_from_unary_op(expr->unary_op.unary_op_type);
 
-    push_instruction(
-        context,
-        (IRInstruction){.typ = instruction_type, .value1 = dst, .value2 = src});
+    push_instruction(context, ir_unary_instr(instruction_type, dst, src));
 
     return dst;
   }
-  case EXPR_TYPE_BINARY: MCC_ASSERT_MSG(false, "not implemented yet"); break;
+  case EXPR_TYPE_BINARY: MCC_UNIMPLEMENTED(); break;
   }
 
-  MCC_ASSERT_MSG(false, "unreachable");
+  MCC_UNREACHABLE();
 }
 
 __attribute__((nonnull)) static IRFunctionDef
@@ -77,12 +74,16 @@ generate_ir_function_def(const FunctionDecl* decl, Arena* permanent_arena,
 
   for (size_t i = 0; i < decl->body->statement_count; ++i) {
     const Stmt stmt = decl->body->statements[i];
-    if (stmt.type == STMT_TYPE_RETURN) {
+    switch (stmt.type) {
+    case STMT_TYPE_RETURN: {
       IRValue return_value =
           emit_ir_instructions_from_expr(stmt.ret.expr, &context);
 
-      push_instruction(
-          &context, (IRInstruction){.typ = IR_RETURN, .value1 = return_value});
+      push_instruction(&context,
+                       ir_single_operand_instr(IR_RETURN, return_value));
+      break;
+    }
+    case STMT_TYPE_COMPOUND: MCC_UNIMPLEMENTED(); break;
     }
     // TODO: handle other kinds of statements
   }
