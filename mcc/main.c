@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 #include "diagnostic.h"
+#include "ir.h"
 #include "lexer.h"
 #include "parser.h"
 #include "utils/arena.h"
@@ -173,6 +174,10 @@ int main(int argc, char* argv[])
     ast_print_translation_unit(parse_result.ast);
     return 0;
   }
+
+  IRProgram* ir =
+      generate_ir(parse_result.ast, &permanent_arena, scratch_arena);
+  dump_ir(ir);
 
   const StringBuffer asm_filename =
       replace_extension(src_filename, ".s", &permanent_arena);

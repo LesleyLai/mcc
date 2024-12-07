@@ -33,7 +33,7 @@ struct ConstExpr {
 
 struct UnaryOpExpr {
   UnaryOpType unary_op_type;
-  Expr* expr;
+  Expr* inner_expr;
 };
 
 struct BinaryOpExpr {

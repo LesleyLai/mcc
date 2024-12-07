@@ -80,7 +80,7 @@ void* arena_aligned_grow(Arena* arena, void* p, size_t new_alignment,
 
   Byte* aligned_ptr = align_forward(arena->previous, new_alignment);
   const size_t old_size = (size_t)(arena->current - arena->previous);
-  assert(old_size < new_size);
+  MCC_ASSERT_MSG(old_size < new_size, "Old size is too small");
 
   if (p != aligned_ptr) {
     return _arena_reallocate(arena, new_alignment, old_size, new_size);

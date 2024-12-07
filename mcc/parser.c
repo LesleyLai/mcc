@@ -259,7 +259,7 @@ static Expr* parse_unary_op(Parser* parser)
   *result = (Expr){.type = EXPR_TYPE_UNARY,
                    .source_range = result_source_range,
                    .unary_op = (struct UnaryOpExpr){
-                       .unary_op_type = operator_type, .expr = expr}};
+                       .unary_op_type = operator_type, .inner_expr = expr}};
 
   return result;
 }

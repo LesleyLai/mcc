@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 project(mcc C CXX)
 
-set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD 20)
@@ -9,8 +9,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 IF (WIN32)
-    message(FATAL_ERROR "Windows is not supported. You can use WSL." )
-ENDIF()
+    message(FATAL_ERROR "Windows is not supported. You can use WSL.")
+ENDIF ()
 
 # The "developer mode" is a one-stop setting that
 # - enables address and UB sanitizers when possible

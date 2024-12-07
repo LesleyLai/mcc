@@ -43,7 +43,7 @@ static void ast_print_expr(Expr* expr, int indent)
     printf("%*sUnaryOPExpr <", indent, "");
     print_source_range(expr->source_range);
     printf("> operator: %s\n", unary_op_name(expr->unary_op.unary_op_type));
-    ast_print_expr(expr->unary_op.expr, indent + 2);
+    ast_print_expr(expr->unary_op.inner_expr, indent + 2);
     break;
   case EXPR_TYPE_BINARY:
     printf("%*sBinaryOPExpr <", indent, "");
