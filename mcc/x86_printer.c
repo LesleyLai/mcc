@@ -12,11 +12,23 @@ static const char* x86_instruction_name(X86InstructionType typ)
   MCC_UNREACHABLE();
 }
 
+static const char* x86_register_name(X86Register reg)
+{
+  switch (reg) {
+  case X86_REG_AX: return "rax";
+  case X86_REG_R10: return "r10";
+  case X86_REG_SP: return "rsp";
+  }
+  MCC_UNREACHABLE();
+}
+
 static void print_x86_operand(X86Operand operand, FILE* stream)
 {
   switch (operand.typ) {
   case X86_OPERAND_IMMEDIATE: (void)fprintf(stream, "%i", operand.imm); break;
-  case X86_OPERAND_REGISTER: (void)fprintf(stream, "rax"); break;
+  case X86_OPERAND_REGISTER:
+    (void)fprintf(stream, "%s", x86_register_name(operand.reg));
+    break;
   }
 }
 

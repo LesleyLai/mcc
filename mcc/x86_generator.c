@@ -1,9 +1,9 @@
 #include "ir.h"
 #include "x86.h"
 
+// TODO: implement dynamic resizing
 const size_t MAX_INSTRUCTION_COUNT = 16;
 
-// TODO: implement dynamic resizing
 typedef struct X86InstructionVector {
   size_t length;
   X86Instruction* data;
@@ -30,6 +30,11 @@ static X86Operand x86_immediate_operand(int32_t value)
   return (X86Operand){.typ = X86_OPERAND_IMMEDIATE, .imm = value};
 }
 
+static X86Operand x86_register_operand(X86Register reg)
+{
+  return (X86Operand){.typ = X86_OPERAND_REGISTER, .reg = reg};
+}
+
 static X86FunctionDef
 generate_x86_function_def(const IRFunctionDef* ir_function,
                           Arena* permanent_arena)
@@ -47,13 +52,12 @@ generate_x86_function_def(const IRFunctionDef* ir_function,
       case IR_VALUE_TYPE_INVALID: MCC_UNREACHABLE(); break;
       case IR_VALUE_TYPE_CONSTANT: {
         const int value = operand.constant;
-        push_instruction(
-            &instructions,
-            (X86Instruction){
-                .typ = X86_INST_MOV,
-                .operand1 = (X86Operand){.typ = X86_OPERAND_REGISTER},
-                .operand2 = x86_immediate_operand(value),
-            });
+        push_instruction(&instructions,
+                         (X86Instruction){
+                             .typ = X86_INST_MOV,
+                             .operand1 = x86_register_operand(X86_REG_AX),
+                             .operand2 = x86_immediate_operand(value),
+                         });
 
         push_instruction(&instructions, (X86Instruction){.typ = X86_INST_RET});
         break;

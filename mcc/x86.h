@@ -22,6 +22,12 @@ struct X86FunctionDef {
   X86Instruction* instructions;
 };
 
+typedef enum X86Register {
+  X86_REG_AX,
+  X86_REG_R10,
+  X86_REG_SP, // Stack pointer
+} X86Register;
+
 typedef enum X86OperandType {
   X86_OPERAND_IMMEDIATE,
   X86_OPERAND_REGISTER,
@@ -31,6 +37,7 @@ struct X86Operand {
   X86OperandType typ;
   union {
     int32_t imm;
+    X86Register reg;
   };
 };
 
