@@ -47,4 +47,9 @@ void dump_x86_assembly(const X86Program* program, FILE* stream)
                   program->functions->name.start);
     dump_x86_function(&program->functions[i], stream);
   }
+
+#ifdef __linux__
+  // indicates that code does not need an execution stack
+  (void)fprintf(stream, ".section .note.GNU-stack,\"\",@progbits\n");
+#endif
 }
