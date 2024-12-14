@@ -3,10 +3,9 @@
 static void print_ir_value(IRValue value)
 {
   switch (value.typ) {
-  case IR_VALUE_TYPE_INVALID: MCC_ASSERT_MSG(false, "Invalid IR"); break;
   case IR_VALUE_TYPE_CONSTANT: printf("%i", value.constant); break;
   case IR_VALUE_TYPE_VARIABLE:
-    printf("%.*s", (int)value.name.size, value.name.start);
+    printf("%.*s", (int)value.variable.size, value.variable.start);
     break;
   }
 }
@@ -30,14 +29,14 @@ void dump_ir(const IRProgram* ir)
       const IRInstruction instruction = ir_function.instructions[j];
       switch (instruction.typ) {
       case IR_NEG:
-        print_unary_op(instruction.value1, instruction.value2, "neg");
+        print_unary_op(instruction.operand1, instruction.operand2, "neg");
         break;
       case IR_COMPLEMENT:
-        print_unary_op(instruction.value1, instruction.value2, "complement");
+        print_unary_op(instruction.operand1, instruction.operand2, "complement");
         break;
       case IR_RETURN: {
         printf("  return ");
-        print_ir_value(instruction.value1);
+        print_ir_value(instruction.operand1);
         printf("\n");
       } break;
       }

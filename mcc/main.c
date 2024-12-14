@@ -20,12 +20,16 @@ void assemble(StringView asm_filename, StringView obj_filename)
   enum { buffer_size = 10000 };
   char buffer[buffer_size];
 
-  snprintf(buffer, buffer_size, "as -c %.*s -o %.*s -msyntax=intel -mnaked-reg",
-           (int)asm_filename.size, asm_filename.start, (int)obj_filename.size,
-           obj_filename.start);
+  const int print_size = snprintf(
+      buffer, buffer_size, "as -c %.*s -o %.*s -msyntax=intel -mnaked-reg",
+      (int)asm_filename.size, asm_filename.start, (int)obj_filename.size,
+      obj_filename.start);
+
+  MCC_ASSERT_MSG(print_size < buffer_size,
+                 "Buffer too small to hold as command");
 
   if (system(buffer)) {
-    fprintf(stderr, "Failed to call the assembler");
+    (void)fprintf(stderr, "Failed to call the assembler");
     exit(1);
   }
 }
@@ -35,9 +39,13 @@ void link(const char* obj_filename, const char* executable_name)
   enum { buffer_size = 10000 };
   char buffer[buffer_size];
 
-  snprintf(buffer, buffer_size, "gcc %s -o %s", obj_filename, executable_name);
+  const int print_size = snprintf(buffer, buffer_size, "gcc %s -o %s",
+                                  obj_filename, executable_name);
+  MCC_ASSERT_MSG(print_size < buffer_size,
+                 "Buffer too small to hold linker command");
+
   if (system(buffer)) {
-    fprintf(stderr, "Failed to call the linker");
+    (void)fprintf(stderr, "Failed to call the linker");
     exit(1);
   }
 }
@@ -108,7 +116,7 @@ static void save_x86_asm_file(const char* filename, const X86Program* program)
   }
   MCC_DEFER(fclose(asm_file))
   {
-    dump_x86_assembly(program, asm_file);
+    x86_dump_assembly(program, asm_file);
     if (ferror(asm_file)) { perror("Failed to write asm_file"); }
   }
 }
@@ -170,15 +178,16 @@ int main(int argc, char* argv[])
     return 0;
   }
 
-  const X86Program x86 = generate_x86_assembly(ir, &permanent_arena);
+  const X86Program x86_program =
+      x86_generate_assembly(ir, &permanent_arena, scratch_arena);
   if (args.codegen_only) {
-    dump_x86_assembly(&x86, stdout);
+    x86_dump_assembly(&x86_program, stdout);
     return 0;
   }
 
   const StringBuffer asm_filename =
       replace_extension(src_filename, ".s", &permanent_arena);
-  save_x86_asm_file(string_buffer_c_str(&asm_filename), &x86);
+  save_x86_asm_file(string_buffer_c_str(&asm_filename), &x86_program);
 
   if (args.compile_only) { return 0; }
 

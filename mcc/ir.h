@@ -30,7 +30,6 @@ struct IRFunctionDef {
 };
 
 typedef enum IRValueType {
-  IR_VALUE_TYPE_INVALID = 0,
   IR_VALUE_TYPE_CONSTANT,
   IR_VALUE_TYPE_VARIABLE,
 } IRValueType;
@@ -39,7 +38,7 @@ typedef struct IRValue {
   IRValueType typ;
   union {
     int32_t constant;
-    StringView name; // variable
+    StringView variable; // variable
   };
 } IRValue;
 
@@ -51,9 +50,9 @@ typedef enum IRInstructionType {
 
 struct IRInstruction {
   IRInstructionType typ;
-  IRValue value1; // often dest
-  IRValue value2;
-  IRValue value3;
+  IRValue operand1; // often dest
+  IRValue operand2;
+  IRValue operand3;
 };
 
 /*
@@ -64,20 +63,20 @@ struct IRInstruction {
 static inline IRInstruction ir_single_operand_instr(IRInstructionType typ,
                                                     IRValue operand)
 {
-  return MCC_COMPOUND_LITERAL(IRInstruction){.typ = typ, .value1 = operand};
+  return MCC_COMPOUND_LITERAL(IRInstruction){.typ = typ, .operand1 = operand};
 }
 
 static inline IRInstruction ir_unary_instr(IRInstructionType typ, IRValue dst,
                                            IRValue src)
 {
   return MCC_COMPOUND_LITERAL(IRInstruction){
-      .typ = typ, .value1 = dst, .value2 = src};
+      .typ = typ, .operand1 = dst, .operand2 = src};
 }
 
 static inline IRValue ir_variable(StringView name)
 {
   return MCC_COMPOUND_LITERAL(IRValue){.typ = IR_VALUE_TYPE_VARIABLE,
-                                       .name = name};
+                                       .variable = name};
 }
 
 #endif // MCC_IR_H

@@ -22,22 +22,24 @@
 #define MCC_ASSERT_MSG(condition, message)                                     \
   do {                                                                         \
     if (!(condition)) {                                                        \
-      printf("mcc fatal error:\n[%s:%i] Assert failed in %s: %s\n\n",          \
-             __FILE__, __LINE__, __func__, message);                           \
+      (void)fprintf(stderr,                                                    \
+                    "mcc fatal error:\n[%s:%i] Assert failed in %s: %s\n\n",   \
+                    __FILE__, __LINE__, __func__, message);                    \
       abort();                                                                 \
     }                                                                          \
   } while (0)
 
 #define MCC_UNIMPLEMENTED()                                                    \
   do {                                                                         \
-    printf("mcc fatal error:\n[%s:%i]: Unimplemented\n\n", __FILE__,           \
-           __LINE__);                                                          \
+    (void)fprintf(stderr, "mcc fatal error:\n[%s:%i]: Unimplemented\n\n",      \
+                  __FILE__, __LINE__);                                         \
     abort();                                                                   \
   } while (0)
 
 #define MCC_UNREACHABLE()                                                      \
   do {                                                                         \
-    printf("mcc fatal error:\n[%s:%i]: unreachable\n\n", __FILE__, __LINE__);  \
+    (void)fprintf(stderr, "mcc fatal error:\n[%s:%i]: unreachable\n\n",        \
+                  __FILE__, __LINE__);                                         \
     abort();                                                                   \
   } while (0)
 
