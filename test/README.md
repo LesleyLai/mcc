@@ -14,9 +14,13 @@ cargo -q run --release -- --mcc <mcc executable> --base-folder ../test_data
 
 The test runner is heavily inspired by [turnt](https://pypi.org/project/turnt/).
 
+The test runner scans all `*.c` files in the base folder (`../test_data` in this case) and its subdirectories, using these files as test cases.
+
 ### Test Configuration File
 
-The test driver scans the base folder for subdirectories containing a `test_config.toml` file. The configuration file should follow this format:
+For each test file, the test driver uses a `test_config.toml` file located in the same directory or the nearest parent directory. In other words, the configuration files are applied recursively, with config files in subdirectories overriding those in parent directories.
+
+The configuration file should follow this format:
 
 ```toml
 command = "{mcc} {filename} ; {base}"

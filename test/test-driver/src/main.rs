@@ -63,10 +63,37 @@ impl Display for TestError {
     }
 }
 
+#[derive(Copy, Clone)]
 struct TestConfig<'a> {
     command: &'a str,
     expect_return_code: i32,
     working_dir: &'a Path,
+}
+
+impl<'a> TestConfig<'a> {
+    // Override test config is finding related instructions in source file
+    fn override_by_file(&self, test_file_path: &Path) -> Self {
+        let mut modified = *self;
+
+        let return_re = return_regex();
+
+        let file = File::open(&test_file_path).unwrap();
+        let reader = BufReader::new(file);
+
+        let mut overrided_return = None;
+        for line in reader.lines() {
+            let line = line.unwrap();
+            if let Some(captures) = return_re.captures(&line) {
+                overrided_return = Some(captures.get(1).unwrap().as_str().parse().unwrap());
+            }
+        }
+
+        if let Some(overrided_return) = overrided_return {
+            modified.expect_return_code = overrided_return;
+        }
+
+        modified
+    }
 }
 
 fn run_test(config: &TestConfig) -> Result<(), TestError> {
@@ -124,17 +151,15 @@ fn print_test_case_message_prefix(path: &Path, suffix: &str) {
 fn run_tests_with_command(
     states: &mut TestRunnerStates,
     folder: &Path,
-    config: &TestTomlConfig,
+    toml_config: &TestTomlConfig,
     suffix: &str,
 ) {
     let global_config = global_config();
     let mcc_path = &global_config.mcc_path;
 
-    let command = config
+    let command = toml_config
         .command
         .replace("{mcc}", &mcc_path.display().to_string());
-
-    let return_re = return_regex();
 
     for entry in read_dir(folder).unwrap() {
         let path = entry.unwrap().path();
@@ -144,30 +169,18 @@ fn run_tests_with_command(
                 .replace("{filename}", &path.display().to_string())
                 .replace("{base}", &path.with_extension("").display().to_string());
 
-            let mut overrided_return = None;
-            {
-                let file = File::open(&path).unwrap();
-                let reader = BufReader::new(file);
-
-                for line in reader.lines() {
-                    let line = line.unwrap();
-                    if let Some(captures) = return_re.captures(&line) {
-                        overrided_return = Some(captures.get(1).unwrap().as_str().parse().unwrap());
-                    }
-                }
-            }
-
-            let test_config = TestConfig {
+            let config = TestConfig {
                 command: &command,
-                expect_return_code: overrided_return.unwrap_or(config.return_code),
+                expect_return_code: toml_config.return_code,
                 working_dir: folder,
-            };
+            }
+            .override_by_file(&path);
 
-            if let Err(error) = run_test(&test_config) {
+            if let Err(error) = run_test(&config) {
                 print_test_case_message_prefix(&path, suffix);
                 states.failed_test_count += 1;
                 println!("{}:\n{}", "Failed".red().bold(), error);
-                println!("Command: {}", test_config.command);
+                println!("Command: {}", config.command);
                 println!();
             } else if global_config.verbose {
                 print_test_case_message_prefix(&path, suffix);
@@ -205,25 +218,29 @@ fn read_test_config_file(directory: &Path) -> Option<TestTomlFile> {
     toml::from_str(&s).expect("Failed to parse test toml")
 }
 
-fn run_tests_in(states: &mut TestRunnerStates, current_folder: &Path) {
+fn run_tests_in(
+    states: &mut TestRunnerStates,
+    current_folder: &Path,
+    parent_config_file: Option<&TestTomlFile>,
+) {
+    let config_file = read_test_config_file(current_folder);
+    let config_file = config_file.as_ref().or(parent_config_file);
     for entry in read_dir(current_folder).unwrap() {
         let path = entry.unwrap().path();
         if path.is_dir() {
-            run_tests_in(states, &path);
+            run_tests_in(states, &path, config_file);
         }
     }
 
-    let config_file = read_test_config_file(current_folder);
-    if config_file.is_none() {
-        return;
-    }
-    let config_file = config_file.unwrap();
-
-    match config_file {
-        TestTomlFile::Flat(config) => run_tests_with_command(states, &current_folder, &config, ""),
-        TestTomlFile::Nested { commands } => {
-            for (name, command) in &commands {
-                run_tests_with_command(states, &current_folder, command, name)
+    if let Some(config_file) = config_file {
+        match config_file {
+            TestTomlFile::Flat(config) => {
+                run_tests_with_command(states, &current_folder, &config, "")
+            }
+            TestTomlFile::Nested { commands } => {
+                for (name, command) in commands {
+                    run_tests_with_command(states, &current_folder, command, name)
+                }
             }
         }
     }
@@ -235,7 +252,7 @@ fn main() -> ExitCode {
     let mut states = TestRunnerStates::new();
 
     let base_folder = &global_config().base_dir;
-    run_tests_in(&mut states, base_folder);
+    run_tests_in(&mut states, base_folder, None);
 
     let all_test_passes = states.failed_test_count == 0;
 
