@@ -1,4 +1,5 @@
 mod global_configuration;
+mod state;
 
 use colored::Colorize;
 use regex::Regex;
@@ -12,6 +13,7 @@ use std::process::{exit, Command, ExitCode};
 use std::sync::OnceLock;
 
 use crate::global_configuration::global_config;
+use crate::state::TestRunnerStates;
 
 fn test_run_mcc() {
     let mcc_path = &global_config().mcc_path;
@@ -68,7 +70,7 @@ struct TestConfig<'a> {
 }
 
 fn run_test(config: &TestConfig) -> Result<(), TestError> {
-    let output = std::process::Command::new("sh")
+    let output = Command::new("sh")
         .current_dir(config.working_dir)
         .args(["-c", config.command])
         .output()
@@ -104,24 +106,19 @@ enum TestTomlFile {
     },
 }
 
-#[derive(Debug)]
-struct TestRunnerStates {
-    failed_test_count: usize,
-    total_test_count: usize,
-}
-
-impl TestRunnerStates {
-    fn new() -> Self {
-        Self {
-            failed_test_count: 0,
-            total_test_count: 0,
-        }
-    }
-}
-
 fn return_regex() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| Regex::new(r"// +RETURN: +([0-9]+)$").unwrap())
+}
+
+fn print_test_case_message_prefix(path: &Path, suffix: &str) {
+    let base_dir = &global_config().base_dir;
+
+    print!("{}", path.strip_prefix(base_dir).unwrap().display());
+    if !suffix.is_empty() {
+        print!("[{}]", suffix);
+    }
+    print!(": ");
 }
 
 fn run_tests_with_command(
@@ -132,7 +129,6 @@ fn run_tests_with_command(
 ) {
     let global_config = global_config();
     let mcc_path = &global_config.mcc_path;
-    let base_dir = &global_config.base_dir;
 
     let command = config
         .command
@@ -167,18 +163,14 @@ fn run_tests_with_command(
                 working_dir: folder,
             };
 
-            print!("{}", path.strip_prefix(base_dir).unwrap().display());
-            if !suffix.is_empty() {
-                print!("[{}]", suffix);
-            }
-            print!(": ");
-
             if let Err(error) = run_test(&test_config) {
+                print_test_case_message_prefix(&path, suffix);
                 states.failed_test_count += 1;
                 println!("{}:\n{}", "Failed".red().bold(), error);
                 println!("Command: {}", test_config.command);
                 println!();
-            } else {
+            } else if global_config.verbose {
+                print_test_case_message_prefix(&path, suffix);
                 println!("{}", "PASSED".green().bold());
             }
 
@@ -225,7 +217,6 @@ fn run_tests_in(states: &mut TestRunnerStates, current_folder: &Path) {
     if config_file.is_none() {
         return;
     }
-
     let config_file = config_file.unwrap();
 
     match config_file {
