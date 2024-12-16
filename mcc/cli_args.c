@@ -21,9 +21,9 @@ static const Option options[] = {
     {"-S", "Compile only; do not assemble or link."},
     {"-c", "Compile and assemble, but do not link."}};
 
-void print_usage()
+void print_usage(FILE* stream)
 {
-  puts("Usage: mcc [options] filename...\n");
+  (void)fputs("Usage: mcc [options] filename...\n", stream);
 }
 
 void print_options()
@@ -41,7 +41,7 @@ CliArgs parse_cli_args(int argc, char** argv)
   for (int i = 1; i < argc; ++i) {
     const char* arg = argv[i];
     if (!strcmp(arg, "--help") || !strcmp(arg, "-h")) {
-      print_usage();
+      print_usage(stdout);
       print_options();
       exit(0);
     } else if (!strcmp(arg, "--lex")) {
@@ -65,8 +65,8 @@ CliArgs parse_cli_args(int argc, char** argv)
   }
 
   if (argc < 2) {
-    puts("mcc: fatal error: no input files");
-    print_usage();
+    (void)fputs("mcc: fatal error: no input files\n", stderr);
+    print_usage(stderr);
     exit(1);
   }
 
