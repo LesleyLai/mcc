@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 // TODO: implement dynamic resizing
-const size_t MAX_INSTRUCTION_COUNT = 16;
+const size_t MAX_INSTRUCTION_COUNT = 160;
 
 typedef struct X86InstructionVector {
   size_t length;
@@ -22,7 +22,7 @@ static X86InstructionVector new_instruction_vector(Arena* permanent_arena)
 static void push_instruction(struct X86InstructionVector* instructions,
                              X86Instruction instruction)
 {
-  MCC_ASSERT_MSG(instructions->length < MAX_INSTRUCTION_COUNT + 1,
+  MCC_ASSERT_MSG(instructions->length < MAX_INSTRUCTION_COUNT,
                  "Too many instructions");
   instructions->data[instructions->length++] = instruction;
 }
