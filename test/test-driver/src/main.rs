@@ -1,19 +1,18 @@
 mod global_configuration;
-mod state;
+mod test_configuration;
+mod test_database;
+mod tests_detector;
 
 use colored::Colorize;
-use regex::Regex;
-use serde::Deserialize;
-use std::collections::HashMap;
 use std::fmt::Display;
-use std::fs::{read_dir, File};
-use std::io::{BufRead, BufReader, Read};
+use std::fs::remove_file;
 use std::path::Path;
 use std::process::{exit, Command, ExitCode};
-use std::sync::OnceLock;
 
 use crate::global_configuration::global_config;
-use crate::state::TestRunnerStates;
+use crate::test_configuration::TestConfig;
+use crate::test_database::TestDatabase;
+use crate::tests_detector::detect_tests;
 
 fn test_run_mcc() {
     let mcc_path = &global_config().mcc_path;
@@ -63,79 +62,46 @@ impl Display for TestError {
     }
 }
 
-#[derive(Copy, Clone)]
-struct TestConfig<'a> {
-    command: &'a str,
-    expect_return_code: i32,
-    working_dir: &'a Path,
-}
+fn run_test(database: &TestDatabase, config: &TestConfig) -> Result<(), TestError> {
+    let config = config.override_by_file(&database, config.path);
 
-impl<'a> TestConfig<'a> {
-    // Override test config is finding related instructions in source file
-    fn override_by_file(&self, test_file_path: &Path) -> Self {
-        let mut modified = *self;
+    let TestConfig {
+        command,
+        path,
+        working_dir,
+        expect_code,
+        ..
+    } = config;
+    let path = database.get_path(path);
 
-        let return_re = return_regex();
+    let command = database
+        .get_command(command)
+        .replace("{filename}", &path.display().to_string())
+        .replace("{base}", &path.with_extension("").display().to_string());
 
-        let file = File::open(&test_file_path).unwrap();
-        let reader = BufReader::new(file);
-
-        let mut overrided_return = None;
-        for line in reader.lines() {
-            let line = line.unwrap();
-            if let Some(captures) = return_re.captures(&line) {
-                overrided_return = Some(captures.get(1).unwrap().as_str().parse().unwrap());
-            }
-        }
-
-        if let Some(overrided_return) = overrided_return {
-            modified.expect_return_code = overrided_return;
-        }
-
-        modified
-    }
-}
-
-fn run_test(config: &TestConfig) -> Result<(), TestError> {
     let output = Command::new("sh")
-        .current_dir(config.working_dir)
-        .args(["-c", config.command])
+        .current_dir(database.get_path(working_dir))
+        .args(["-c", &command])
         .output()
-        .expect("Failed to run mcc");
+        .expect("Failed to test command");
 
     let actual_code = output.status.code();
 
-    if actual_code.is_none_or(|actual_code| actual_code != config.expect_return_code) {
+    // TODO: better way than this ad-hoc solution
+    // Remove generated files
+    let _ = remove_file(path.with_extension("o"));
+    let _ = remove_file(path.with_extension("s"));
+    let _ = remove_file(path.with_extension(""));
+
+    if actual_code.is_none_or(|actual_code| actual_code != expect_code) {
         Err(TestError {
-            expect_code: config.expect_return_code,
+            expect_code,
             actual_code,
             stderr: String::from_utf8(output.stderr).unwrap(),
         })
     } else {
         Ok(())
     }
-}
-
-#[derive(Deserialize, Debug)]
-struct TestTomlConfig {
-    command: String,
-
-    #[serde(default)]
-    return_code: i32,
-}
-
-#[derive(Deserialize, Debug)]
-#[serde(untagged)]
-enum TestTomlFile {
-    Flat(TestTomlConfig),
-    Nested {
-        commands: HashMap<String, TestTomlConfig>,
-    },
-}
-
-fn return_regex() -> &'static Regex {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"// +RETURN: +([0-9]+)$").unwrap())
 }
 
 fn print_test_case_message_prefix(path: &Path, suffix: &str) {
@@ -148,118 +114,40 @@ fn print_test_case_message_prefix(path: &Path, suffix: &str) {
     print!(": ");
 }
 
-fn run_tests_with_command(
-    states: &mut TestRunnerStates,
-    folder: &Path,
-    toml_config: &TestTomlConfig,
-    suffix: &str,
-) {
-    let global_config = global_config();
-    let mcc_path = &global_config.mcc_path;
+fn run_tests(database: &TestDatabase) -> ExitCode {
+    let total_test_count = database.tests().len();
+    let mut failed_test_count = 0;
 
-    let command = toml_config
-        .command
-        .replace("{mcc}", &mcc_path.display().to_string());
+    let start = std::time::Instant::now();
+    for config in database.tests() {
+        let path = database.get_path(config.path);
+        let suffix = database.get_string(config.suffix);
 
-    for entry in read_dir(folder).unwrap() {
-        let path = entry.unwrap().path();
+        if let Err(error) = run_test(&database, &config) {
+            print_test_case_message_prefix(&path, suffix);
+            println!("{}:\n{}", "Failed".red().bold(), error);
+            println!("Command: {}", database.get_command(config.command));
+            println!();
 
-        if path.extension().is_some_and(|e| e == "c") {
-            let command = command
-                .replace("{filename}", &path.display().to_string())
-                .replace("{base}", &path.with_extension("").display().to_string());
-
-            let config = TestConfig {
-                command: &command,
-                expect_return_code: toml_config.return_code,
-                working_dir: folder,
-            }
-            .override_by_file(&path);
-
-            if let Err(error) = run_test(&config) {
-                print_test_case_message_prefix(&path, suffix);
-                states.failed_test_count += 1;
-                println!("{}:\n{}", "Failed".red().bold(), error);
-                println!("Command: {}", config.command);
-                println!();
-            } else if global_config.verbose {
-                print_test_case_message_prefix(&path, suffix);
-                println!("{}", "PASSED".green().bold());
-            }
-
-            // TODO: better way than this ad-hoc solution
-            // Remove generated files
-            let _ = std::fs::remove_file(path.with_extension("o"));
-            let _ = std::fs::remove_file(path.with_extension("s"));
-            let _ = std::fs::remove_file(path.with_extension(""));
-
-            states.total_test_count += 1;
+            failed_test_count += 1;
+        } else if !global_config().quiet {
+            print_test_case_message_prefix(&path, suffix);
+            println!("{}", "PASSED".green().bold());
         }
     }
-}
+    let delta = std::time::Instant::now() - start;
+    println!(
+        "{} tests executed in: {:.4}s",
+        database.tests().len(),
+        delta.as_secs_f32()
+    );
 
-fn read_test_config_file(directory: &Path) -> Option<TestTomlFile> {
-    use std::io::ErrorKind;
-
-    let file_path = directory.join("test_config.toml");
-    let file = File::open(&file_path);
-    if file
-        .as_ref()
-        .is_err_and(|e| e.kind() == ErrorKind::NotFound)
-    {
-        return None;
-    }
-    let mut file = file.unwrap();
-
-    let mut s = String::new();
-    file.read_to_string(&mut s)
-        .expect("Failed to read test toml");
-
-    toml::from_str(&s).expect("Failed to parse test toml")
-}
-
-fn run_tests_in(
-    states: &mut TestRunnerStates,
-    current_folder: &Path,
-    parent_config_file: Option<&TestTomlFile>,
-) {
-    let config_file = read_test_config_file(current_folder);
-    let config_file = config_file.as_ref().or(parent_config_file);
-    for entry in read_dir(current_folder).unwrap() {
-        let path = entry.unwrap().path();
-        if path.is_dir() {
-            run_tests_in(states, &path, config_file);
-        }
-    }
-
-    if let Some(config_file) = config_file {
-        match config_file {
-            TestTomlFile::Flat(config) => {
-                run_tests_with_command(states, &current_folder, &config, "")
-            }
-            TestTomlFile::Nested { commands } => {
-                for (name, command) in commands {
-                    run_tests_with_command(states, &current_folder, command, name)
-                }
-            }
-        }
-    }
-}
-
-fn main() -> ExitCode {
-    test_run_mcc();
-
-    let mut states = TestRunnerStates::new();
-
-    let base_folder = &global_config().base_dir;
-    run_tests_in(&mut states, base_folder, None);
-
-    let all_test_passes = states.failed_test_count == 0;
+    let all_test_passes = failed_test_count == 0;
 
     let result_string = format!(
         "[{}/{}] tests pass",
-        states.total_test_count - states.failed_test_count,
-        states.total_test_count
+        total_test_count - failed_test_count,
+        total_test_count
     );
     if all_test_passes {
         println!("{}", result_string.green().bold());
@@ -268,4 +156,11 @@ fn main() -> ExitCode {
         println!("{}", result_string.red().bold());
         ExitCode::FAILURE
     }
+}
+
+fn main() -> ExitCode {
+    test_run_mcc();
+
+    let database = detect_tests();
+    run_tests(&database)
 }
