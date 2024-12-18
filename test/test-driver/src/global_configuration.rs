@@ -13,8 +13,14 @@ pub fn global_config() -> &'static TestRunnerConfig {
     CONFIG.get_or_init(|| {
         let args = Args::parse();
 
-        let mcc_path = args.mcc.canonicalize().unwrap();
-        let base_dir = args.base_folder.canonicalize().unwrap();
+        let mcc_path = args
+            .mcc
+            .canonicalize()
+            .expect("Can't canonicalize mcc path");
+        let base_dir = args
+            .base_folder
+            .canonicalize()
+            .expect("Can't canonicalize base directory path");
         let quiet = args.quiet;
 
         TestRunnerConfig {

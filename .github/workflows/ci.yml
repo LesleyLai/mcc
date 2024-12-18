@@ -13,12 +13,12 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-20.04
+          - ubuntu-latest
         compiler:
           - llvm-13.0.0
           - gcc-11
         generator:
-          - "Ninja Multi-Config"
+          - "Ninja"
         build_type:
           - Release
           - Debug
@@ -27,26 +27,10 @@ jobs:
           - OFF
 
         include:
-          # Add appropriate variables for gcov version required. This will intentionally break
-          # if you try to use a compiler that does not have gcov set
-          - compiler: gcc-11
-            gcov_executable: gcov
-          - compiler: llvm-13.0.0
-            gcov_executable: "llvm-cov gcov"
-
           # Set up preferred package generators, for given build configurations
           - build_type: Release
             developer_mode: OFF
             package_generator: TBZ2
-
-          # This exists solely to make sure a non-multiconfig build works
-          - os: ubuntu-20.04
-            compiler: gcc-11
-            generator: "Unix Makefiles"
-            build_type: Debug
-            gcov_executable: gcov
-            developer_mode: On
-
 
 
     steps:
@@ -59,27 +43,42 @@ jobs:
           vcvarsall: ${{ contains(matrix.os, 'windows' )}}
           cmake: true
           ninja: true
-          conan: false
-          vcpkg: false
-          ccache: true
-          gcovr: true
-          opencppcoverage: true
+
+      - name: Set up CPM cache
+        id: cache-cpm
+        uses: actions/cache@v4
+        with:
+          path: ~/cpm-cache
+          key: ${{ runner.os }}-cpm
 
         # make sure coverage is only enabled for Debug builds, since it sets -O0 to make sure coverage
         # has meaningful results
       - name: Configure CMake
         run: |
-          cmake -S . -B ./build -G "${{matrix.generator}}" -DCMAKE_BUILD_TYPE:STRING=${{matrix.build_type}} -DMCC_ENABLE_DEVELOPER_MODE:BOOL=${{matrix.developer_mode}} -DMCC_BUILD_TESTS:BOOL=ON -DMCC_TEST_ENABLE_COVERAGE:BOOL=${{ matrix.build_type == 'Debug' }} -DGIT_SHA:STRING=${{ github.sha }}
+          cmake -S . -B ./build -G "${{matrix.generator}}" -DCPM_SOURCE_CACHE=~/cpm-cache -DCMAKE_BUILD_TYPE:STRING=${{matrix.build_type}} -DMCC_ENABLE_DEVELOPER_MODE:BOOL=${{matrix.developer_mode}} -DMCC_BUILD_TESTS:BOOL=ON -DGIT_SHA:STRING=${{ github.sha }}
 
       - name: Build
         # Execute the build.  You can specify a specific target with "--target <NAME>"
         run: |
           cmake --build ./build --config ${{matrix.build_type}}
 
-      - name: Unix - Test and coverage
+      - name: Unit Tests
         if: runner.os != 'Windows'
         working-directory: ./build
         # Execute tests defined by the CMake configuration.
         # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
         run: |
           ctest -C ${{matrix.build_type}} --output-on-failure
+
+      - run: rustup toolchain install stable --profile minimal
+
+      - name: Set Up Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "./test/test-driver"
+
+
+      - name: End-to-End Tests
+        working-directory: ./test/test-driver
+        run: |
+          cargo run --release -q -- --mcc ../../build/mcc/mcc --base-folder ../test_data/
