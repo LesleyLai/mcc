@@ -11,10 +11,10 @@ void string_buffer_printf(StringBuffer* str, const char* restrict format, ...)
   va_start(args, format);
   va_list args_copy;
   va_copy(args_copy, args);
-  int buffer_size = vsnprintf(NULL, 0, format, args);
+  const int buffer_size = vsnprintf(NULL, 0, format, args);
   va_end(args);
 
-  MCC_ASSERT_MSG(buffer_size > 0, "Buffer size must be greater than 0");
+  MCC_ASSERT_MSG(buffer_size >= 0, "Buffer size must be greater than 0");
 
   const size_t buffer_size_u = (size_t)buffer_size;
 

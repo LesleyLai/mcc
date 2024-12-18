@@ -15,8 +15,8 @@ jobs:
         os:
           - ubuntu-latest
         compiler:
-          - llvm-13.0.0
-          - gcc-11
+          - llvm-18.0.0
+          - gcc-13
         generator:
           - "Ninja"
         build_type:
