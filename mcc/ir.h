@@ -43,9 +43,20 @@ typedef struct IRValue {
 } IRValue;
 
 typedef enum IRInstructionType {
+  IR_INVALID = 0,
+  IR_RETURN, // return val
+
+  // unary
   IR_NEG,        // dest = -src
   IR_COMPLEMENT, // dest = ~src
-  IR_RETURN,     // return val
+
+  // binary
+  IR_ADD, // dest = src1 + src2
+  IR_SUB, // dest = src1 - src2
+  IR_MUL, // dest = src1 * src2
+  IR_DIV, // dest = src1 / src2
+  IR_MOD, // dest = src1 % src2
+
 } IRInstructionType;
 
 struct IRInstruction {

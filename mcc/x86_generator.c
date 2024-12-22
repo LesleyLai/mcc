@@ -84,6 +84,7 @@ generate_x86_function_def(const IRFunctionDef* ir_function,
   for (size_t j = 0; j < ir_function->instruction_count; ++j) {
     IRInstruction* ir_instruction = &ir_function->instructions[j];
     switch (ir_instruction->typ) {
+    case IR_INVALID: MCC_UNREACHABLE(); break;
     case IR_NEG: {
       push_unary_instruction(&instructions, X86_INST_NEG, ir_instruction);
     } break;
@@ -102,6 +103,11 @@ generate_x86_function_def(const IRFunctionDef* ir_function,
       push_instruction(&instructions, (X86Instruction){.typ = X86_INST_RET});
       break;
     }
+    case IR_ADD: MCC_UNIMPLEMENTED(); break;
+    case IR_SUB: MCC_UNIMPLEMENTED(); break;
+    case IR_MUL: MCC_UNIMPLEMENTED(); break;
+    case IR_DIV: MCC_UNIMPLEMENTED(); break;
+    case IR_MOD: MCC_UNIMPLEMENTED(); break;
     }
   }
 

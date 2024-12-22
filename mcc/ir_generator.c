@@ -10,6 +10,18 @@ static IRInstructionType instruction_typ_from_unary_op(UnaryOpType op_type)
   MCC_UNREACHABLE();
 }
 
+static IRInstructionType instruction_typ_from_binary_op(BinaryOpType op_type)
+{
+  switch (op_type) {
+  case BINARY_OP_TYPE_PLUS: return IR_ADD;
+  case BINARY_OP_TYPE_MINUS: return IR_SUB;
+  case BINARY_OP_TYPE_MULT: return IR_MUL;
+  case BINARY_OP_TYPE_DIVIDE: return IR_DIV;
+  case BINARY_OP_TYPE_MOD: return IR_MOD;
+  }
+  MCC_UNREACHABLE();
+}
+
 typedef struct IRGenContext {
   Arena* permanent_arena;
   size_t instruction_count;
@@ -53,7 +65,28 @@ static IRValue emit_ir_instructions_from_expr(const Expr* expr,
 
     return dst;
   }
-  case EXPR_TYPE_BINARY: MCC_UNIMPLEMENTED(); break;
+  case EXPR_TYPE_BINARY: {
+    const IRInstructionType instruction_type =
+        instruction_typ_from_binary_op(expr->binary_op.binary_op_type);
+
+    const IRValue lhs =
+        emit_ir_instructions_from_expr(expr->binary_op.lhs, context);
+
+    const IRValue rhs =
+        emit_ir_instructions_from_expr(expr->binary_op.rhs, context);
+
+    const StringView dst_name = create_fresh_variable_name(context);
+    const IRValue dst = ir_variable(dst_name);
+
+    push_instruction(context, (IRInstruction){
+                                  .typ = instruction_type,
+                                  .operand1 = dst,
+                                  .operand2 = lhs,
+                                  .operand3 = rhs,
+                              });
+
+    return dst;
+  }
   }
 
   MCC_UNREACHABLE();
