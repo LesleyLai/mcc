@@ -15,7 +15,7 @@
 #include <stdarg.h>
 #include <string.h>
 
-void assemble(StringView asm_filename, StringView obj_filename)
+static void assemble(StringView asm_filename, StringView obj_filename)
 {
   enum { buffer_size = 10000 };
   char buffer[buffer_size];
@@ -34,7 +34,7 @@ void assemble(StringView asm_filename, StringView obj_filename)
   }
 }
 
-void link(const char* obj_filename, const char* executable_name)
+static void link(const char* obj_filename, const char* executable_name)
 {
   enum { buffer_size = 10000 };
   char buffer[buffer_size];
@@ -50,7 +50,7 @@ void link(const char* obj_filename, const char* executable_name)
   }
 }
 
-char* string_from_file(FILE* file, Arena* permanent_arena)
+static char* string_from_file(FILE* file, Arena* permanent_arena)
 {
   fseek(file, 0, SEEK_END);
   const long length = ftell(file);
@@ -73,8 +73,9 @@ char* string_from_file(FILE* file, Arena* permanent_arena)
   return buffer;
 }
 
-void print_parse_diagnostics(ParseErrorsView errors, const char* src_filename,
-                             const char* source)
+static void print_parse_diagnostics(ParseErrorsView errors,
+                                    const char* src_filename,
+                                    const char* source)
 {
   enum { diagnostics_arena_size = 40000 }; // 40 Mb virtual memory
   uint8_t diagnostics_buffer[diagnostics_arena_size];
@@ -92,8 +93,8 @@ void print_parse_diagnostics(ParseErrorsView errors, const char* src_filename,
   }
 }
 
-StringBuffer replace_extension(const char* filename, const char* ext,
-                               Arena* permanent_arena)
+static StringBuffer replace_extension(const char* filename, const char* ext,
+                                      Arena* permanent_arena)
 {
   const char* dot = strrchr(filename, '.');
 
@@ -123,14 +124,11 @@ static void save_x86_asm_file(const char* filename, const X86Program* program)
 
 int main(int argc, char* argv[])
 {
-  const size_t permanent_arena_size = 4000000000; // 4 GB virtual memory
-  void* permanent_arena_buffer = malloc(permanent_arena_size);
-  Arena permanent_arena =
-      arena_init(permanent_arena_buffer, permanent_arena_size);
+  // 4 GB virtual memory
+  Arena permanent_arena = arena_from_virtual_mem(4000000000);
 
-  const size_t scratch_arena_size = 400000000; // 400 MB virtual memory
-  void* scratch_arena_buffer = malloc(scratch_arena_size);
-  Arena scratch_arena = arena_init(scratch_arena_buffer, scratch_arena_size);
+  // 40 MB virtual memory
+  Arena scratch_arena = arena_from_virtual_mem(40000000);
 
   const CliArgs args = parse_cli_args(argc, argv);
 

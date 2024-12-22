@@ -27,6 +27,7 @@ add_library(mcc_lib
         x86_generator.c
         x86.h
         x86_printer.c
+        utils/arena_vm.c
 )
 target_link_libraries(mcc_lib
         PUBLIC mcc::compiler_options

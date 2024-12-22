@@ -19,6 +19,9 @@ typedef struct Arena {
 Arena arena_init(void* buffer, size_t size);
 void arena_reset(Arena* arena);
 
+// Allocate an arena from a large chunk of OS virtual memory
+Arena arena_from_virtual_mem(size_t size);
+
 #if defined(__GNUC__) || defined(__clang__)
 __attribute((malloc))
 #endif
