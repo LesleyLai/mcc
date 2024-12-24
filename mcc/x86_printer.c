@@ -52,9 +52,6 @@ void x86_print_instruction(X86Instruction instruction, FILE* stream)
     (void)fputs("  pop    rbp\n", stream);
     (void)fputs("  ret\n", stream);
   } break;
-  case X86_INST_SUB:
-    print_binary_instruction("sub", instruction, stream);
-    break;
   case X86_INST_NEG:
     (void)fputs("  neg    ", stream);
     print_x86_operand(instruction.operand1, stream);
@@ -62,6 +59,15 @@ void x86_print_instruction(X86Instruction instruction, FILE* stream)
   case X86_INST_NOT:
     (void)fputs("  not    ", stream);
     print_x86_operand(instruction.operand1, stream);
+    break;
+  case X86_INST_ADD:
+    print_binary_instruction("add", instruction, stream);
+    break;
+  case X86_INST_SUB:
+    print_binary_instruction("sub", instruction, stream);
+    break;
+  case X86_INST_MUL:
+    print_binary_instruction("mul", instruction, stream);
     break;
   }
 }

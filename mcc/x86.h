@@ -59,7 +59,9 @@ typedef enum X86InstructionType {
   X86_INST_NEG,
   X86_INST_NOT,
 
+  X86_INST_ADD,
   X86_INST_SUB,
+  X86_INST_MUL,
 } X86InstructionType;
 
 struct X86Instruction {

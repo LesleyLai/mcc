@@ -19,7 +19,7 @@ static X86InstructionVector new_instruction_vector(Arena* permanent_arena)
                                 MAX_INSTRUCTION_COUNT)};
 }
 
-static void push_instruction(struct X86InstructionVector* instructions,
+static void push_instruction(X86InstructionVector* instructions,
                              X86Instruction instruction)
 {
   MCC_ASSERT_MSG(instructions->length < MAX_INSTRUCTION_COUNT,
@@ -74,6 +74,22 @@ static void push_unary_instruction(X86InstructionVector* instructions,
                                  });
 }
 
+static void push_binary_instruction(X86InstructionVector* instructions,
+                                    X86InstructionType type,
+                                    const IRInstruction* ir_instruction)
+{
+  const X86Operand dst = x86_operand_from_ir(ir_instruction->operand1);
+  const X86Operand lhs = x86_operand_from_ir(ir_instruction->operand2);
+  const X86Operand rhs = x86_operand_from_ir(ir_instruction->operand3);
+
+  push_instruction(
+      instructions,
+      (X86Instruction){.typ = X86_INST_MOV, .operand1 = dst, .operand2 = lhs});
+  push_instruction(
+      instructions,
+      (X86Instruction){.typ = type, .operand1 = dst, .operand2 = rhs});
+}
+
 // First pass to generate assembly. Still need fixing later
 static X86FunctionDef
 generate_x86_function_def(const IRFunctionDef* ir_function,
@@ -85,12 +101,6 @@ generate_x86_function_def(const IRFunctionDef* ir_function,
     IRInstruction* ir_instruction = &ir_function->instructions[j];
     switch (ir_instruction->typ) {
     case IR_INVALID: MCC_UNREACHABLE(); break;
-    case IR_NEG: {
-      push_unary_instruction(&instructions, X86_INST_NEG, ir_instruction);
-    } break;
-    case IR_COMPLEMENT: {
-      push_unary_instruction(&instructions, X86_INST_NOT, ir_instruction);
-    } break;
     case IR_RETURN: {
       push_instruction(
           &instructions,
@@ -103,8 +113,19 @@ generate_x86_function_def(const IRFunctionDef* ir_function,
       push_instruction(&instructions, (X86Instruction){.typ = X86_INST_RET});
       break;
     }
-    case IR_ADD: MCC_UNIMPLEMENTED(); break;
-    case IR_SUB: MCC_UNIMPLEMENTED(); break;
+
+    case IR_NEG:
+      push_unary_instruction(&instructions, X86_INST_NEG, ir_instruction);
+      break;
+    case IR_COMPLEMENT:
+      push_unary_instruction(&instructions, X86_INST_NOT, ir_instruction);
+      break;
+    case IR_ADD:
+      push_binary_instruction(&instructions, X86_INST_ADD, ir_instruction);
+      break;
+    case IR_SUB:
+      push_binary_instruction(&instructions, X86_INST_SUB, ir_instruction);
+      break;
     case IR_MUL: MCC_UNIMPLEMENTED(); break;
     case IR_DIV: MCC_UNIMPLEMENTED(); break;
     case IR_MOD: MCC_UNIMPLEMENTED(); break;
@@ -172,7 +193,10 @@ static intptr_t replace_pseudo_registers(X86FunctionDef* function)
       }
     } break;
       // Binary instruction
-    case X86_INST_MOV: {
+    case X86_INST_MOV:
+    case X86_INST_ADD:
+    case X86_INST_SUB:
+    case X86_INST_MUL: {
       if (instruction->operand1.typ == X86_OPERAND_PSEUDO) {
         add_unique_name(&unique_names, instruction->operand1.pseudo);
       }
@@ -180,7 +204,6 @@ static intptr_t replace_pseudo_registers(X86FunctionDef* function)
         add_unique_name(&unique_names, instruction->operand2.pseudo);
       }
     } break;
-    case X86_INST_SUB: MCC_UNIMPLEMENTED(); break;
     }
   }
 
@@ -189,7 +212,17 @@ static intptr_t replace_pseudo_registers(X86FunctionDef* function)
     switch (instruction->typ) {
     case X86_INST_NOP:
     case X86_INST_RET: break;
-    case X86_INST_MOV: {
+    case X86_INST_NEG: // Unary operators
+    case X86_INST_NOT: {
+      if (instruction->operand1.typ == X86_OPERAND_PSEUDO) {
+        instruction->operand1 = x86_stack_operand(find_name_stack_offset(
+            &unique_names, instruction->operand1.pseudo));
+      }
+    } break;
+    case X86_INST_MOV: // binary operators
+    case X86_INST_ADD:
+    case X86_INST_SUB:
+    case X86_INST_MUL: {
       if (instruction->operand1.typ == X86_OPERAND_PSEUDO) {
         instruction->operand1 = x86_stack_operand(find_name_stack_offset(
             &unique_names, instruction->operand1.pseudo));
@@ -199,19 +232,6 @@ static intptr_t replace_pseudo_registers(X86FunctionDef* function)
             &unique_names, instruction->operand2.pseudo));
       }
     } break;
-    case X86_INST_NEG: {
-      if (instruction->operand1.typ == X86_OPERAND_PSEUDO) {
-        instruction->operand1 = x86_stack_operand(find_name_stack_offset(
-            &unique_names, instruction->operand1.pseudo));
-      }
-    } break;
-    case X86_INST_NOT: {
-      if (instruction->operand1.typ == X86_OPERAND_PSEUDO) {
-        instruction->operand1 = x86_stack_operand(find_name_stack_offset(
-            &unique_names, instruction->operand1.pseudo));
-      }
-    } break;
-    case X86_INST_SUB: MCC_UNIMPLEMENTED(); break;
     }
   }
   return unique_names.count * 4;
@@ -246,7 +266,7 @@ X86Program x86_generate_assembly(IRProgram* ir, Arena* permanent_arena,
       X86Instruction instruction = function.instructions[j];
 
       // Fix the situation of moving from memory to memory
-      if (instruction.typ == X86_INST_MOV &&
+      if ((instruction.typ == X86_INST_MOV) &&
           instruction.operand1.typ == X86_OPERAND_STACK &&
           instruction.operand2.typ == X86_OPERAND_STACK) {
         push_instruction(
