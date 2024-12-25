@@ -163,7 +163,7 @@ static size_t find_name_stack_offset(const struct UniqueNameMap* map,
   return (size_t)(index + 1) * 4;
 }
 
-void add_unique_name(struct UniqueNameMap* map, StringView name)
+static void add_unique_name(struct UniqueNameMap* map, StringView name)
 {
   // Find whether the name is already in the map
   if (try_find_unique_name(map, name) >= 0) { return; }
@@ -237,6 +237,77 @@ static intptr_t replace_pseudo_registers(X86FunctionDef* function)
   return unique_names.count * 4;
 }
 
+// Fix this binary instruction if both source and destination are memory
+// addresses
+static void fix_binary_operands(X86InstructionVector* new_instructions,
+                                X86Instruction instruction)
+{
+  if (instruction.operand1.typ == X86_OPERAND_STACK &&
+      instruction.operand2.typ == X86_OPERAND_STACK) {
+    push_instruction(
+        new_instructions,
+        (X86Instruction){.typ = X86_INST_MOV,
+                         .operand1 = x86_register_operand(X86_REG_R10),
+                         .operand2 = instruction.operand2});
+
+    push_instruction(
+        new_instructions,
+        (X86Instruction){.typ = instruction.typ,
+                         .operand1 = instruction.operand1,
+                         .operand2 = x86_register_operand(X86_REG_R10)});
+  } else {
+    push_instruction(new_instructions, instruction);
+  }
+}
+
+static void fix_invalid_instructions(X86FunctionDef* function,
+                                     intptr_t stack_size,
+                                     Arena* permanent_arena)
+{
+  X86InstructionVector new_instructions =
+      new_instruction_vector(permanent_arena);
+
+  if (stack_size > 0) {
+    push_instruction(
+        &new_instructions,
+        (X86Instruction){.typ = X86_INST_SUB,
+                         .operand1 = x86_register_operand(X86_REG_SP),
+                         // TODO: properly handle different size of operands
+                         .operand2 = x86_immediate_operand((int)stack_size)});
+  }
+  for (size_t j = 0; j < function->instruction_count; ++j) {
+    X86Instruction instruction = function->instructions[j];
+
+    // Fix the situation of moving from memory to memory
+    switch (instruction.typ) {
+    case X86_INST_MOV:
+    case X86_INST_ADD:
+    case X86_INST_SUB: {
+      fix_binary_operands(&new_instructions, instruction);
+      break;
+    }
+
+    default: push_instruction(&new_instructions, function->instructions[j]);
+    }
+  }
+
+  function->instruction_count = new_instructions.length;
+  function->instructions = new_instructions.data;
+}
+
+static X86FunctionDef x86_generate_function(const IRFunctionDef* ir_function,
+                                            Arena* permanent_arena,
+                                            Arena scratch_arena)
+{
+  // passes to generate an x86 assembly function
+  X86FunctionDef function =
+      generate_x86_function_def(ir_function, &scratch_arena);
+  const intptr_t stack_size = replace_pseudo_registers(&function);
+  fix_invalid_instructions(&function, stack_size, permanent_arena);
+
+  return function;
+}
+
 X86Program x86_generate_assembly(IRProgram* ir, Arena* permanent_arena,
                                  Arena scratch_arena)
 {
@@ -244,54 +315,9 @@ X86Program x86_generate_assembly(IRProgram* ir, Arena* permanent_arena,
   X86FunctionDef* functions =
       ARENA_ALLOC_ARRAY(permanent_arena, X86FunctionDef, function_count);
 
-  const Arena initial_scratch_arena = scratch_arena;
   for (size_t i = 0; i < ir->function_count; ++i) {
-    X86FunctionDef function =
-        generate_x86_function_def(&ir->functions[i], &scratch_arena);
-
-    const intptr_t stack_size = replace_pseudo_registers(&function);
-
-    X86InstructionVector new_instructions =
-        new_instruction_vector(permanent_arena);
-
-    if (stack_size > 0) {
-      push_instruction(
-          &new_instructions,
-          (X86Instruction){.typ = X86_INST_SUB,
-                           .operand1 = x86_register_operand(X86_REG_SP),
-                           // TODO: properly handle different size of operands
-                           .operand2 = x86_immediate_operand((int)stack_size)});
-    }
-    for (size_t j = 0; j < function.instruction_count; ++j) {
-      X86Instruction instruction = function.instructions[j];
-
-      // Fix the situation of moving from memory to memory
-      if ((instruction.typ == X86_INST_MOV) &&
-          instruction.operand1.typ == X86_OPERAND_STACK &&
-          instruction.operand2.typ == X86_OPERAND_STACK) {
-        push_instruction(
-            &new_instructions,
-            (X86Instruction){.typ = X86_INST_MOV,
-                             .operand1 = x86_register_operand(X86_REG_R10),
-                             .operand2 = instruction.operand2});
-
-        push_instruction(
-            &new_instructions,
-            (X86Instruction){.typ = X86_INST_MOV,
-                             .operand1 = instruction.operand1,
-                             .operand2 = x86_register_operand(X86_REG_R10)});
-
-      } else {
-        push_instruction(&new_instructions, function.instructions[j]);
-      }
-    }
-
-    function.instruction_count = new_instructions.length;
-    function.instructions = new_instructions.data;
-    functions[i] = function;
-
-    // reset scratch buffer
-    scratch_arena = initial_scratch_arena;
+    functions[i] = x86_generate_function(&ir->functions[i], permanent_arena,
+                                         scratch_arena);
   }
 
   return (X86Program){.function_count = function_count, .functions = functions};
