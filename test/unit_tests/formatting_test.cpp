@@ -1,17 +1,12 @@
 #include <catch2/catch_test_macros.hpp>
 
-extern "C" {
-#include "utils/format.h"
-#include "utils/str.h"
-}
-
 #include <cstdint>
 #include <string_view>
 
 extern "C" {
-#include "utils/arena.h"
-#include "utils/format.h"
-#include "utils/str.h"
+#include <mcc/arena.h>
+#include <mcc/format.h>
+#include <mcc/str.h>
 }
 
 using namespace std::string_view_literals;

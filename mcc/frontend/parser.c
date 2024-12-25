@@ -1,6 +1,7 @@
-#include "parser.h"
+#include <mcc/parser.h>
 
-#include "utils/format.h"
+#include <mcc/ast.h>
+#include <mcc/format.h>
 
 #include <assert.h>
 #include <stdbool.h>

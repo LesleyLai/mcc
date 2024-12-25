@@ -2,9 +2,11 @@
 #define MCC_TOKEN_H
 
 #include "source_location.h"
-#include "utils/str.h"
+#include "str.h"
 
 typedef enum TokenType {
+  TOKEN_INVALID = 0,
+
   TOKEN_LEFT_PAREN,  // (
   TOKEN_RIGHT_PAREN, // )
   TOKEN_LEFT_BRACE,  // {

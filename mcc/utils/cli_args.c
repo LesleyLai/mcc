@@ -1,6 +1,6 @@
-#include "cli_args.h"
+#include <mcc/cli_args.h>
 
-#include "utils/prelude.h"
+#include <mcc/prelude.h>
 
 #include <stdio.h>
 #include <stdlib.h>

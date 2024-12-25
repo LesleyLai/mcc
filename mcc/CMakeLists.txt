@@ -1,39 +1,42 @@
+
+get_filename_component(include_dir ${CMAKE_CURRENT_SOURCE_DIR}/../include/mcc ABSOLUTE)
 add_library(mcc_lib
-        utils/str.h
-        utils/arena.c
-        utils/arena.h
-        utils/defer.h
-        utils/prelude.h
-        utils/format.h
+        ${include_dir}/str.h
+        ${include_dir}/arena.h
+        ${include_dir}/prelude.h
+        ${include_dir}/format.h
+        ${include_dir}/ast.h
+        ${include_dir}/parser.h
+        ${include_dir}/source_location.h
+        ${include_dir}/diagnostic.h
+        ${include_dir}/cli_args.h
+        ${include_dir}/token.h
+        ${include_dir}/ir.h
+        ${include_dir}/x86.h
+
         utils/format.c
         utils/str.c
-
-        lexer.h
-        lexer.c
-        ast.h
-        ast_printer.c
-        parser.h
-        parser.c
-        source_location.h
-        diagnostic.c
-        diagnostic.h
-        cli_args.c
-        cli_args.h
-        token.c
-        token.h
-        ir.h
-        ir_generator.c
-        ir_printer.c
-        x86_generator.c
-        x86.h
-        x86_printer.c
+        utils/arena.c
         utils/arena_vm.c
+        utils/diagnostic.c
+        utils/cli_args.c
+
+        frontend/lexer.c
+        frontend/ast_printer.c
+        frontend/parser.c
+        frontend/token.c
+
+        ir/ir_generator.c
+        ir/ir_printer.c
+        
+        x86/x86_generator.c
+        x86/x86_printer.c
 )
 target_link_libraries(mcc_lib
         PUBLIC mcc::compiler_options
         PRIVATE mcc::compiler_warnings)
 target_include_directories(mcc_lib
-        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
+        PUBLIC ${PROJECT_SOURCE_DIR}/include
 )
 
 add_executable(mcc main.c)

@@ -1,9 +1,19 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include "lexer.h"
+#include <mcc/parser.h>
 
-Lexer lexer_create(const char* source)
+// The lexer consumes source code and produces tokens lazily
+
+typedef struct Lexer {
+  const char* start;
+  const char* previous;
+  const char* current;
+  uint32_t line;
+  uint32_t column;
+} Lexer;
+
+static Lexer lexer_create(const char* source)
 {
   return (Lexer){
       .start = source,
@@ -172,7 +182,7 @@ static Token lexer_scan_identifier(Lexer* lexer)
   return lexer_make_token(lexer, lexer_get_identifier_type(lexer));
 }
 
-Token lexer_scan_token(Lexer* lexer)
+static Token lexer_scan_token(Lexer* lexer)
 {
   lexer_skip_whitespace(lexer);
 

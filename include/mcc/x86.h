@@ -1,10 +1,8 @@
 #ifndef MCC_X86_H
 #define MCC_X86_H
 
-#include "utils/arena.h"
-#include "utils/str.h"
-#include <stddef.h>
-#include <stdint.h>
+#include "arena.h"
+#include "str.h"
 
 typedef struct X86Program X86Program;
 typedef struct X86FunctionDef X86FunctionDef;

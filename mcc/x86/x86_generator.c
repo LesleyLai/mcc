@@ -1,5 +1,5 @@
-#include "ir.h"
-#include "x86.h"
+#include <mcc/ir.h>
+#include <mcc/x86.h>
 
 #include <stdint.h>
 

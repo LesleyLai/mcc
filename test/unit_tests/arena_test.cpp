@@ -3,7 +3,7 @@
 #include <cstdint>
 
 extern "C" {
-#include "utils/arena.h"
+#include <mcc/arena.h>
 }
 
 static void require_ptr_equal(const void* ptr1, const void* ptr2)

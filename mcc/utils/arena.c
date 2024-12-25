@@ -1,6 +1,5 @@
-#include "arena.h"
+#include <mcc/arena.h>
 
-#include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,12 +1,13 @@
 #ifndef MCC_PARSER_H
 #define MCC_PARSER_H
 
-#include "ast.h"
 #include "diagnostic.h"
 #include "token.h"
 
-#include "utils/arena.h"
-#include "utils/str.h"
+#include <mcc/arena.h>
+#include <mcc/str.h>
+
+typedef struct TranslationUnit TranslationUnit;
 
 typedef struct ParseErrorsView {
   size_t size;
@@ -18,6 +19,9 @@ typedef struct ParseResult {
   ParseErrorsView errors;
 } ParseResult;
 
+// @brief Scan the source file and generate a list of tokens
+Tokens lex(const char* source, Arena* permanent_arena, Arena scratch_arena);
+
 ParseResult parse(Tokens tokens, Arena* permanent_arena, Arena scratch_arena);
 
-#endif
+#endif // MCC_PARSER_H

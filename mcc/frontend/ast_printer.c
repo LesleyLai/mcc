@@ -1,6 +1,5 @@
-#include "ast.h"
-#include "utils/prelude.h"
-#include <stdio.h>
+#include <mcc/ast.h>
+#include <mcc/prelude.h>
 
 static void print_source_range(SourceRange range)
 {

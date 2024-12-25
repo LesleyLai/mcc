@@ -1,6 +1,9 @@
 #ifndef MCC_PRELUDE_H
 #define MCC_PRELUDE_H
 
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -42,5 +45,23 @@
                   __FILE__, __LINE__);                                         \
     abort();                                                                   \
   } while (0)
+
+/* Defer
+ *
+ * Example:
+ *  ```c
+ *  File* file = ...
+ *  MCC_DEFER(fclose(file)) {
+ *    // do stuff here
+ *  }
+ *  ```
+ */
+#define MCC_CONCAT_IMPL(x, y) x##y
+#define MCC_CONCAT(x, y) MCC_CONCAT_IMPL(x, y)
+
+#define MCC_MACRO_VAR(name) MCC_CONCAT(name, __LINE__)
+#define MCC_DEFER(end)                                                         \
+  for (int MCC_MACRO_VAR(_i_) = 0; !MCC_MACRO_VAR(_i_);                        \
+       ((MCC_MACRO_VAR(_i_) += 1), end))
 
 #endif // MCC_PRELUDE_H

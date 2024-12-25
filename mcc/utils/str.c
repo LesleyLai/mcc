@@ -1,8 +1,13 @@
-#include "str.h"
-
-#include <string.h>
+#include <mcc/str.h>
 
 #include <stdlib.h>
+#include <string.h>
+
+static_assert(sizeof(StringView) == 2 * sizeof(void*),
+              "Size of a StringView should be 2 pointer size");
+
+static_assert(sizeof(StringBuffer) == 4 * sizeof(void*),
+              "Size of a StringView should be 4 pointer size");
 
 StringView string_view_from_c_str(const char* source)
 {
@@ -71,7 +76,9 @@ size_t string_buffer_capacity(StringBuffer self)
 static void string_buffer_grow(StringBuffer* self, size_t new_capacity)
 {
   // No need to free old memory since we only use arena allocation
-  assert(new_capacity > self->capacity_);
+  MCC_ASSERT_MSG(new_capacity > self->capacity_,
+                 "Only call string_buffer_grow when the capacity of self is "
+                 "not big enough");
   self->capacity_ = new_capacity;
   self->data_ = arena_aligned_grow(self->allocator, self->data_, alignof(char),
                                    new_capacity + 1);

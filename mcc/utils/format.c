@@ -1,4 +1,4 @@
-#include "format.h"
+#include <mcc/format.h>
 
 #include <stdarg.h>
 #include <stdio.h>

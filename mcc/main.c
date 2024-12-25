@@ -1,16 +1,16 @@
-#include "cli_args.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "diagnostic.h"
-#include "ir.h"
-#include "lexer.h"
-#include "parser.h"
-#include "utils/arena.h"
-#include "utils/defer.h"
-#include "utils/str.h"
-#include "x86.h"
+#include <mcc/arena.h>
+#include <mcc/ast.h>
+#include <mcc/cli_args.h>
+#include <mcc/diagnostic.h>
+#include <mcc/ir.h>
+#include <mcc/parser.h>
+#include <mcc/prelude.h>
+#include <mcc/str.h>
+#include <mcc/x86.h>
 
 #include <stdarg.h>
 #include <string.h>
@@ -169,10 +169,10 @@ int main(int argc, char* argv[])
   }
 
   IRProgram* ir =
-      generate_ir(parse_result.ast, &permanent_arena, scratch_arena);
+      ir_generate(parse_result.ast, &permanent_arena, scratch_arena);
 
   if (args.gen_ir_only) {
-    dump_ir(ir);
+    print_ir(ir);
     return 0;
   }
 

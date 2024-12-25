@@ -1,14 +1,11 @@
-//
-// Created by lesley on 11/27/24.
-//
-
-#include "token.h"
+#include <mcc/token.h>
 
 #include <stdio.h>
 
 static const char* token_type_string(TokenType type)
 {
   switch (type) {
+  case TOKEN_INVALID: MCC_UNREACHABLE();
   case TOKEN_LEFT_PAREN: return "(";
   case TOKEN_RIGHT_PAREN: return ")";
   case TOKEN_LEFT_BRACE: return "{";

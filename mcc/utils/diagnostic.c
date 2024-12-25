@@ -1,7 +1,7 @@
-#include "diagnostic.h"
-#include "stdio.h"
+#include <mcc/diagnostic.h>
 
-#include "utils/format.h"
+#include <mcc/format.h>
+#include <stdio.h>
 
 static void write_diagnostic_line(StringBuffer* output, const char* source,
                                   SourceRange range, const char* line_start,

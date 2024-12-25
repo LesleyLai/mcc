@@ -1,8 +1,9 @@
 #include <catch2/catch_test_macros.hpp>
 
 extern "C" {
-#include "utils/format.h"
-#include "utils/str.h"
+
+#include <mcc/format.h>
+#include <mcc/str.h>
 }
 
 #include <fmt/format.h>

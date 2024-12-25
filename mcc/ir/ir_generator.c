@@ -1,5 +1,29 @@
-#include "ir.h"
-#include "utils/format.h"
+#include <mcc/ir.h>
+
+#include <mcc/ast.h>
+#include <mcc/format.h>
+
+/*
+ * =============================================================================
+ * Convenient "constructors"
+ * =============================================================================
+ */
+static IRInstruction ir_single_operand_instr(IRInstructionType typ,
+                                             IRValue operand)
+{
+  return (IRInstruction){.typ = typ, .operand1 = operand};
+}
+
+static IRInstruction ir_unary_instr(IRInstructionType typ, IRValue dst,
+                                    IRValue src)
+{
+  return (IRInstruction){.typ = typ, .operand1 = dst, .operand2 = src};
+}
+
+static IRValue ir_variable(StringView name)
+{
+  return (IRValue){.typ = IR_VALUE_TYPE_VARIABLE, .variable = name};
+}
 
 static IRInstructionType instruction_typ_from_unary_op(UnaryOpType op_type)
 {
@@ -126,10 +150,9 @@ generate_ir_function_def(const FunctionDecl* decl, Arena* permanent_arena,
                          .instructions = context.instructions};
 }
 
-IRProgram* generate_ir(TranslationUnit* ast, Arena* permanent_arena,
+IRProgram* ir_generate(TranslationUnit* ast, Arena* permanent_arena,
                        Arena scratch_arena)
 {
-
   const size_t ir_function_count = ast->decl_count;
   IRFunctionDef* ir_functions =
       ARENA_ALLOC_ARRAY(permanent_arena, IRFunctionDef, ir_function_count);

@@ -2,7 +2,6 @@
 #define MCC_ARENA_H
 
 #include "prelude.h"
-#include <stddef.h>
 
 typedef struct Arena Arena;
 

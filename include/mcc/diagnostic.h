@@ -2,7 +2,7 @@
 #define MCC_DIAGNOSTIC_H
 
 #include "source_location.h"
-#include "utils/str.h"
+#include "str.h"
 
 typedef struct ParseError {
   StringView msg;

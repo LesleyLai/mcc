@@ -1,11 +1,8 @@
 #ifndef MCC_STR_H
 #define MCC_STR_H
 
-#include <assert.h>
-#include <stdbool.h>
-#include <stddef.h>
-
 #include "arena.h"
+#include "prelude.h"
 
 // A view of a slice of string
 typedef struct StringView {
@@ -21,12 +18,6 @@ typedef struct StringBuffer {
   char* data_;
   Arena* allocator;
 } StringBuffer;
-
-static_assert(sizeof(StringView) == 2 * sizeof(void*),
-              "Size of a StringView should be 2 pointer size");
-
-static_assert(sizeof(StringBuffer) == 4 * sizeof(void*),
-              "Size of a StringView should be 4 pointer size");
 
 StringView string_view_from_c_str(const char* source);
 StringView string_view_from_buffer(const StringBuffer* buffer);

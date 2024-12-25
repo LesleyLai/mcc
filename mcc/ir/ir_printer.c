@@ -1,4 +1,4 @@
-#include "ir.h"
+#include <mcc/ir.h>
 
 static void print_ir_value(IRValue value)
 {
@@ -30,7 +30,7 @@ static void print_binary_op(IRInstruction instruction, const char* op_name)
   printf("\n");
 }
 
-void dump_ir(const IRProgram* ir)
+void print_ir(const IRProgram* ir)
 {
   for (size_t i = 0; i < ir->function_count; i++) {
     const IRFunctionDef ir_function = ir->functions[i];

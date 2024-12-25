@@ -2,9 +2,8 @@
 #define MCC_AST_H
 
 #include "source_location.h"
-#include "utils/str.h"
+#include "str.h"
 
-#include <stdint.h>
 #include <stdlib.h>
 
 typedef enum ExprType {

@@ -1,6 +1,6 @@
-#include "x86.h"
+#include <mcc/x86.h>
 
-#include "utils/prelude.h"
+#include <mcc/prelude.h>
 
 static const char* x86_register_name(X86Register reg)
 {
