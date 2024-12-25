@@ -7,6 +7,7 @@ static const char* x86_register_name(X86Register reg)
   switch (reg) {
   case X86_REG_INVALID: MCC_UNREACHABLE(); break;
   case X86_REG_AX: return "eax";
+  case X86_REG_DX: return "edx";
   case X86_REG_R10: return "r10d";
   case X86_REG_R11: return "r11d";
   case X86_REG_SP: return "rsp";
@@ -32,6 +33,13 @@ static void print_x86_operand(X86Operand operand, FILE* stream)
   }
 }
 
+static void print_unary_instruction(const char* name,
+                                    X86Instruction instruction, FILE* stream)
+{
+  (void)fprintf(stream, "  %-6s ", name);
+  print_x86_operand(instruction.operand1, stream);
+}
+
 static void print_binary_instruction(const char* name,
                                      X86Instruction instruction, FILE* stream)
 {
@@ -54,14 +62,8 @@ void x86_print_instruction(X86Instruction instruction, FILE* stream)
     (void)fputs("  pop    rbp\n", stream);
     (void)fputs("  ret\n", stream);
   } break;
-  case X86_INST_NEG:
-    (void)fputs("  neg    ", stream);
-    print_x86_operand(instruction.operand1, stream);
-    break;
-  case X86_INST_NOT:
-    (void)fputs("  not    ", stream);
-    print_x86_operand(instruction.operand1, stream);
-    break;
+  case X86_INST_NEG: print_unary_instruction("neg", instruction, stream); break;
+  case X86_INST_NOT: print_unary_instruction("not", instruction, stream); break;
   case X86_INST_ADD:
     print_binary_instruction("add", instruction, stream);
     break;
@@ -71,6 +73,10 @@ void x86_print_instruction(X86Instruction instruction, FILE* stream)
   case X86_INST_IMUL:
     print_binary_instruction("imul", instruction, stream);
     break;
+  case X86_INST_IDIV:
+    print_unary_instruction("idiv", instruction, stream);
+    break;
+  case X86_INST_CDQ: (void)fputs("  cdq", stream); break;
   }
 }
 

@@ -25,6 +25,7 @@ struct X86FunctionDef {
 typedef enum X86Register {
   X86_REG_INVALID = 0,
   X86_REG_AX,
+  X86_REG_DX,
   X86_REG_R10,
   X86_REG_R11,
   X86_REG_SP, // Stack pointer
@@ -64,6 +65,9 @@ typedef enum X86InstructionType {
   X86_INST_ADD,
   X86_INST_SUB,
   X86_INST_IMUL,
+  X86_INST_IDIV,
+
+  X86_INST_CDQ, // extends the sign bit of eax into the edx register
 } X86InstructionType;
 
 struct X86Instruction {
