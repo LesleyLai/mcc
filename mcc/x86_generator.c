@@ -126,7 +126,9 @@ generate_x86_function_def(const IRFunctionDef* ir_function,
     case IR_SUB:
       push_binary_instruction(&instructions, X86_INST_SUB, ir_instruction);
       break;
-    case IR_MUL: MCC_UNIMPLEMENTED(); break;
+    case IR_MUL:
+      push_binary_instruction(&instructions, X86_INST_IMUL, ir_instruction);
+      break;
     case IR_DIV: MCC_UNIMPLEMENTED(); break;
     case IR_MOD: MCC_UNIMPLEMENTED(); break;
     }
@@ -196,7 +198,7 @@ static intptr_t replace_pseudo_registers(X86FunctionDef* function)
     case X86_INST_MOV:
     case X86_INST_ADD:
     case X86_INST_SUB:
-    case X86_INST_MUL: {
+    case X86_INST_IMUL: {
       if (instruction->operand1.typ == X86_OPERAND_PSEUDO) {
         add_unique_name(&unique_names, instruction->operand1.pseudo);
       }
@@ -222,7 +224,7 @@ static intptr_t replace_pseudo_registers(X86FunctionDef* function)
     case X86_INST_MOV: // binary operators
     case X86_INST_ADD:
     case X86_INST_SUB:
-    case X86_INST_MUL: {
+    case X86_INST_IMUL: {
       if (instruction->operand1.typ == X86_OPERAND_PSEUDO) {
         instruction->operand1 = x86_stack_operand(find_name_stack_offset(
             &unique_names, instruction->operand1.pseudo));
@@ -284,6 +286,32 @@ static void fix_invalid_instructions(X86FunctionDef* function,
     case X86_INST_ADD:
     case X86_INST_SUB: {
       fix_binary_operands(&new_instructions, instruction);
+      break;
+    }
+
+      // imul can't use a memory address as its destination, regardless of its
+      // source operand
+    case X86_INST_IMUL: {
+      if (instruction.operand1.typ == X86_OPERAND_STACK) {
+        push_instruction(
+            &new_instructions,
+            (X86Instruction){.typ = X86_INST_MOV,
+                             .operand1 = x86_register_operand(X86_REG_R11),
+                             .operand2 = instruction.operand1});
+        push_instruction(
+            &new_instructions,
+            (X86Instruction){.typ = X86_INST_IMUL,
+                             .operand1 = x86_register_operand(X86_REG_R11),
+                             .operand2 = instruction.operand2});
+        push_instruction(
+            &new_instructions,
+            (X86Instruction){.typ = X86_INST_MOV,
+                             .operand1 = instruction.operand1,
+                             .operand2 = x86_register_operand(X86_REG_R11)});
+      } else {
+        push_instruction(&new_instructions, instruction);
+      }
+
       break;
     }
 

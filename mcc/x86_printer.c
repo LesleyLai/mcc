@@ -8,6 +8,7 @@ static const char* x86_register_name(X86Register reg)
   case X86_REG_INVALID: MCC_UNREACHABLE(); break;
   case X86_REG_AX: return "eax";
   case X86_REG_R10: return "r10d";
+  case X86_REG_R11: return "r11d";
   case X86_REG_SP: return "rsp";
   }
   MCC_UNREACHABLE();
@@ -66,8 +67,8 @@ void x86_print_instruction(X86Instruction instruction, FILE* stream)
   case X86_INST_SUB:
     print_binary_instruction("sub", instruction, stream);
     break;
-  case X86_INST_MUL:
-    print_binary_instruction("mul", instruction, stream);
+  case X86_INST_IMUL:
+    print_binary_instruction("imul", instruction, stream);
     break;
   }
 }
