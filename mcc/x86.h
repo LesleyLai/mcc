@@ -53,6 +53,7 @@ struct X86Operand {
 };
 
 typedef enum X86InstructionType {
+  x86_INST_INVALID = 0,
   X86_INST_NOP,
   X86_INST_RET,
   X86_INST_MOV,

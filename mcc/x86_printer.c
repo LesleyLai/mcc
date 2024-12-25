@@ -35,7 +35,7 @@ static void print_x86_operand(X86Operand operand, FILE* stream)
 static void print_binary_instruction(const char* name,
                                      X86Instruction instruction, FILE* stream)
 {
-  (void)fprintf(stream, "  %s    ", name);
+  (void)fprintf(stream, "  %-6s ", name);
   print_x86_operand(instruction.operand1, stream);
   (void)fputs(", ", stream);
   print_x86_operand(instruction.operand2, stream);
@@ -44,6 +44,7 @@ static void print_binary_instruction(const char* name,
 void x86_print_instruction(X86Instruction instruction, FILE* stream)
 {
   switch (instruction.typ) {
+  case x86_INST_INVALID: MCC_UNREACHABLE(); break;
   case X86_INST_NOP: MCC_UNIMPLEMENTED(); break;
   case X86_INST_MOV:
     print_binary_instruction("mov", instruction, stream);

@@ -184,6 +184,7 @@ static intptr_t replace_pseudo_registers(X86FunctionDef* function)
   for (size_t j = 0; j < function->instruction_count; ++j) {
     X86Instruction* instruction = &function->instructions[j];
     switch (instruction->typ) {
+    case x86_INST_INVALID: MCC_UNREACHABLE(); break;
     case X86_INST_NOP:
     case X86_INST_RET:
       break;
@@ -212,6 +213,7 @@ static intptr_t replace_pseudo_registers(X86FunctionDef* function)
   for (size_t j = 0; j < function->instruction_count; ++j) {
     X86Instruction* instruction = &function->instructions[j];
     switch (instruction->typ) {
+    case x86_INST_INVALID: MCC_UNREACHABLE(); break;
     case X86_INST_NOP:
     case X86_INST_RET: break;
     case X86_INST_NEG: // Unary operators
@@ -342,8 +344,7 @@ X86Program x86_generate_assembly(IRProgram* ir, Arena* permanent_arena,
   const size_t function_count = ir->function_count;
   X86FunctionDef* functions =
       ARENA_ALLOC_ARRAY(permanent_arena, X86FunctionDef, function_count);
-
-  for (size_t i = 0; i < ir->function_count; ++i) {
+  for (size_t i = 0; i < function_count; ++i) {
     functions[i] = x86_generate_function(&ir->functions[i], permanent_arena,
                                          scratch_arena);
   }
