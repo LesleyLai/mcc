@@ -6,26 +6,22 @@
 
 // A three-address code intermediate representation
 
-typedef struct IRProgram IRProgram;
-typedef struct IRInstruction IRInstruction;
-typedef struct IRFunctionDef IRFunctionDef;
+struct TranslationUnit;
 
-typedef struct TranslationUnit TranslationUnit;
+struct IRProgram* ir_generate(struct TranslationUnit* ast,
+                              Arena* permanent_arena, Arena scratch_arena);
+void print_ir(const struct IRProgram* ir);
 
-IRProgram* ir_generate(TranslationUnit* ast, Arena* permanent_arena,
-                       Arena scratch_arena);
-void print_ir(const IRProgram* ir);
-
-struct IRProgram {
+typedef struct IRProgram {
   size_t function_count;
-  IRFunctionDef* functions;
-};
+  struct IRFunctionDef* functions;
+} IRProgram;
 
-struct IRFunctionDef {
+typedef struct IRFunctionDef {
   StringView name;
   size_t instruction_count;
-  IRInstruction* instructions;
-};
+  struct IRInstruction* instructions;
+} IRFunctionDef;
 
 typedef enum IRValueType {
   IR_VALUE_TYPE_CONSTANT,
@@ -57,11 +53,11 @@ typedef enum IRInstructionType {
 
 } IRInstructionType;
 
-struct IRInstruction {
+typedef struct IRInstruction {
   IRInstructionType typ;
   IRValue operand1; // often dest
   IRValue operand2;
   IRValue operand3;
-};
+} IRInstruction;
 
 #endif // MCC_IR_H

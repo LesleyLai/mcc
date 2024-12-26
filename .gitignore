@@ -7,5 +7,7 @@ cmake-build-*
 *.o
 .venv
 
+test/test_driver/target
 
-test/test-driver/target
+# temporary files used to test compiler
+test_files/**

@@ -3,8 +3,6 @@
 
 #include "prelude.h"
 
-typedef struct Arena Arena;
-
 typedef unsigned char Byte;
 
 // Arena memory allocator for bulk allocations
