@@ -14,6 +14,7 @@ extern "C" {
 
 namespace stdr = std::ranges;
 namespace stdv = std::views;
+using Catch::Matchers::RangeEquals;
 
 class TokensView : public std::ranges::view_interface<TokensView> {
 public:
@@ -79,6 +80,5 @@ TEST_CASE("Lexer lex symbols", "[lexer]")
                                            TOKEN_EOF};
 
   const TokensView tokens{lex(input, &permanent_arena, scratch_arena)};
-  REQUIRE_THAT(stdv::transform(tokens, &Token::type),
-               Catch::Matchers::RangeEquals(expected));
+  REQUIRE_THAT(stdv::transform(tokens, &Token::type), RangeEquals(expected));
 }

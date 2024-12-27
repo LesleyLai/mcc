@@ -28,6 +28,11 @@ static const char* binary_op_name(BinaryOpType binary_op_type)
   case BINARY_OP_TYPE_MULT: return "*";
   case BINARY_OP_TYPE_DIVIDE: return "/";
   case BINARY_OP_TYPE_MOD: return "%";
+  case BINARY_OP_TYPE_BITWISE_AND: return "&";
+  case BINARY_OP_TYPE_BITWISE_OR: return "|";
+  case BINARY_OP_TYPE_BITWISE_XOR: return "^";
+  case BINARY_OP_TYPE_BITWISE_LEFT_SHIFT: return "<<";
+  case BINARY_OP_TYPE_BITWISE_RIGHT_SHIFT: return ">>";
   }
   MCC_ASSERT_MSG(false, "invalid enum");
 }

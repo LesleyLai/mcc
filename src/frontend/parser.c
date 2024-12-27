@@ -144,15 +144,19 @@ static Expr* parse_number_literal(Parser* parser)
  */
 typedef enum Precedence {
   PREC_NONE = 0,
-  PREC_ASSIGNMENT, // =
-  PREC_OR,         // or
-  PREC_AND,        // and
-  PREC_EQUALITY,   // == !=
-  PREC_COMPARISON, // < > <= >=
-  PREC_TERM,       // + - ! ~
-  PREC_FACTOR,     // * / %
-  PREC_UNARY,      // ! -
-  PREC_CALL,       // . ()
+  PREC_ASSIGNMENT,  // =
+  PREC_OR,          // or
+  PREC_AND,         // and
+  PREC_BITWISE_OR,  // |
+  PREC_BITWISE_XOR, // ^
+  PREC_BITWISE_AND, // &
+  PREC_EQUALITY,    // == !=
+  PREC_COMPARISON,  // < > <= >=
+  PREC_SHIFT,       // << >>
+  PREC_TERM,        // + -
+  PREC_FACTOR,      // * / %
+  PREC_UNARY,       // ! -
+  PREC_CALL,        // . ()
   PREC_PRIMARY
 } Precedence;
 
@@ -170,7 +174,7 @@ typedef struct ParseRule {
   Precedence precedence;
 } ParseRule;
 
-static ParseRule rules[] = {
+static ParseRule rules[TOKEN_TYPES_COUNT] = {
     [TOKEN_LEFT_PAREN] = {parse_group, NULL, PREC_NONE},
     [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
     [TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE},
@@ -182,6 +186,13 @@ static ParseRule rules[] = {
     [TOKEN_STAR] = {NULL, parse_binary_op_left_associative, PREC_FACTOR},
     [TOKEN_SLASH] = {NULL, parse_binary_op_left_associative, PREC_FACTOR},
     [TOKEN_PERCENT] = {NULL, parse_binary_op_left_associative, PREC_FACTOR},
+    [TOKEN_AMPERSAND] = {NULL, parse_binary_op_left_associative,
+                         PREC_BITWISE_AND},
+    [TOKEN_CARET] = {NULL, parse_binary_op_left_associative, PREC_BITWISE_XOR},
+    [TOKEN_BAR] = {NULL, parse_binary_op_left_associative, PREC_BITWISE_OR},
+    [TOKEN_LESS_LESS] = {NULL, parse_binary_op_left_associative, PREC_SHIFT},
+    [TOKEN_GREATER_GREATER] = {NULL, parse_binary_op_left_associative,
+                               PREC_SHIFT},
     [TOKEN_TILDE] = {parse_unary_op, NULL, PREC_TERM},
     [TOKEN_KEYWORD_VOID] = {NULL, NULL, PREC_NONE},
     [TOKEN_KEYWORD_INT] = {NULL, NULL, PREC_NONE},
@@ -262,6 +273,24 @@ static Expr* parse_unary_op(Parser* parser)
   return result;
 }
 
+static BinaryOpType binop_type_from_token_type(TokenType token_type)
+{
+  switch (token_type) {
+  case TOKEN_PLUS: return BINARY_OP_TYPE_PLUS;
+  case TOKEN_MINUS: return BINARY_OP_TYPE_MINUS;
+  case TOKEN_STAR: return BINARY_OP_TYPE_MULT;
+  case TOKEN_SLASH: return BINARY_OP_TYPE_DIVIDE;
+  case TOKEN_PERCENT: return BINARY_OP_TYPE_MOD;
+  case TOKEN_LESS_LESS: return BINARY_OP_TYPE_BITWISE_LEFT_SHIFT;
+  case TOKEN_GREATER_GREATER: return BINARY_OP_TYPE_BITWISE_RIGHT_SHIFT;
+  case TOKEN_AMPERSAND: return BINARY_OP_TYPE_BITWISE_AND;
+  case TOKEN_CARET: return BINARY_OP_TYPE_BITWISE_XOR;
+  case TOKEN_BAR: return BINARY_OP_TYPE_BITWISE_OR;
+
+  default: MCC_UNREACHABLE();
+  }
+}
+
 static Expr* parse_binary_op_left_associative(Parser* parser, Expr* lhs_expr)
 {
   Token operator_token = parser_previous_token(parser);
@@ -270,15 +299,7 @@ static Expr* parse_binary_op_left_associative(Parser* parser, Expr* lhs_expr)
   const ParseRule* rule = get_rule(operator_type);
   Expr* rhs_expr = parse_precedence(parser, (Precedence)(rule->precedence + 1));
 
-  BinaryOpType binary_op_type;
-  switch (operator_type) {
-  case TOKEN_PLUS: binary_op_type = BINARY_OP_TYPE_PLUS; break;
-  case TOKEN_MINUS: binary_op_type = BINARY_OP_TYPE_MINUS; break;
-  case TOKEN_STAR: binary_op_type = BINARY_OP_TYPE_MULT; break;
-  case TOKEN_SLASH: binary_op_type = BINARY_OP_TYPE_DIVIDE; break;
-  case TOKEN_PERCENT: binary_op_type = BINARY_OP_TYPE_MOD; break;
-  default: return NULL; // TODO: better error reporting for unreachable
-  }
+  BinaryOpType binary_op_type = binop_type_from_token_type(operator_type);
 
   // build result
   // TODO: Fix this
