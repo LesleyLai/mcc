@@ -65,6 +65,10 @@ typedef enum X86InstructionType {
   X86_INST_IMUL,
   X86_INST_IDIV,
 
+  X86_INST_AND, // bitwise and
+  X86_INST_OR,  // bitwise or
+  X86_INST_XOR, // bitwise xor
+
   X86_INST_CDQ, // extends the sign bit of eax into the edx register
 } X86InstructionType;
 

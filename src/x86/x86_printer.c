@@ -77,6 +77,13 @@ void x86_print_instruction(X86Instruction instruction, FILE* stream)
     print_unary_instruction("idiv", instruction, stream);
     break;
   case X86_INST_CDQ: (void)fputs("  cdq", stream); break;
+  case X86_INST_AND:
+    print_binary_instruction("and", instruction, stream);
+    break;
+  case X86_INST_OR: print_binary_instruction("or", instruction, stream); break;
+  case X86_INST_XOR:
+    print_binary_instruction("xor", instruction, stream);
+    break;
   }
 }
 
