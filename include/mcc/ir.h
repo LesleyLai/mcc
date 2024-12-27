@@ -45,11 +45,17 @@ typedef enum IRInstructionType {
   IR_COMPLEMENT, // dest = ~src
 
   // binary
-  IR_ADD, // dest = src1 + src2
-  IR_SUB, // dest = src1 - src2
-  IR_MUL, // dest = src1 * src2
-  IR_DIV, // dest = src1 / src2
-  IR_MOD, // dest = src1 % src2
+  IR_ADD,                    // dest = src1 + src2
+  IR_SUB,                    // dest = src1 - src2
+  IR_MUL,                    // dest = src1 * src2
+  IR_DIV,                    // dest = src1 / src2
+  IR_MOD,                    // dest = src1 % src2
+  IR_BITWISE_AND,            // dest = src1 & src2
+  IR_BITWISE_OR,             // dest = src1 | src2
+  IR_BITWISE_XOR,            // dest = src1 ^ src2
+  IR_SHIFT_LEFT,             // dest = src1 << src2
+  IR_SHIFT_RIGHT_ARITHMETIC, // dest = src1 >> src2
+  IR_SHIFT_RIGHT_LOGICAL,    // dest = (unsigned)src1 >> (unsigned)src2
 
 } IRInstructionType;
 

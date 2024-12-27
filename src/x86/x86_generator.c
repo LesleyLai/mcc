@@ -169,6 +169,12 @@ generate_x86_function_def(const IRFunctionDef* ir_function,
       break;
     case IR_DIV:
     case IR_MOD: push_div_mod_instruction(&instructions, ir_instruction); break;
+    case IR_BITWISE_AND: MCC_UNIMPLEMENTED(); break;
+    case IR_BITWISE_OR: MCC_UNIMPLEMENTED(); break;
+    case IR_BITWISE_XOR: MCC_UNIMPLEMENTED(); break;
+    case IR_SHIFT_LEFT: MCC_UNIMPLEMENTED(); break;
+    case IR_SHIFT_RIGHT_ARITHMETIC: MCC_UNIMPLEMENTED(); break;
+    case IR_SHIFT_RIGHT_LOGICAL: MCC_UNIMPLEMENTED(); break;
     }
   }
 

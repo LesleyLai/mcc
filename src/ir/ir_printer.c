@@ -52,6 +52,14 @@ void print_ir(const IRProgram* ir)
       case IR_MUL: print_binary_op(instruction, "mul"); break;
       case IR_DIV: print_binary_op(instruction, "div"); break;
       case IR_MOD: print_binary_op(instruction, "mod"); break;
+      case IR_BITWISE_AND: print_binary_op(instruction, "bitand"); break;
+      case IR_BITWISE_OR: print_binary_op(instruction, "bitor"); break;
+      case IR_BITWISE_XOR: print_binary_op(instruction, "xor"); break;
+      case IR_SHIFT_LEFT: print_binary_op(instruction, "shl"); break;
+      case IR_SHIFT_RIGHT_ARITHMETIC:
+        print_binary_op(instruction, "ashr");
+        break;
+      case IR_SHIFT_RIGHT_LOGICAL: print_binary_op(instruction, "lshr"); break;
       }
     }
   }

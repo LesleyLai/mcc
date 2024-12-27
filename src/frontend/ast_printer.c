@@ -31,8 +31,8 @@ static const char* binary_op_name(BinaryOpType binary_op_type)
   case BINARY_OP_TYPE_BITWISE_AND: return "&";
   case BINARY_OP_TYPE_BITWISE_OR: return "|";
   case BINARY_OP_TYPE_BITWISE_XOR: return "^";
-  case BINARY_OP_TYPE_BITWISE_LEFT_SHIFT: return "<<";
-  case BINARY_OP_TYPE_BITWISE_RIGHT_SHIFT: return ">>";
+  case BINARY_OP_TYPE_SHIFT_LEFT: return "<<";
+  case BINARY_OP_TYPE_SHIFT_RIGHT: return ">>";
   }
   MCC_ASSERT_MSG(false, "invalid enum");
 }
