@@ -84,6 +84,12 @@ void x86_print_instruction(X86Instruction instruction, FILE* stream)
   case X86_INST_XOR:
     print_binary_instruction("xor", instruction, stream);
     break;
+  case X86_INST_SHL:
+    print_binary_instruction("shl", instruction, stream);
+    break;
+  case X86_INST_SAR:
+    print_binary_instruction("sar", instruction, stream);
+    break;
   }
 }
 

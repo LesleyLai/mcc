@@ -178,8 +178,12 @@ generate_x86_function_def(const IRFunctionDef* ir_function,
     case IR_BITWISE_XOR:
       push_binary_instruction(&instructions, X86_INST_XOR, ir_instruction);
       break;
-    case IR_SHIFT_LEFT: MCC_UNIMPLEMENTED(); break;
-    case IR_SHIFT_RIGHT_ARITHMETIC: MCC_UNIMPLEMENTED(); break;
+    case IR_SHIFT_LEFT:
+      push_binary_instruction(&instructions, X86_INST_SHL, ir_instruction);
+      break;
+    case IR_SHIFT_RIGHT_ARITHMETIC:
+      push_binary_instruction(&instructions, X86_INST_SAR, ir_instruction);
+      break;
     case IR_SHIFT_RIGHT_LOGICAL: MCC_UNIMPLEMENTED(); break;
     }
   }
@@ -253,7 +257,9 @@ static intptr_t replace_pseudo_registers(X86FunctionDef* function)
     case X86_INST_IMUL:
     case X86_INST_AND:
     case X86_INST_OR:
-    case X86_INST_XOR: {
+    case X86_INST_XOR:
+    case X86_INST_SHL:
+    case X86_INST_SAR: {
       if (instruction->operand1.typ == X86_OPERAND_PSEUDO) {
         add_unique_name(&unique_names, instruction->operand1.pseudo);
       }
@@ -285,7 +291,9 @@ static intptr_t replace_pseudo_registers(X86FunctionDef* function)
     case X86_INST_IMUL:
     case X86_INST_AND:
     case X86_INST_OR:
-    case X86_INST_XOR: {
+    case X86_INST_XOR:
+    case X86_INST_SHL:
+    case X86_INST_SAR: {
       if (instruction->operand1.typ == X86_OPERAND_PSEUDO) {
         instruction->operand1 = x86_stack_operand(find_name_stack_offset(
             &unique_names, instruction->operand1.pseudo));
@@ -346,7 +354,10 @@ static void fix_invalid_instructions(X86FunctionDef* function,
     switch (instruction.typ) {
     case X86_INST_MOV:
     case X86_INST_ADD:
-    case X86_INST_SUB: {
+    case X86_INST_SUB:
+    case X86_INST_AND:
+    case X86_INST_OR:
+    case X86_INST_XOR: {
       fix_binary_operands(&new_instructions, instruction);
       break;
     }
