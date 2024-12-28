@@ -122,6 +122,22 @@ static void save_x86_asm_file(const char* filename, const X86Program* program)
   }
 }
 
+static void preprocess(const char* src_filename,
+                       const char* preprocessed_filename)
+{
+  enum { buffer_size = 10000 };
+  char buffer[buffer_size];
+
+  const int print_size = snprintf(buffer, buffer_size, "gcc -E -P %s -o %s",
+                                  src_filename, preprocessed_filename);
+  MCC_ASSERT_MSG(print_size < buffer_size,
+                 "Buffer too small to hold preprocessing command");
+  if (system(buffer)) {
+    (void)fprintf(stderr, "Failed to call the preprocessor");
+    exit(1);
+  }
+}
+
 int main(int argc, char* argv[])
 {
   // 4 GB virtual memory
@@ -134,14 +150,21 @@ int main(int argc, char* argv[])
 
   const char* src_filename = args.source_filename;
 
-  FILE* src_file = fopen(src_filename, "rb");
-  if (!src_file) {
-    (void)fprintf(stderr, "Mcc: fatal error: %s: No such file", src_filename);
+  const StringBuffer preprocessed_filename =
+      (replace_extension(src_filename, ".i", &permanent_arena));
+  const char* preprocessed_filename_cstr =
+      string_buffer_c_str(&preprocessed_filename);
+  preprocess(src_filename, preprocessed_filename_cstr);
+
+  FILE* preprocessed_file = fopen(preprocessed_filename_cstr, "rb");
+  if (!preprocessed_file) {
+    (void)fprintf(stderr, "Mcc: fatal error: %s: No such file",
+                  preprocessed_filename_cstr);
     return 1;
   }
 
-  const char* source = string_from_file(src_file, &permanent_arena);
-  fclose(src_file);
+  const char* source = string_from_file(preprocessed_file, &permanent_arena);
+  fclose(preprocessed_file);
 
   Tokens tokens = lex(source, &permanent_arena, scratch_arena);
   if (args.stop_after_lexer) {

@@ -1,9 +1,2 @@
-[commands]
-
-[commands.lexing]
-command = "{mcc} --lex {filename}"
-return_code = 0
-
-[commands.fail-parsing]
 command = "{mcc} --parse {filename}"
 return_code = 1

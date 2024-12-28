@@ -92,6 +92,7 @@ async fn run_test(database: &TestDatabase, config: &TestConfig) -> Result<(), Te
     // Remove generated files
     use tokio::fs::remove_file;
     let _ = remove_file(path.with_extension("o")).await;
+    let _ = remove_file(path.with_extension("i")).await;
     let _ = remove_file(path.with_extension("s")).await;
     let _ = remove_file(path.with_extension("")).await;
 
