@@ -15,8 +15,9 @@ typedef enum ExprType {
 
 typedef enum UnaryOpType {
   UNARY_OP_INVALID = 0,
-  UNARY_OP_MINUS,                   // -
+  UNARY_OP_NEGATION,                // -
   UNARY_OP_BITWISE_TYPE_COMPLEMENT, // ~
+  UNARY_OP_NOT,                     // -
 } UnaryOpType;
 
 typedef enum BinaryOpType {
@@ -33,6 +34,16 @@ typedef enum BinaryOpType {
   BINARY_OP_BITWISE_XOR,
   BINARY_OP_SHIFT_LEFT,
   BINARY_OP_SHIFT_RIGHT,
+
+  BINARY_OP_AND, // logical and
+  BINARY_OP_OR,  // logical or
+
+  BINARY_OP_EQUAL,
+  BINARY_OP_NOT_EQUAL,
+  BINARY_OP_LESS,
+  BINARY_OP_LESS_EQUAL,
+  BINARY_OP_GREATER,
+  BINARY_OP_GREATER_EQUAL,
 } BinaryOpType;
 
 typedef struct Expr Expr;

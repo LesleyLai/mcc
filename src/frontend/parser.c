@@ -145,8 +145,8 @@ static Expr* parse_number_literal(Parser* parser)
 typedef enum Precedence {
   PREC_NONE = 0,
   PREC_ASSIGNMENT,  // =
-  PREC_OR,          // or
-  PREC_AND,         // and
+  PREC_OR,          // ||
+  PREC_AND,         // &&
   PREC_BITWISE_OR,  // |
   PREC_BITWISE_XOR, // ^
   PREC_BITWISE_AND, // &
@@ -190,7 +190,22 @@ static ParseRule rules[TOKEN_TYPES_COUNT] = {
                          PREC_BITWISE_AND},
     [TOKEN_CARET] = {NULL, parse_binary_op_left_associative, PREC_BITWISE_XOR},
     [TOKEN_BAR] = {NULL, parse_binary_op_left_associative, PREC_BITWISE_OR},
+
+    [TOKEN_AMPERSAND_AMPERSAND] = {NULL, parse_binary_op_left_associative,
+                                   PREC_AND},
+    [TOKEN_BAR_BAR] = {NULL, parse_binary_op_left_associative, PREC_OR},
+    [TOKEN_EQUAL_EQUAL] = {NULL, parse_binary_op_left_associative,
+                           PREC_EQUALITY},
+    [TOKEN_NOT] = {parse_unary_op, NULL, PREC_UNARY},
+    [TOKEN_NOT_EQUAL] = {NULL, parse_binary_op_left_associative, PREC_EQUALITY},
+
+    [TOKEN_LESS] = {NULL, parse_binary_op_left_associative, PREC_COMPARISON},
+    [TOKEN_LESS_EQUAL] = {NULL, parse_binary_op_left_associative,
+                          PREC_COMPARISON},
     [TOKEN_LESS_LESS] = {NULL, parse_binary_op_left_associative, PREC_SHIFT},
+    [TOKEN_GREATER] = {NULL, parse_binary_op_left_associative, PREC_COMPARISON},
+    [TOKEN_GREATER_EQUAL] = {NULL, parse_binary_op_left_associative,
+                             PREC_COMPARISON},
     [TOKEN_GREATER_GREATER] = {NULL, parse_binary_op_left_associative,
                                PREC_SHIFT},
     [TOKEN_TILDE] = {parse_unary_op, NULL, PREC_TERM},
@@ -247,10 +262,11 @@ static Expr* parse_unary_op(Parser* parser)
 {
   Token operator_token = parser_previous_token(parser);
 
-  UnaryOpType operator_type = 0xdeadbeef;
+  UnaryOpType operator_type;
   switch (operator_token.type) {
-  case TOKEN_MINUS: operator_type = UNARY_OP_MINUS; break;
+  case TOKEN_MINUS: operator_type = UNARY_OP_NEGATION; break;
   case TOKEN_TILDE: operator_type = UNARY_OP_BITWISE_TYPE_COMPLEMENT; break;
+  case TOKEN_NOT: operator_type = UNARY_OP_NOT; break;
   default: MCC_ASSERT_MSG(false, "Unexpected operator");
   }
 
@@ -286,7 +302,14 @@ static BinaryOpType binop_type_from_token_type(TokenType token_type)
   case TOKEN_AMPERSAND: return BINARY_OP_BITWISE_AND;
   case TOKEN_CARET: return BINARY_OP_BITWISE_XOR;
   case TOKEN_BAR: return BINARY_OP_BITWISE_OR;
-
+  case TOKEN_AMPERSAND_AMPERSAND: return BINARY_OP_AND;
+  case TOKEN_BAR_BAR: return BINARY_OP_OR;
+  case TOKEN_EQUAL_EQUAL: return BINARY_OP_EQUAL;
+  case TOKEN_NOT_EQUAL: return BINARY_OP_NOT_EQUAL;
+  case TOKEN_LESS: return BINARY_OP_LESS;
+  case TOKEN_LESS_EQUAL: return BINARY_OP_LESS_EQUAL;
+  case TOKEN_GREATER: return BINARY_OP_GREATER;
+  case TOKEN_GREATER_EQUAL: return BINARY_OP_GREATER_EQUAL;
   default: MCC_UNREACHABLE();
   }
 }

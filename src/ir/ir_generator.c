@@ -29,8 +29,9 @@ static IRInstructionType instruction_typ_from_unary_op(UnaryOpType op_type)
 {
   switch (op_type) {
   case UNARY_OP_INVALID: MCC_UNREACHABLE();
-  case UNARY_OP_MINUS: return IR_NEG;
+  case UNARY_OP_NEGATION: return IR_NEG;
   case UNARY_OP_BITWISE_TYPE_COMPLEMENT: return IR_COMPLEMENT;
+  case UNARY_OP_NOT: MCC_UNIMPLEMENTED();
   }
   MCC_UNREACHABLE();
 }
@@ -49,6 +50,14 @@ static IRInstructionType instruction_typ_from_binary_op(BinaryOpType op_type)
   case BINARY_OP_BITWISE_XOR: return IR_BITWISE_XOR;
   case BINARY_OP_SHIFT_LEFT: return IR_SHIFT_LEFT;
   case BINARY_OP_SHIFT_RIGHT: return IR_SHIFT_RIGHT_ARITHMETIC;
+  case BINARY_OP_AND: MCC_UNIMPLEMENTED();
+  case BINARY_OP_OR: MCC_UNIMPLEMENTED();
+  case BINARY_OP_EQUAL: MCC_UNIMPLEMENTED();
+  case BINARY_OP_NOT_EQUAL: MCC_UNIMPLEMENTED();
+  case BINARY_OP_LESS: MCC_UNIMPLEMENTED();
+  case BINARY_OP_LESS_EQUAL: MCC_UNIMPLEMENTED();
+  case BINARY_OP_GREATER: MCC_UNIMPLEMENTED();
+  case BINARY_OP_GREATER_EQUAL: MCC_UNIMPLEMENTED();
   }
   MCC_UNREACHABLE();
 }
