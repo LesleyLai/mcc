@@ -14,7 +14,8 @@ static void print_source_range(SourceRange range)
 static const char* unary_op_name(UnaryOpType unary_op_type)
 {
   switch (unary_op_type) {
-  case UNARY_OP_TYPE_MINUS: return "-";
+  case UNARY_OP_INVALID: MCC_UNREACHABLE();
+  case UNARY_OP_MINUS: return "-";
   case UNARY_OP_BITWISE_TYPE_COMPLEMENT: return "~";
   }
   MCC_ASSERT_MSG(false, "invalid enum");
@@ -23,16 +24,17 @@ static const char* unary_op_name(UnaryOpType unary_op_type)
 static const char* binary_op_name(BinaryOpType binary_op_type)
 {
   switch (binary_op_type) {
-  case BINARY_OP_TYPE_PLUS: return "+";
-  case BINARY_OP_TYPE_MINUS: return "-";
-  case BINARY_OP_TYPE_MULT: return "*";
-  case BINARY_OP_TYPE_DIVIDE: return "/";
-  case BINARY_OP_TYPE_MOD: return "%";
-  case BINARY_OP_TYPE_BITWISE_AND: return "&";
-  case BINARY_OP_TYPE_BITWISE_OR: return "|";
-  case BINARY_OP_TYPE_BITWISE_XOR: return "^";
-  case BINARY_OP_TYPE_SHIFT_LEFT: return "<<";
-  case BINARY_OP_TYPE_SHIFT_RIGHT: return ">>";
+  case BINARY_OP_INVALID: MCC_UNREACHABLE();
+  case BINARY_OP_PLUS: return "+";
+  case BINARY_OP_MINUS: return "-";
+  case BINARY_OP_MULT: return "*";
+  case BINARY_OP_DIVIDE: return "/";
+  case BINARY_OP_MOD: return "%";
+  case BINARY_OP_BITWISE_AND: return "&";
+  case BINARY_OP_BITWISE_OR: return "|";
+  case BINARY_OP_BITWISE_XOR: return "^";
+  case BINARY_OP_SHIFT_LEFT: return "<<";
+  case BINARY_OP_SHIFT_RIGHT: return ">>";
   }
   MCC_ASSERT_MSG(false, "invalid enum");
 }
@@ -40,16 +42,15 @@ static const char* binary_op_name(BinaryOpType binary_op_type)
 static void ast_print_expr(Expr* expr, int indent)
 {
   switch (expr->type) {
-  case EXPR_TYPE_CONST:
-    printf("%*s%i\n", indent, "", expr->const_expr.val);
-    break;
-  case EXPR_TYPE_UNARY:
+  case EXPR_INVALID: MCC_UNREACHABLE();
+  case EXPR_CONST: printf("%*s%i\n", indent, "", expr->const_expr.val); break;
+  case EXPR_UNARY:
     printf("%*sUnaryOPExpr <", indent, "");
     print_source_range(expr->source_range);
     printf("> operator: %s\n", unary_op_name(expr->unary_op.unary_op_type));
     ast_print_expr(expr->unary_op.inner_expr, indent + 2);
     break;
-  case EXPR_TYPE_BINARY:
+  case EXPR_BINARY:
     printf("%*sBinaryOPExpr <", indent, "");
     print_source_range(expr->source_range);
     printf("> operator: %s\n", binary_op_name(expr->binary_op.binary_op_type));
@@ -64,10 +65,11 @@ static void ast_print_compound_stmt(CompoundStmt* stmt, int indent);
 static void ast_print_stmt(Stmt* stmt, int indent)
 {
   switch (stmt->type) {
-  case STMT_TYPE_COMPOUND:
+  case STMT_INVALID: MCC_UNREACHABLE();
+  case STMT_COMPOUND:
     ast_print_compound_stmt(&stmt->compound, indent + 2);
     break;
-  case STMT_TYPE_RETURN: {
+  case STMT_RETURN: {
     printf("%*sReturnStmt <", indent, "");
     print_source_range(stmt->source_range);
     printf(">\n");

@@ -132,7 +132,7 @@ static Expr* parse_number_literal(Parser* parser)
                  "Not used all characters for numbers");
 
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
-  *result = (Expr){.type = EXPR_TYPE_CONST,
+  *result = (Expr){.type = EXPR_CONST,
                    .source_range = token_source_range(token),
                    .const_expr = (struct ConstExpr){.val = val}};
   return result;
@@ -249,7 +249,7 @@ static Expr* parse_unary_op(Parser* parser)
 
   UnaryOpType operator_type = 0xdeadbeef;
   switch (operator_token.type) {
-  case TOKEN_MINUS: operator_type = UNARY_OP_TYPE_MINUS; break;
+  case TOKEN_MINUS: operator_type = UNARY_OP_MINUS; break;
   case TOKEN_TILDE: operator_type = UNARY_OP_BITWISE_TYPE_COMPLEMENT; break;
   default: MCC_ASSERT_MSG(false, "Unexpected operator");
   }
@@ -265,7 +265,7 @@ static Expr* parse_unary_op(Parser* parser)
                                         expr->source_range);
 
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
-  *result = (Expr){.type = EXPR_TYPE_UNARY,
+  *result = (Expr){.type = EXPR_UNARY,
                    .source_range = result_source_range,
                    .unary_op = (struct UnaryOpExpr){
                        .unary_op_type = operator_type, .inner_expr = expr}};
@@ -276,16 +276,16 @@ static Expr* parse_unary_op(Parser* parser)
 static BinaryOpType binop_type_from_token_type(TokenType token_type)
 {
   switch (token_type) {
-  case TOKEN_PLUS: return BINARY_OP_TYPE_PLUS;
-  case TOKEN_MINUS: return BINARY_OP_TYPE_MINUS;
-  case TOKEN_STAR: return BINARY_OP_TYPE_MULT;
-  case TOKEN_SLASH: return BINARY_OP_TYPE_DIVIDE;
-  case TOKEN_PERCENT: return BINARY_OP_TYPE_MOD;
-  case TOKEN_LESS_LESS: return BINARY_OP_TYPE_SHIFT_LEFT;
-  case TOKEN_GREATER_GREATER: return BINARY_OP_TYPE_SHIFT_RIGHT;
-  case TOKEN_AMPERSAND: return BINARY_OP_TYPE_BITWISE_AND;
-  case TOKEN_CARET: return BINARY_OP_TYPE_BITWISE_XOR;
-  case TOKEN_BAR: return BINARY_OP_TYPE_BITWISE_OR;
+  case TOKEN_PLUS: return BINARY_OP_PLUS;
+  case TOKEN_MINUS: return BINARY_OP_MINUS;
+  case TOKEN_STAR: return BINARY_OP_MULT;
+  case TOKEN_SLASH: return BINARY_OP_DIVIDE;
+  case TOKEN_PERCENT: return BINARY_OP_MOD;
+  case TOKEN_LESS_LESS: return BINARY_OP_SHIFT_LEFT;
+  case TOKEN_GREATER_GREATER: return BINARY_OP_SHIFT_RIGHT;
+  case TOKEN_AMPERSAND: return BINARY_OP_BITWISE_AND;
+  case TOKEN_CARET: return BINARY_OP_BITWISE_XOR;
+  case TOKEN_BAR: return BINARY_OP_BITWISE_OR;
 
   default: MCC_UNREACHABLE();
   }
@@ -306,7 +306,7 @@ static Expr* parse_binary_op_left_associative(Parser* parser, Expr* lhs_expr)
   SourceRange result_source_range = token_source_range(operator_token);
 
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
-  *result = (Expr){.type = EXPR_TYPE_BINARY,
+  *result = (Expr){.type = EXPR_BINARY,
                    .source_range = result_source_range,
                    .binary_op = (struct BinaryOpExpr){
                        .binary_op_type = binary_op_type,
@@ -372,7 +372,7 @@ static void parse_stmt(Parser* parser, Stmt* out_stmt)
     parse_return_stmt(parser, &return_stmt);
 
     *out_stmt =
-        (Stmt){.type = STMT_TYPE_RETURN,
+        (Stmt){.type = STMT_RETURN,
                .source_range = {.begin = first_loc,
                                 .end = parser_previous_token(parser).location},
                .ret = return_stmt};
@@ -386,7 +386,7 @@ static void parse_stmt(Parser* parser, Stmt* out_stmt)
     parse_compound_stmt(parser, &compound);
 
     *out_stmt =
-        (Stmt){.type = STMT_TYPE_COMPOUND,
+        (Stmt){.type = STMT_COMPOUND,
                .source_range = {.begin = first_loc,
                                 .end = parser_previous_token(parser).location},
                .compound = compound};

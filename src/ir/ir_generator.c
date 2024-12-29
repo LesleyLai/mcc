@@ -28,7 +28,8 @@ static IRValue ir_variable(StringView name)
 static IRInstructionType instruction_typ_from_unary_op(UnaryOpType op_type)
 {
   switch (op_type) {
-  case UNARY_OP_TYPE_MINUS: return IR_NEG;
+  case UNARY_OP_INVALID: MCC_UNREACHABLE();
+  case UNARY_OP_MINUS: return IR_NEG;
   case UNARY_OP_BITWISE_TYPE_COMPLEMENT: return IR_COMPLEMENT;
   }
   MCC_UNREACHABLE();
@@ -37,16 +38,17 @@ static IRInstructionType instruction_typ_from_unary_op(UnaryOpType op_type)
 static IRInstructionType instruction_typ_from_binary_op(BinaryOpType op_type)
 {
   switch (op_type) {
-  case BINARY_OP_TYPE_PLUS: return IR_ADD;
-  case BINARY_OP_TYPE_MINUS: return IR_SUB;
-  case BINARY_OP_TYPE_MULT: return IR_MUL;
-  case BINARY_OP_TYPE_DIVIDE: return IR_DIV;
-  case BINARY_OP_TYPE_MOD: return IR_MOD;
-  case BINARY_OP_TYPE_BITWISE_AND: return IR_BITWISE_AND;
-  case BINARY_OP_TYPE_BITWISE_OR: return IR_BITWISE_OR;
-  case BINARY_OP_TYPE_BITWISE_XOR: return IR_BITWISE_XOR;
-  case BINARY_OP_TYPE_SHIFT_LEFT: return IR_SHIFT_LEFT;
-  case BINARY_OP_TYPE_SHIFT_RIGHT: return IR_SHIFT_RIGHT_ARITHMETIC;
+  case BINARY_OP_INVALID: MCC_UNREACHABLE();
+  case BINARY_OP_PLUS: return IR_ADD;
+  case BINARY_OP_MINUS: return IR_SUB;
+  case BINARY_OP_MULT: return IR_MUL;
+  case BINARY_OP_DIVIDE: return IR_DIV;
+  case BINARY_OP_MOD: return IR_MOD;
+  case BINARY_OP_BITWISE_AND: return IR_BITWISE_AND;
+  case BINARY_OP_BITWISE_OR: return IR_BITWISE_OR;
+  case BINARY_OP_BITWISE_XOR: return IR_BITWISE_XOR;
+  case BINARY_OP_SHIFT_LEFT: return IR_SHIFT_LEFT;
+  case BINARY_OP_SHIFT_RIGHT: return IR_SHIFT_RIGHT_ARITHMETIC;
   }
   MCC_UNREACHABLE();
 }
@@ -77,10 +79,11 @@ static IRValue emit_ir_instructions_from_expr(const Expr* expr,
                                               IRGenContext* context)
 {
   switch (expr->type) {
-  case EXPR_TYPE_CONST:
+  case EXPR_INVALID: MCC_UNREACHABLE();
+  case EXPR_CONST:
     return (IRValue){.typ = IR_VALUE_TYPE_CONSTANT,
                      .constant = expr->const_expr.val};
-  case EXPR_TYPE_UNARY: {
+  case EXPR_UNARY: {
     const IRValue src =
         emit_ir_instructions_from_expr(expr->unary_op.inner_expr, context);
 
@@ -94,7 +97,7 @@ static IRValue emit_ir_instructions_from_expr(const Expr* expr,
 
     return dst;
   }
-  case EXPR_TYPE_BINARY: {
+  case EXPR_BINARY: {
     const IRInstructionType instruction_type =
         instruction_typ_from_binary_op(expr->binary_op.binary_op_type);
 
@@ -137,7 +140,8 @@ generate_ir_function_def(const FunctionDecl* decl, Arena* permanent_arena,
   for (size_t i = 0; i < decl->body->statement_count; ++i) {
     const Stmt stmt = decl->body->statements[i];
     switch (stmt.type) {
-    case STMT_TYPE_RETURN: {
+    case STMT_INVALID: MCC_UNREACHABLE();
+    case STMT_RETURN: {
       IRValue return_value =
           emit_ir_instructions_from_expr(stmt.ret.expr, &context);
 
@@ -145,7 +149,7 @@ generate_ir_function_def(const FunctionDecl* decl, Arena* permanent_arena,
                        ir_single_operand_instr(IR_RETURN, return_value));
       break;
     }
-    case STMT_TYPE_COMPOUND: MCC_UNIMPLEMENTED(); break;
+    case STMT_COMPOUND: MCC_UNIMPLEMENTED(); break;
     }
     // TODO: handle other kinds of statements
   }

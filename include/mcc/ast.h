@@ -7,28 +7,32 @@
 #include <stdlib.h>
 
 typedef enum ExprType {
-  EXPR_TYPE_CONST,
-  EXPR_TYPE_UNARY,
-  EXPR_TYPE_BINARY
+  EXPR_INVALID = 0,
+  EXPR_CONST,
+  EXPR_UNARY,
+  EXPR_BINARY
 } ExprType;
 
 typedef enum UnaryOpType {
-  UNARY_OP_TYPE_MINUS,              // -
+  UNARY_OP_INVALID = 0,
+  UNARY_OP_MINUS,                   // -
   UNARY_OP_BITWISE_TYPE_COMPLEMENT, // ~
 } UnaryOpType;
 
 typedef enum BinaryOpType {
-  BINARY_OP_TYPE_PLUS,
-  BINARY_OP_TYPE_MINUS,
-  BINARY_OP_TYPE_MULT,
-  BINARY_OP_TYPE_DIVIDE,
-  BINARY_OP_TYPE_MOD,
+  BINARY_OP_INVALID = 0,
 
-  BINARY_OP_TYPE_BITWISE_AND,
-  BINARY_OP_TYPE_BITWISE_OR,
-  BINARY_OP_TYPE_BITWISE_XOR,
-  BINARY_OP_TYPE_SHIFT_LEFT,
-  BINARY_OP_TYPE_SHIFT_RIGHT,
+  BINARY_OP_PLUS,
+  BINARY_OP_MINUS,
+  BINARY_OP_MULT,
+  BINARY_OP_DIVIDE,
+  BINARY_OP_MOD,
+
+  BINARY_OP_BITWISE_AND,
+  BINARY_OP_BITWISE_OR,
+  BINARY_OP_BITWISE_XOR,
+  BINARY_OP_SHIFT_LEFT,
+  BINARY_OP_SHIFT_RIGHT,
 } BinaryOpType;
 
 typedef struct Expr Expr;
@@ -59,8 +63,9 @@ typedef struct Expr {
 } Expr;
 
 typedef enum StatementType {
-  STMT_TYPE_COMPOUND,
-  STMT_TYPE_RETURN
+  STMT_INVALID = 0,
+  STMT_COMPOUND,
+  STMT_RETURN
 } StatementType;
 
 typedef struct Stmt Stmt;
