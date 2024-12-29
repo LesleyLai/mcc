@@ -20,9 +20,19 @@ struct X86FunctionDef {
   X86Instruction* instructions;
 };
 
+// Size in bytes
+typedef enum X86Size {
+  X86_SZ_1 = 1,
+  X86_SZ_2 = 2,
+  X86_SZ_4 = 4,
+  X86_SZ_8 = 8,
+} X86Size;
+
 typedef enum X86Register {
   X86_REG_INVALID = 0,
   X86_REG_AX,
+  X86_REG_BX,
+  X86_REG_CX,
   X86_REG_DX,
   X86_REG_R10,
   X86_REG_R11,
@@ -76,6 +86,7 @@ typedef enum X86InstructionType {
 
 struct X86Instruction {
   X86InstructionType typ;
+  X86Size size;        // size in bytes
   X86Operand operand1; // Usually destination (in Intel syntax)
   X86Operand operand2;
 };

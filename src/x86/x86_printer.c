@@ -2,33 +2,83 @@
 
 #include <mcc/prelude.h>
 
-static const char* x86_register_name(X86Register reg)
+static const char* x86_register_name(X86Register reg, X86Size size)
 {
-  switch (reg) {
-  case X86_REG_INVALID: MCC_UNREACHABLE(); break;
-  case X86_REG_AX: return "eax";
-  case X86_REG_DX: return "edx";
-  case X86_REG_R10: return "r10d";
-  case X86_REG_R11: return "r11d";
-  case X86_REG_SP: return "rsp";
+  switch (size) {
+  case X86_SZ_1: {
+    switch (reg) {
+    case X86_REG_INVALID: MCC_UNREACHABLE(); break;
+    case X86_REG_AX: return "al";
+    case X86_REG_BX: return "bl";
+    case X86_REG_CX: return "cl";
+    case X86_REG_DX: return "dl";
+    case X86_REG_R10: return "r10b";
+    case X86_REG_R11: return "r11b";
+    case X86_REG_SP: return "spl";
+    }
+    MCC_UNREACHABLE();
+  }
+  case X86_SZ_2: MCC_UNREACHABLE(); break;
+  case X86_SZ_4: {
+    switch (reg) {
+    case X86_REG_INVALID: MCC_UNREACHABLE(); break;
+    case X86_REG_AX: return "eax";
+    case X86_REG_BX: return "ebx";
+    case X86_REG_CX: return "ecx";
+    case X86_REG_DX: return "edx";
+    case X86_REG_R10: return "r10d";
+    case X86_REG_R11: return "r11d";
+    case X86_REG_SP: return "esp";
+    }
+    MCC_UNREACHABLE();
+  }
+  case X86_SZ_8: {
+    switch (reg) {
+    case X86_REG_INVALID: MCC_UNREACHABLE(); break;
+    case X86_REG_AX: return "rax";
+    case X86_REG_BX: return "rbx";
+    case X86_REG_CX: return "rcx";
+    case X86_REG_DX: return "rdx";
+    case X86_REG_R10: return "r10";
+    case X86_REG_R11: return "r11";
+    case X86_REG_SP: return "rsp";
+    }
+    MCC_UNREACHABLE();
+  }
   }
   MCC_UNREACHABLE();
 }
 
-static void print_x86_operand(X86Operand operand, FILE* stream)
+static const char* size_directive(X86Size size)
+{
+  switch (size) {
+  case X86_SZ_1: return "byte ptr";
+  case X86_SZ_2: return "word ptr";
+  case X86_SZ_4: return "dword ptr";
+  case X86_SZ_8: return "qword ptr";
+  }
+  MCC_UNREACHABLE();
+}
+
+static void print_x86_operand(X86Operand operand, X86Size size, FILE* stream)
 {
   switch (operand.typ) {
   case X86_OPERAND_INVALID: MCC_UNREACHABLE(); break;
-  case X86_OPERAND_IMMEDIATE: (void)fprintf(stream, "%i", operand.imm); break;
+  case X86_OPERAND_IMMEDIATE: {
+    MCC_ASSERT_MSG(size >= X86_SZ_4,
+                   "Only support 4 or 8 bytes immediate operand for now");
+    (void)fprintf(stream, "%i", operand.imm);
+  } break;
   case X86_OPERAND_REGISTER:
-    (void)fprintf(stream, "%s", x86_register_name(operand.reg));
+    (void)fprintf(stream, "%s", x86_register_name(operand.reg, size));
     break;
   case X86_OPERAND_PSEUDO:
     (void)fprintf(stream, "%*s", (int)operand.pseudo.size,
                   operand.pseudo.start);
     break;
   case X86_OPERAND_STACK:
-    (void)fprintf(stream, "dword ptr [rbp-%li]", operand.stack.offset);
+    (void)fprintf(stream, "%s [rbp-%li]", size_directive(size),
+                  operand.stack.offset);
     break;
   }
 }
@@ -37,16 +87,16 @@ static void print_unary_instruction(const char* name,
                                     X86Instruction instruction, FILE* stream)
 {
   (void)fprintf(stream, "  %-6s ", name);
-  print_x86_operand(instruction.operand1, stream);
+  print_x86_operand(instruction.operand1, instruction.size, stream);
 }
 
 static void print_binary_instruction(const char* name,
                                      X86Instruction instruction, FILE* stream)
 {
   (void)fprintf(stream, "  %-6s ", name);
-  print_x86_operand(instruction.operand1, stream);
+  print_x86_operand(instruction.operand1, instruction.size, stream);
   (void)fputs(", ", stream);
-  print_x86_operand(instruction.operand2, stream);
+  print_x86_operand(instruction.operand2, instruction.size, stream);
 }
 
 void x86_print_instruction(X86Instruction instruction, FILE* stream)

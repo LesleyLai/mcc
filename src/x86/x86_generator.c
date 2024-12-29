@@ -64,12 +64,14 @@ static void push_unary_instruction(X86InstructionVector* instructions,
 
   push_instruction(instructions, (X86Instruction){
                                      .typ = X86_INST_MOV,
+                                     .size = X86_SZ_4,
                                      .operand1 = dst,
                                      .operand2 = src,
                                  });
 
   push_instruction(instructions, (X86Instruction){
                                      .typ = type,
+                                     .size = X86_SZ_4,
                                      .operand1 = dst,
                                  });
 }
@@ -82,12 +84,14 @@ static void push_binary_instruction(X86InstructionVector* instructions,
   const X86Operand lhs = x86_operand_from_ir(ir_instruction->operand2);
   const X86Operand rhs = x86_operand_from_ir(ir_instruction->operand3);
 
-  push_instruction(
-      instructions,
-      (X86Instruction){.typ = X86_INST_MOV, .operand1 = dst, .operand2 = lhs});
-  push_instruction(
-      instructions,
-      (X86Instruction){.typ = type, .operand1 = dst, .operand2 = rhs});
+  push_instruction(instructions, (X86Instruction){.typ = X86_INST_MOV,
+                                                  .size = X86_SZ_4,
+                                                  .operand1 = dst,
+                                                  .operand2 = lhs});
+  push_instruction(instructions, (X86Instruction){.typ = type,
+                                                  .size = X86_SZ_4,
+                                                  .operand1 = dst,
+                                                  .operand2 = rhs});
 }
 
 static void push_div_mod_instruction(X86InstructionVector* instructions,
@@ -98,6 +102,7 @@ static void push_div_mod_instruction(X86InstructionVector* instructions,
       instructions,
       (X86Instruction){
           .typ = X86_INST_MOV,
+          .size = X86_SZ_4,
           .operand1 = x86_register_operand(X86_REG_AX),
           .operand2 = x86_operand_from_ir(ir_instruction->operand2),
       });
@@ -108,6 +113,7 @@ static void push_div_mod_instruction(X86InstructionVector* instructions,
   // idiv <rhs>
   push_instruction(instructions,
                    (X86Instruction){.typ = X86_INST_IDIV,
+                                    .size = X86_SZ_4,
                                     .operand1 = x86_operand_from_ir(
                                         ir_instruction->operand3)});
 
@@ -122,6 +128,7 @@ static void push_div_mod_instruction(X86InstructionVector* instructions,
 
   push_instruction(instructions, (X86Instruction){
                                      .typ = X86_INST_MOV,
+                                     .size = X86_SZ_4,
                                      .operand1 = x86_operand_from_ir(
                                          ir_instruction->operand1),
                                      .operand2 = src,
@@ -144,6 +151,7 @@ generate_x86_function_def(const IRFunctionDef* ir_function,
           &instructions,
           (X86Instruction){
               .typ = X86_INST_MOV,
+              .size = X86_SZ_4,
               .operand1 = x86_register_operand(X86_REG_AX),
               .operand2 = x86_operand_from_ir(ir_instruction->operand1),
           });
@@ -311,22 +319,42 @@ static intptr_t replace_pseudo_registers(X86FunctionDef* function)
 
 // Fix this binary instruction if both source and destination are memory
 // addresses
-static void fix_binary_operands(X86InstructionVector* new_instructions,
-                                X86Instruction instruction)
+static void fix_binary_instruction(X86InstructionVector* new_instructions,
+                                   X86Instruction instruction)
 {
   if (instruction.operand1.typ == X86_OPERAND_STACK &&
       instruction.operand2.typ == X86_OPERAND_STACK) {
     push_instruction(
         new_instructions,
         (X86Instruction){.typ = X86_INST_MOV,
+                         .size = instruction.size,
                          .operand1 = x86_register_operand(X86_REG_R10),
                          .operand2 = instruction.operand2});
 
     push_instruction(
         new_instructions,
         (X86Instruction){.typ = instruction.typ,
+                         .size = instruction.size,
                          .operand1 = instruction.operand1,
                          .operand2 = x86_register_operand(X86_REG_R10)});
+  } else {
+    push_instruction(new_instructions, instruction);
+  }
+}
+
+static void fix_shift_instruction(X86InstructionVector* new_instructions,
+                                  X86Instruction instruction)
+{
+  if (instruction.operand2.typ == X86_OPERAND_STACK) {
+    push_instruction(
+        new_instructions,
+        (X86Instruction){.typ = X86_INST_MOV,
+                         .size = X86_SZ_1,
+                         .operand1 = x86_register_operand(X86_REG_CX),
+                         .operand2 = instruction.operand2});
+
+    instruction.operand2 = x86_register_operand(X86_REG_CX);
+    push_instruction(new_instructions, instruction);
   } else {
     push_instruction(new_instructions, instruction);
   }
@@ -343,8 +371,8 @@ static void fix_invalid_instructions(X86FunctionDef* function,
     push_instruction(
         &new_instructions,
         (X86Instruction){.typ = X86_INST_SUB,
+                         .size = X86_SZ_8,
                          .operand1 = x86_register_operand(X86_REG_SP),
-                         // TODO: properly handle different size of operands
                          .operand2 = x86_immediate_operand((int)stack_size)});
   }
   for (size_t j = 0; j < function->instruction_count; ++j) {
@@ -358,7 +386,7 @@ static void fix_invalid_instructions(X86FunctionDef* function,
     case X86_INST_AND:
     case X86_INST_OR:
     case X86_INST_XOR: {
-      fix_binary_operands(&new_instructions, instruction);
+      fix_binary_instruction(&new_instructions, instruction);
       break;
     }
 
@@ -369,16 +397,19 @@ static void fix_invalid_instructions(X86FunctionDef* function,
         push_instruction(
             &new_instructions,
             (X86Instruction){.typ = X86_INST_MOV,
+                             .size = instruction.size,
                              .operand1 = x86_register_operand(X86_REG_R11),
                              .operand2 = instruction.operand1});
         push_instruction(
             &new_instructions,
             (X86Instruction){.typ = X86_INST_IMUL,
+                             .size = instruction.size,
                              .operand1 = x86_register_operand(X86_REG_R11),
                              .operand2 = instruction.operand2});
         push_instruction(
             &new_instructions,
             (X86Instruction){.typ = X86_INST_MOV,
+                             .size = instruction.size,
                              .operand1 = instruction.operand1,
                              .operand2 = x86_register_operand(X86_REG_R11)});
       } else {
@@ -394,17 +425,23 @@ static void fix_invalid_instructions(X86FunctionDef* function,
         push_instruction(
             &new_instructions,
             (X86Instruction){.typ = X86_INST_MOV,
+                             .size = instruction.size,
                              .operand1 = x86_register_operand(X86_REG_R10),
                              .operand2 = instruction.operand1});
         push_instruction(
             &new_instructions,
             (X86Instruction){.typ = X86_INST_IDIV,
+                             .size = instruction.size,
                              .operand1 = x86_register_operand(X86_REG_R10)});
       } else {
         push_instruction(&new_instructions, instruction);
       }
       break;
-    default: push_instruction(&new_instructions, function->instructions[j]);
+    case X86_INST_SHL:
+    case X86_INST_SAR:
+      fix_shift_instruction(&new_instructions, instruction);
+      break;
+    default: push_instruction(&new_instructions, instruction);
     }
   }
 
