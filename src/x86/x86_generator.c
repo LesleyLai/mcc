@@ -166,6 +166,8 @@ generate_x86_function_def(const IRFunctionDef* ir_function,
     case IR_COMPLEMENT:
       push_unary_instruction(&instructions, X86_INST_NOT, ir_instruction);
       break;
+    case IR_NOT: MCC_UNIMPLEMENTED(); break;
+
     case IR_ADD:
       push_binary_instruction(&instructions, X86_INST_ADD, ir_instruction);
       break;
@@ -193,6 +195,12 @@ generate_x86_function_def(const IRFunctionDef* ir_function,
       push_binary_instruction(&instructions, X86_INST_SAR, ir_instruction);
       break;
     case IR_SHIFT_RIGHT_LOGICAL: MCC_UNIMPLEMENTED(); break;
+    case IR_EQUAL: MCC_UNIMPLEMENTED(); break;
+    case IR_NOT_EQUAL: MCC_UNIMPLEMENTED(); break;
+    case IR_LESS: MCC_UNIMPLEMENTED(); break;
+    case IR_LESS_EQUAL: MCC_UNIMPLEMENTED(); break;
+    case IR_GREATER: MCC_UNIMPLEMENTED(); break;
+    case IR_GREATER_EQUAL: MCC_UNIMPLEMENTED(); break;
     }
   }
 

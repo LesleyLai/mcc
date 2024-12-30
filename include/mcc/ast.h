@@ -17,7 +17,7 @@ typedef enum UnaryOpType {
   UNARY_OP_INVALID = 0,
   UNARY_OP_NEGATION,                // -
   UNARY_OP_BITWISE_TYPE_COMPLEMENT, // ~
-  UNARY_OP_NOT,                     // -
+  UNARY_OP_NOT,                     // !
 } UnaryOpType;
 
 typedef enum BinaryOpType {

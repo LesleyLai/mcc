@@ -15,9 +15,9 @@ static const char* unary_op_name(UnaryOpType unary_op_type)
 {
   switch (unary_op_type) {
   case UNARY_OP_INVALID: MCC_UNREACHABLE();
-  case UNARY_OP_NOT: return "not";
   case UNARY_OP_NEGATION: return "negation";
   case UNARY_OP_BITWISE_TYPE_COMPLEMENT: return "complement";
+  case UNARY_OP_NOT: return "not";
   }
   MCC_ASSERT_MSG(false, "invalid enum");
 }
@@ -26,24 +26,24 @@ static const char* binary_op_name(BinaryOpType binary_op_type)
 {
   switch (binary_op_type) {
   case BINARY_OP_INVALID: MCC_UNREACHABLE();
-  case BINARY_OP_PLUS: return "plus";
-  case BINARY_OP_MINUS: return "minus";
-  case BINARY_OP_MULT: return "mult";
-  case BINARY_OP_DIVIDE: return "divide";
+  case BINARY_OP_PLUS: return "+";
+  case BINARY_OP_MINUS: return "-";
+  case BINARY_OP_MULT: return "*";
+  case BINARY_OP_DIVIDE: return "/";
   case BINARY_OP_MOD: return "mod";
   case BINARY_OP_BITWISE_AND: return "bit-and";
   case BINARY_OP_BITWISE_OR: return "bit-or";
   case BINARY_OP_BITWISE_XOR: return "xor";
-  case BINARY_OP_SHIFT_LEFT: return "left-shift";
-  case BINARY_OP_SHIFT_RIGHT: return "right-shift";
-  case BINARY_OP_AND: return "logical-and";
-  case BINARY_OP_OR: return "logical-or";
+  case BINARY_OP_SHIFT_LEFT: return "<<";
+  case BINARY_OP_SHIFT_RIGHT: return ">>";
+  case BINARY_OP_AND: return "and";
+  case BINARY_OP_OR: return "or";
   case BINARY_OP_EQUAL: return "equal";
-  case BINARY_OP_NOT_EQUAL: return "not equal";
-  case BINARY_OP_LESS: return "less";
-  case BINARY_OP_LESS_EQUAL: return "less-equal";
-  case BINARY_OP_GREATER: return "greater";
-  case BINARY_OP_GREATER_EQUAL: return "greater-equal";
+  case BINARY_OP_NOT_EQUAL: return "!=";
+  case BINARY_OP_LESS: return "<";
+  case BINARY_OP_LESS_EQUAL: return "<=";
+  case BINARY_OP_GREATER: return ">";
+  case BINARY_OP_GREATER_EQUAL: return ">=";
   }
   MCC_ASSERT_MSG(false, "invalid enum");
 }

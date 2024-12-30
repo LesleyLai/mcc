@@ -43,6 +43,7 @@ typedef enum IRInstructionType {
   // unary
   IR_NEG,        // dest = -src
   IR_COMPLEMENT, // dest = ~src
+  IR_NOT,        // dest = !src
 
   // binary
   IR_ADD,                    // dest = src1 + src2
@@ -56,7 +57,12 @@ typedef enum IRInstructionType {
   IR_SHIFT_LEFT,             // dest = src1 << src2
   IR_SHIFT_RIGHT_ARITHMETIC, // dest = src1 >> src2
   IR_SHIFT_RIGHT_LOGICAL,    // dest = (unsigned)src1 >> (unsigned)src2
-
+  IR_EQUAL,                  // dest = src1 == src2
+  IR_NOT_EQUAL,              // dest = src1 != src2
+  IR_LESS,                   // dest = src1 < src2
+  IR_LESS_EQUAL,             // dest = src1 <= src2
+  IR_GREATER,                // dest = src1 > src2
+  IR_GREATER_EQUAL,          // dest = src1 >= src2
 } IRInstructionType;
 
 typedef struct IRInstruction {

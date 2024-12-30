@@ -47,6 +47,7 @@ void print_ir(const IRProgram* ir)
       } break;
       case IR_NEG: print_unary_op(instruction, "neg"); break;
       case IR_COMPLEMENT: print_unary_op(instruction, "complement"); break;
+      case IR_NOT: print_unary_op(instruction, "not"); break;
       case IR_ADD: print_binary_op(instruction, "add"); break;
       case IR_SUB: print_binary_op(instruction, "sub"); break;
       case IR_MUL: print_binary_op(instruction, "mul"); break;
@@ -60,6 +61,12 @@ void print_ir(const IRProgram* ir)
         print_binary_op(instruction, "ashr");
         break;
       case IR_SHIFT_RIGHT_LOGICAL: print_binary_op(instruction, "lshr"); break;
+      case IR_EQUAL: print_binary_op(instruction, "eq"); break;
+      case IR_NOT_EQUAL: print_binary_op(instruction, "ne"); break;
+      case IR_LESS: print_binary_op(instruction, "lt"); break;
+      case IR_LESS_EQUAL: print_binary_op(instruction, "le"); break;
+      case IR_GREATER: print_binary_op(instruction, "gt"); break;
+      case IR_GREATER_EQUAL: print_binary_op(instruction, "ge"); break;
       }
     }
   }
