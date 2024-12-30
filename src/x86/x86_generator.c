@@ -202,7 +202,27 @@ generate_x86_function_def(const IRFunctionDef* ir_function,
     case IR_COMPLEMENT:
       push_unary_instruction(&instructions, X86_INST_NOT, ir_instruction);
       break;
-    case IR_NOT: MCC_UNIMPLEMENTED(); break;
+    case IR_NOT: {
+      X86Operand dest = x86_operand_from_ir(ir_instruction->operand1);
+      X86Operand src = x86_operand_from_ir(ir_instruction->operand2);
+      // xor dest dest
+      push_instruction(&instructions, (X86Instruction){.typ = X86_INST_XOR,
+                                                       .size = X86_SZ_4,
+                                                       .operand1 = dest,
+                                                       .operand2 = dest});
+
+      // cmp src, 0
+      push_instruction(&instructions,
+                       (X86Instruction){.typ = X86_INST_CMP,
+                                        .size = X86_SZ_4,
+                                        .operand1 = src,
+                                        .operand2 = x86_immediate_operand(0)});
+
+      // sete dest
+      push_instruction(&instructions, (X86Instruction){.typ = X86_INST_SETE,
+                                                       .size = X86_SZ_4,
+                                                       .operand1 = dest});
+    } break;
 
     case IR_ADD:
       push_binary_instruction(&instructions, X86_INST_ADD, ir_instruction);
@@ -232,20 +252,10 @@ generate_x86_function_def(const IRFunctionDef* ir_function,
       break;
     case IR_SHIFT_RIGHT_LOGICAL: MCC_UNIMPLEMENTED(); break;
     case IR_EQUAL:
-      generate_comparison_instruction(&instructions, ir_instruction);
-      break;
     case IR_NOT_EQUAL:
-      generate_comparison_instruction(&instructions, ir_instruction);
-      break;
     case IR_LESS:
-      generate_comparison_instruction(&instructions, ir_instruction);
-      break;
     case IR_LESS_EQUAL:
-      generate_comparison_instruction(&instructions, ir_instruction);
-      break;
     case IR_GREATER:
-      generate_comparison_instruction(&instructions, ir_instruction);
-      break;
     case IR_GREATER_EQUAL:
       generate_comparison_instruction(&instructions, ir_instruction);
       break;
