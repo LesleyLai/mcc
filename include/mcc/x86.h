@@ -82,6 +82,16 @@ typedef enum X86InstructionType {
   X86_INST_SAR, // Arithemtic Right Shift
 
   X86_INST_CDQ, // extends the sign bit of eax into the edx register
+
+  X86_INST_CMP, // Compare
+
+  // conditional set instructions
+  X86_INST_SETE,
+  X86_INST_SETNE,
+  X86_INST_SETG,
+  X86_INST_SETGE,
+  X86_INST_SETL,
+  X86_INST_SETLE,
 } X86InstructionType;
 
 struct X86Instruction {

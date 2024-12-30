@@ -65,8 +65,6 @@ static void print_x86_operand(X86Operand operand, X86Size size, FILE* stream)
   switch (operand.typ) {
   case X86_OPERAND_INVALID: MCC_UNREACHABLE(); break;
   case X86_OPERAND_IMMEDIATE: {
-    MCC_ASSERT_MSG(size >= X86_SZ_4,
-                   "Only support 4 or 8 bytes immediate operand for now");
     (void)fprintf(stream, "%i", operand.imm);
   } break;
   case X86_OPERAND_REGISTER:
@@ -81,6 +79,13 @@ static void print_x86_operand(X86Operand operand, X86Size size, FILE* stream)
                   operand.stack.offset);
     break;
   }
+}
+
+static void print_cond_set_instruction(const char* name,
+                                       X86Instruction instruction, FILE* stream)
+{
+  (void)fprintf(stream, "  %-6s ", name);
+  print_x86_operand(instruction.operand1, X86_SZ_1, stream);
 }
 
 static void print_unary_instruction(const char* name,
@@ -139,6 +144,27 @@ void x86_print_instruction(X86Instruction instruction, FILE* stream)
     break;
   case X86_INST_SAR:
     print_binary_instruction("sar", instruction, stream);
+    break;
+  case X86_INST_CMP:
+    print_binary_instruction("cmp", instruction, stream);
+    break;
+  case X86_INST_SETE:
+    print_cond_set_instruction("sete", instruction, stream);
+    break;
+  case X86_INST_SETNE:
+    print_cond_set_instruction("setne", instruction, stream);
+    break;
+  case X86_INST_SETG:
+    print_cond_set_instruction("setg", instruction, stream);
+    break;
+  case X86_INST_SETGE:
+    print_cond_set_instruction("setge", instruction, stream);
+    break;
+  case X86_INST_SETL:
+    print_cond_set_instruction("setl", instruction, stream);
+    break;
+  case X86_INST_SETLE:
+    print_cond_set_instruction("setle", instruction, stream);
     break;
   }
 }

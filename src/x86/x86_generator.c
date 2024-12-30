@@ -135,6 +135,42 @@ static void push_div_mod_instruction(X86InstructionVector* instructions,
                                  });
 }
 
+static void generate_comparison_instruction(X86InstructionVector* instructions,
+                                            const IRInstruction* ir_instruction)
+{
+  const X86Operand dest = x86_operand_from_ir(ir_instruction->operand1);
+  const X86Operand lhs = x86_operand_from_ir(ir_instruction->operand2);
+  const X86Operand rhs = x86_operand_from_ir(ir_instruction->operand3);
+
+  X86InstructionType instruction;
+  switch (ir_instruction->typ) {
+  case IR_EQUAL: instruction = X86_INST_SETE; break;
+  case IR_NOT_EQUAL: instruction = X86_INST_SETNE; break;
+  case IR_LESS: instruction = X86_INST_SETL; break;
+  case IR_LESS_EQUAL: instruction = X86_INST_SETLE; break;
+  case IR_GREATER: instruction = X86_INST_SETG; break;
+  case IR_GREATER_EQUAL: instruction = X86_INST_SETGE; break;
+  default: MCC_UNREACHABLE();
+  }
+
+  // xor dest dest
+  push_instruction(instructions, (X86Instruction){.typ = X86_INST_XOR,
+                                                  .size = X86_SZ_4,
+                                                  .operand1 = dest,
+                                                  .operand2 = dest});
+
+  // cmp lhs, rhs
+  push_instruction(instructions, (X86Instruction){.typ = X86_INST_CMP,
+                                                  .size = X86_SZ_4,
+                                                  .operand1 = lhs,
+                                                  .operand2 = rhs});
+
+  // sete dest
+  push_instruction(
+      instructions,
+      (X86Instruction){.typ = instruction, .size = X86_SZ_4, .operand1 = dest});
+}
+
 // First pass to generate assembly. Still need fixing later
 static X86FunctionDef
 generate_x86_function_def(const IRFunctionDef* ir_function,
@@ -195,12 +231,24 @@ generate_x86_function_def(const IRFunctionDef* ir_function,
       push_binary_instruction(&instructions, X86_INST_SAR, ir_instruction);
       break;
     case IR_SHIFT_RIGHT_LOGICAL: MCC_UNIMPLEMENTED(); break;
-    case IR_EQUAL: MCC_UNIMPLEMENTED(); break;
-    case IR_NOT_EQUAL: MCC_UNIMPLEMENTED(); break;
-    case IR_LESS: MCC_UNIMPLEMENTED(); break;
-    case IR_LESS_EQUAL: MCC_UNIMPLEMENTED(); break;
-    case IR_GREATER: MCC_UNIMPLEMENTED(); break;
-    case IR_GREATER_EQUAL: MCC_UNIMPLEMENTED(); break;
+    case IR_EQUAL:
+      generate_comparison_instruction(&instructions, ir_instruction);
+      break;
+    case IR_NOT_EQUAL:
+      generate_comparison_instruction(&instructions, ir_instruction);
+      break;
+    case IR_LESS:
+      generate_comparison_instruction(&instructions, ir_instruction);
+      break;
+    case IR_LESS_EQUAL:
+      generate_comparison_instruction(&instructions, ir_instruction);
+      break;
+    case IR_GREATER:
+      generate_comparison_instruction(&instructions, ir_instruction);
+      break;
+    case IR_GREATER_EQUAL:
+      generate_comparison_instruction(&instructions, ir_instruction);
+      break;
     }
   }
 
@@ -275,7 +323,8 @@ static intptr_t replace_pseudo_registers(X86FunctionDef* function)
     case X86_INST_OR:
     case X86_INST_XOR:
     case X86_INST_SHL:
-    case X86_INST_SAR: {
+    case X86_INST_SAR:
+    case X86_INST_CMP: {
       if (instruction->operand1.typ == X86_OPERAND_PSEUDO) {
         add_unique_name(&unique_names, instruction->operand1.pseudo);
       }
@@ -284,6 +333,16 @@ static intptr_t replace_pseudo_registers(X86FunctionDef* function)
       }
     } break;
     case X86_INST_CDQ: break;
+    case X86_INST_SETE:
+    case X86_INST_SETNE:
+    case X86_INST_SETG:
+    case X86_INST_SETGE:
+    case X86_INST_SETL:
+    case X86_INST_SETLE: {
+      if (instruction->operand1.typ == X86_OPERAND_PSEUDO) {
+        add_unique_name(&unique_names, instruction->operand1.pseudo);
+      }
+    } break;
     }
   }
 
@@ -309,7 +368,8 @@ static intptr_t replace_pseudo_registers(X86FunctionDef* function)
     case X86_INST_OR:
     case X86_INST_XOR:
     case X86_INST_SHL:
-    case X86_INST_SAR: {
+    case X86_INST_SAR:
+    case X86_INST_CMP: {
       if (instruction->operand1.typ == X86_OPERAND_PSEUDO) {
         instruction->operand1 = x86_stack_operand(find_name_stack_offset(
             &unique_names, instruction->operand1.pseudo));
@@ -320,6 +380,17 @@ static intptr_t replace_pseudo_registers(X86FunctionDef* function)
       }
     } break;
     case X86_INST_CDQ: break;
+    case X86_INST_SETE:
+    case X86_INST_SETNE:
+    case X86_INST_SETG:
+    case X86_INST_SETGE:
+    case X86_INST_SETL:
+    case X86_INST_SETLE: {
+      if (instruction->operand1.typ == X86_OPERAND_PSEUDO) {
+        instruction->operand1 = x86_stack_operand(find_name_stack_offset(
+            &unique_names, instruction->operand1.pseudo));
+      }
+    } break;
     }
   }
   return unique_names.count * 4;
@@ -449,6 +520,33 @@ static void fix_invalid_instructions(X86FunctionDef* function,
     case X86_INST_SAR:
       fix_shift_instruction(&new_instructions, instruction);
       break;
+
+    case X86_INST_CMP: {
+      // the first argument of cmp can't be an immediate operands
+      const bool fisrt_is_immediate =
+          instruction.operand1.typ == X86_OPERAND_IMMEDIATE;
+
+      const bool both_are_address =
+          instruction.operand1.typ == X86_OPERAND_STACK &&
+          instruction.operand2.typ == X86_OPERAND_STACK;
+
+      if (fisrt_is_immediate || both_are_address) {
+        push_instruction(
+            &new_instructions,
+            (X86Instruction){.typ = X86_INST_MOV,
+                             .size = instruction.size,
+                             .operand1 = x86_register_operand(X86_REG_R10),
+                             .operand2 = instruction.operand1});
+        push_instruction(
+            &new_instructions,
+            (X86Instruction){.typ = X86_INST_CMP,
+                             .size = instruction.size,
+                             .operand1 = x86_register_operand(X86_REG_R10),
+                             .operand2 = instruction.operand2});
+      } else {
+        push_instruction(&new_instructions, instruction);
+      }
+    } break;
     default: push_instruction(&new_instructions, instruction);
     }
   }
