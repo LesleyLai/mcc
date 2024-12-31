@@ -81,27 +81,36 @@ static void print_x86_operand(X86Operand operand, X86Size size, FILE* stream)
   }
 }
 
-static void print_cond_set_instruction(const char* name,
-                                       X86Instruction instruction, FILE* stream)
+static void print_cond_set_instruction(X86Instruction instruction, FILE* stream)
 {
+  const char* name = nullptr;
+  switch (instruction.setcc.cond) {
+  case X86_COND_INVALID: MCC_UNREACHABLE(); break;
+  case X86_COND_E: name = "sete"; break;
+  case X86_COND_NE: name = "setne"; break;
+  case X86_COND_G: name = "setg"; break;
+  case X86_COND_GE: name = "setge"; break;
+  case X86_COND_L: name = "setl"; break;
+  case X86_COND_LE: name = "setle"; break;
+  }
   (void)fprintf(stream, "  %-6s ", name);
-  print_x86_operand(instruction.operand1, X86_SZ_1, stream);
+  print_x86_operand(instruction.setcc.op, X86_SZ_1, stream);
 }
 
 static void print_unary_instruction(const char* name,
                                     X86Instruction instruction, FILE* stream)
 {
   (void)fprintf(stream, "  %-6s ", name);
-  print_x86_operand(instruction.operand1, instruction.size, stream);
+  print_x86_operand(instruction.unary.op, instruction.unary.size, stream);
 }
 
 static void print_binary_instruction(const char* name,
                                      X86Instruction instruction, FILE* stream)
 {
   (void)fprintf(stream, "  %-6s ", name);
-  print_x86_operand(instruction.operand1, instruction.size, stream);
+  print_x86_operand(instruction.binary.dest, instruction.binary.size, stream);
   (void)fputs(", ", stream);
-  print_x86_operand(instruction.operand2, instruction.size, stream);
+  print_x86_operand(instruction.binary.src, instruction.binary.size, stream);
 }
 
 void x86_print_instruction(X86Instruction instruction, FILE* stream)
@@ -148,24 +157,7 @@ void x86_print_instruction(X86Instruction instruction, FILE* stream)
   case X86_INST_CMP:
     print_binary_instruction("cmp", instruction, stream);
     break;
-  case X86_INST_SETE:
-    print_cond_set_instruction("sete", instruction, stream);
-    break;
-  case X86_INST_SETNE:
-    print_cond_set_instruction("setne", instruction, stream);
-    break;
-  case X86_INST_SETG:
-    print_cond_set_instruction("setg", instruction, stream);
-    break;
-  case X86_INST_SETGE:
-    print_cond_set_instruction("setge", instruction, stream);
-    break;
-  case X86_INST_SETL:
-    print_cond_set_instruction("setl", instruction, stream);
-    break;
-  case X86_INST_SETLE:
-    print_cond_set_instruction("setle", instruction, stream);
-    break;
+  case X86_INST_SETCC: print_cond_set_instruction(instruction, stream); break;
   }
 }
 

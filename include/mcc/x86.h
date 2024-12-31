@@ -63,42 +63,59 @@ struct X86Operand {
 
 typedef enum X86InstructionType {
   x86_INST_INVALID = 0,
+
+  // instructions without payload
   X86_INST_NOP,
   X86_INST_RET,
+  X86_INST_CDQ, // extends the sign bit of eax into the edx register
+
+  // unary instructions
+  X86_INST_NEG, // negation
+  X86_INST_NOT, // bitwise complement
+  X86_INST_IDIV,
+
+  // binary instructions
   X86_INST_MOV,
-
-  X86_INST_NEG,
-  X86_INST_NOT,
-
   X86_INST_ADD,
   X86_INST_SUB,
   X86_INST_IMUL,
-  X86_INST_IDIV,
-
   X86_INST_AND, // bitwise and
   X86_INST_OR,  // bitwise or
   X86_INST_XOR, // bitwise xor
   X86_INST_SHL, // Left Shift
   X86_INST_SAR, // Arithemtic Right Shift
-
-  X86_INST_CDQ, // extends the sign bit of eax into the edx register
-
   X86_INST_CMP, // Compare
 
-  // conditional set instructions
-  X86_INST_SETE,
-  X86_INST_SETNE,
-  X86_INST_SETG,
-  X86_INST_SETGE,
-  X86_INST_SETL,
-  X86_INST_SETLE,
+  X86_INST_SETCC,
 } X86InstructionType;
+
+typedef enum X86CondCode {
+  X86_COND_INVALID = 0,
+  X86_COND_E,  // equal
+  X86_COND_NE, // not equal
+  X86_COND_G,  // greater tjam
+  X86_COND_GE, // greater than or equal
+  X86_COND_L,  // less than
+  X86_COND_LE, // less than or equal
+} X86CondCode;
 
 struct X86Instruction {
   X86InstructionType typ;
-  X86Size size;        // size in bytes
-  X86Operand operand1; // Usually destination (in Intel syntax)
-  X86Operand operand2;
+  union {
+    struct {
+      X86Size size;
+      X86Operand op;
+    } unary;
+    struct {
+      X86Size size;
+      X86Operand dest;
+      X86Operand src;
+    } binary;
+    struct {
+      X86CondCode cond;
+      X86Operand op;
+    } setcc;
+  };
 };
 
 struct IRProgram;

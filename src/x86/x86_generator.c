@@ -54,6 +54,56 @@ static X86Operand x86_operand_from_ir(IRValue ir_operand)
   MCC_UNREACHABLE();
 }
 
+static X86Instruction x86_unary_instruction(X86InstructionType type,
+                                            X86Size size, X86Operand op)
+{
+  // TODO: verify type
+  return (X86Instruction){.typ = type,
+                          .unary = {
+                              .size = size,
+                              .op = op,
+                          }};
+}
+
+static bool is_binary(X86InstructionType typ)
+{
+  switch (typ) {
+  case x86_INST_INVALID: MCC_UNREACHABLE();
+  case X86_INST_NOP:
+  case X86_INST_RET:
+  case X86_INST_CDQ:
+  case X86_INST_NEG:
+  case X86_INST_NOT:
+  case X86_INST_IDIV: return false;
+  case X86_INST_MOV:
+  case X86_INST_ADD:
+  case X86_INST_SUB:
+  case X86_INST_IMUL:
+  case X86_INST_AND:
+  case X86_INST_OR:
+  case X86_INST_XOR:
+  case X86_INST_SHL:
+  case X86_INST_SAR:
+  case X86_INST_CMP: return true;
+  case X86_INST_SETCC: return false;
+  }
+  MCC_UNREACHABLE();
+}
+
+static X86Instruction x86_binary_instruction(X86InstructionType type,
+                                             X86Size size, X86Operand dest,
+                                             X86Operand src)
+{
+  MCC_ASSERT_MSG(is_binary(type),
+                 "Can't construct binary instruction from non-binary type");
+  return (X86Instruction){.typ = type,
+                          .binary = {
+                              .size = size,
+                              .dest = dest,
+                              .src = src,
+                          }};
+}
+
 // Unary instructions like neg or not
 static void push_unary_instruction(X86InstructionVector* instructions,
                                    X86InstructionType type,
@@ -62,18 +112,9 @@ static void push_unary_instruction(X86InstructionVector* instructions,
   const X86Operand dst = x86_operand_from_ir(ir_instruction->operand1);
   const X86Operand src = x86_operand_from_ir(ir_instruction->operand2);
 
-  push_instruction(instructions, (X86Instruction){
-                                     .typ = X86_INST_MOV,
-                                     .size = X86_SZ_4,
-                                     .operand1 = dst,
-                                     .operand2 = src,
-                                 });
-
-  push_instruction(instructions, (X86Instruction){
-                                     .typ = type,
-                                     .size = X86_SZ_4,
-                                     .operand1 = dst,
-                                 });
+  push_instruction(instructions,
+                   x86_binary_instruction(X86_INST_MOV, X86_SZ_4, dst, src));
+  push_instruction(instructions, x86_unary_instruction(type, X86_SZ_4, dst));
 }
 
 static void push_binary_instruction(X86InstructionVector* instructions,
@@ -84,55 +125,37 @@ static void push_binary_instruction(X86InstructionVector* instructions,
   const X86Operand lhs = x86_operand_from_ir(ir_instruction->operand2);
   const X86Operand rhs = x86_operand_from_ir(ir_instruction->operand3);
 
-  push_instruction(instructions, (X86Instruction){.typ = X86_INST_MOV,
-                                                  .size = X86_SZ_4,
-                                                  .operand1 = dst,
-                                                  .operand2 = lhs});
-  push_instruction(instructions, (X86Instruction){.typ = type,
-                                                  .size = X86_SZ_4,
-                                                  .operand1 = dst,
-                                                  .operand2 = rhs});
+  push_instruction(instructions,
+                   x86_binary_instruction(X86_INST_MOV, X86_SZ_4, dst, lhs));
+  push_instruction(instructions,
+                   x86_binary_instruction(type, X86_SZ_4, dst, rhs));
 }
 
 static void push_div_mod_instruction(X86InstructionVector* instructions,
                                      const IRInstruction* ir_instruction)
 {
+  const X86Operand dst = x86_operand_from_ir(ir_instruction->operand1);
+  const X86Operand lhs = x86_operand_from_ir(ir_instruction->operand2);
+  const X86Operand rhs = x86_operand_from_ir(ir_instruction->operand3);
+
   // mov eax, <lhs>
-  push_instruction(
-      instructions,
-      (X86Instruction){
-          .typ = X86_INST_MOV,
-          .size = X86_SZ_4,
-          .operand1 = x86_register_operand(X86_REG_AX),
-          .operand2 = x86_operand_from_ir(ir_instruction->operand2),
-      });
+  push_instruction(instructions, x86_binary_instruction(
+                                     X86_INST_MOV, X86_SZ_4,
+                                     x86_register_operand(X86_REG_AX), lhs));
 
   // cdq
   push_instruction(instructions, (X86Instruction){.typ = X86_INST_CDQ});
 
   // idiv <rhs>
   push_instruction(instructions,
-                   (X86Instruction){.typ = X86_INST_IDIV,
-                                    .size = X86_SZ_4,
-                                    .operand1 = x86_operand_from_ir(
-                                        ir_instruction->operand3)});
+                   x86_unary_instruction(X86_INST_IDIV, X86_SZ_4, rhs));
 
   // if div: mov <dst>, eax
   // if mod: mov <dst>, edx
-  X86Operand src;
-  switch (ir_instruction->typ) {
-  case IR_DIV: src = x86_register_operand(X86_REG_AX); break;
-  case IR_MOD: src = x86_register_operand(X86_REG_DX); break;
-  default: MCC_UNREACHABLE();
-  }
-
-  push_instruction(instructions, (X86Instruction){
-                                     .typ = X86_INST_MOV,
-                                     .size = X86_SZ_4,
-                                     .operand1 = x86_operand_from_ir(
-                                         ir_instruction->operand1),
-                                     .operand2 = src,
-                                 });
+  const X86Operand src = x86_register_operand(
+      ir_instruction->typ == IR_DIV ? X86_REG_AX : X86_REG_DX);
+  push_instruction(instructions,
+                   x86_binary_instruction(X86_INST_MOV, X86_SZ_4, dst, src));
 }
 
 static void generate_comparison_instruction(X86InstructionVector* instructions,
@@ -142,33 +165,30 @@ static void generate_comparison_instruction(X86InstructionVector* instructions,
   const X86Operand lhs = x86_operand_from_ir(ir_instruction->operand2);
   const X86Operand rhs = x86_operand_from_ir(ir_instruction->operand3);
 
-  X86InstructionType instruction;
+  X86CondCode cond_code;
   switch (ir_instruction->typ) {
-  case IR_EQUAL: instruction = X86_INST_SETE; break;
-  case IR_NOT_EQUAL: instruction = X86_INST_SETNE; break;
-  case IR_LESS: instruction = X86_INST_SETL; break;
-  case IR_LESS_EQUAL: instruction = X86_INST_SETLE; break;
-  case IR_GREATER: instruction = X86_INST_SETG; break;
-  case IR_GREATER_EQUAL: instruction = X86_INST_SETGE; break;
+  case IR_EQUAL: cond_code = X86_COND_E; break;
+  case IR_NOT_EQUAL: cond_code = X86_COND_NE; break;
+  case IR_LESS: cond_code = X86_COND_L; break;
+  case IR_LESS_EQUAL: cond_code = X86_COND_LE; break;
+  case IR_GREATER: cond_code = X86_COND_G; break;
+  case IR_GREATER_EQUAL: cond_code = X86_COND_GE; break;
   default: MCC_UNREACHABLE();
   }
 
-  // xor dest dest
-  push_instruction(instructions, (X86Instruction){.typ = X86_INST_XOR,
-                                                  .size = X86_SZ_4,
-                                                  .operand1 = dest,
-                                                  .operand2 = dest});
+  // mov dest, 0
+  push_instruction(instructions,
+                   x86_binary_instruction(X86_INST_MOV, X86_SZ_4, dest,
+                                          x86_immediate_operand(0)));
 
   // cmp lhs, rhs
-  push_instruction(instructions, (X86Instruction){.typ = X86_INST_CMP,
-                                                  .size = X86_SZ_4,
-                                                  .operand1 = lhs,
-                                                  .operand2 = rhs});
+  push_instruction(instructions,
+                   x86_binary_instruction(X86_INST_CMP, X86_SZ_4, lhs, rhs));
 
-  // sete dest
-  push_instruction(
-      instructions,
-      (X86Instruction){.typ = instruction, .size = X86_SZ_4, .operand1 = dest});
+  // setcc dest
+  push_instruction(instructions,
+                   (X86Instruction){.typ = X86_INST_SETCC,
+                                    .setcc = {.cond = cond_code, .op = dest}});
 }
 
 // First pass to generate assembly. Still need fixing later
@@ -183,14 +203,12 @@ generate_x86_function_def(const IRFunctionDef* ir_function,
     switch (ir_instruction->typ) {
     case IR_INVALID: MCC_UNREACHABLE(); break;
     case IR_RETURN: {
-      push_instruction(
-          &instructions,
-          (X86Instruction){
-              .typ = X86_INST_MOV,
-              .size = X86_SZ_4,
-              .operand1 = x86_register_operand(X86_REG_AX),
-              .operand2 = x86_operand_from_ir(ir_instruction->operand1),
-          });
+      // move eax, <op>
+      push_instruction(&instructions,
+                       x86_binary_instruction(
+                           X86_INST_MOV, X86_SZ_4,
+                           x86_register_operand(X86_REG_AX),
+                           x86_operand_from_ir(ir_instruction->operand1)));
 
       push_instruction(&instructions, (X86Instruction){.typ = X86_INST_RET});
       break;
@@ -205,23 +223,20 @@ generate_x86_function_def(const IRFunctionDef* ir_function,
     case IR_NOT: {
       X86Operand dest = x86_operand_from_ir(ir_instruction->operand1);
       X86Operand src = x86_operand_from_ir(ir_instruction->operand2);
-      // xor dest dest
-      push_instruction(&instructions, (X86Instruction){.typ = X86_INST_XOR,
-                                                       .size = X86_SZ_4,
-                                                       .operand1 = dest,
-                                                       .operand2 = dest});
+      X86Operand zero = x86_immediate_operand(0);
+      // mov dest 0
+      push_instruction(&instructions, x86_binary_instruction(
+                                          X86_INST_MOV, X86_SZ_4, dest, zero));
 
       // cmp src, 0
-      push_instruction(&instructions,
-                       (X86Instruction){.typ = X86_INST_CMP,
-                                        .size = X86_SZ_4,
-                                        .operand1 = src,
-                                        .operand2 = x86_immediate_operand(0)});
+      push_instruction(&instructions, x86_binary_instruction(
+                                          X86_INST_CMP, X86_SZ_4, src, zero));
 
       // sete dest
-      push_instruction(&instructions, (X86Instruction){.typ = X86_INST_SETE,
-                                                       .size = X86_SZ_4,
-                                                       .operand1 = dest});
+      push_instruction(
+          &instructions,
+          (X86Instruction){.typ = X86_INST_SETCC,
+                           .setcc = {.cond = X86_COND_E, .op = dest}});
     } break;
 
     case IR_ADD:
@@ -293,14 +308,34 @@ static size_t find_name_stack_offset(const struct UniqueNameMap* map,
   return (size_t)(index + 1) * 4;
 }
 
-static void add_unique_name(struct UniqueNameMap* map, StringView name)
+static void add_unique_name(struct UniqueNameMap* unique_names, StringView name)
 {
   // Find whether the name is already in the map
-  if (try_find_unique_name(map, name) >= 0) { return; }
+  if (try_find_unique_name(unique_names, name) >= 0) { return; }
 
-  MCC_ASSERT_MSG(map->count - 1 < MAX_UNIQUE_NAMES, "Too many unique names");
+  MCC_ASSERT_MSG(unique_names->count - 1 < MAX_UNIQUE_NAMES,
+                 "Too many unique names");
 
-  map->unique_names[map->count++] = name;
+  unique_names->unique_names[unique_names->count++] = name;
+}
+
+// Add a unique name if the operand is a pseudo register
+static void add_unique_name_if_pseudo(struct UniqueNameMap* unique_names,
+                                      X86Operand operand)
+{
+  if (operand.typ == X86_OPERAND_PSEUDO) {
+    add_unique_name(unique_names, operand.pseudo);
+  }
+}
+
+// If operand is a pseudo register, replace it with a stack address
+static void replace_pseudo_register(struct UniqueNameMap* unique_names,
+                                    X86Operand* operand)
+{
+  if (operand->typ == X86_OPERAND_PSEUDO) {
+    *operand = x86_stack_operand(
+        find_name_stack_offset(unique_names, operand->pseudo));
+  }
 }
 
 // Replace all pseudo-registers with stack space
@@ -320,9 +355,7 @@ static intptr_t replace_pseudo_registers(X86FunctionDef* function)
     case X86_INST_NEG:
     case X86_INST_NOT:
     case X86_INST_IDIV: {
-      if (instruction->operand1.typ == X86_OPERAND_PSEUDO) {
-        add_unique_name(&unique_names, instruction->operand1.pseudo);
-      }
+      add_unique_name_if_pseudo(&unique_names, instruction->unary.op);
     } break;
       // Binary instruction
     case X86_INST_MOV:
@@ -335,23 +368,12 @@ static intptr_t replace_pseudo_registers(X86FunctionDef* function)
     case X86_INST_SHL:
     case X86_INST_SAR:
     case X86_INST_CMP: {
-      if (instruction->operand1.typ == X86_OPERAND_PSEUDO) {
-        add_unique_name(&unique_names, instruction->operand1.pseudo);
-      }
-      if (instruction->operand2.typ == X86_OPERAND_PSEUDO) {
-        add_unique_name(&unique_names, instruction->operand2.pseudo);
-      }
+      add_unique_name_if_pseudo(&unique_names, instruction->binary.src);
+      add_unique_name_if_pseudo(&unique_names, instruction->binary.dest);
     } break;
     case X86_INST_CDQ: break;
-    case X86_INST_SETE:
-    case X86_INST_SETNE:
-    case X86_INST_SETG:
-    case X86_INST_SETGE:
-    case X86_INST_SETL:
-    case X86_INST_SETLE: {
-      if (instruction->operand1.typ == X86_OPERAND_PSEUDO) {
-        add_unique_name(&unique_names, instruction->operand1.pseudo);
-      }
+    case X86_INST_SETCC: {
+      add_unique_name_if_pseudo(&unique_names, instruction->setcc.op);
     } break;
     }
   }
@@ -365,10 +387,7 @@ static intptr_t replace_pseudo_registers(X86FunctionDef* function)
     case X86_INST_NEG: // Unary operators
     case X86_INST_NOT:
     case X86_INST_IDIV: {
-      if (instruction->operand1.typ == X86_OPERAND_PSEUDO) {
-        instruction->operand1 = x86_stack_operand(find_name_stack_offset(
-            &unique_names, instruction->operand1.pseudo));
-      }
+      replace_pseudo_register(&unique_names, &instruction->unary.op);
     } break;
     case X86_INST_MOV: // binary operators
     case X86_INST_ADD:
@@ -380,26 +399,12 @@ static intptr_t replace_pseudo_registers(X86FunctionDef* function)
     case X86_INST_SHL:
     case X86_INST_SAR:
     case X86_INST_CMP: {
-      if (instruction->operand1.typ == X86_OPERAND_PSEUDO) {
-        instruction->operand1 = x86_stack_operand(find_name_stack_offset(
-            &unique_names, instruction->operand1.pseudo));
-      }
-      if (instruction->operand2.typ == X86_OPERAND_PSEUDO) {
-        instruction->operand2 = x86_stack_operand(find_name_stack_offset(
-            &unique_names, instruction->operand2.pseudo));
-      }
+      replace_pseudo_register(&unique_names, &instruction->binary.src);
+      replace_pseudo_register(&unique_names, &instruction->binary.dest);
     } break;
     case X86_INST_CDQ: break;
-    case X86_INST_SETE:
-    case X86_INST_SETNE:
-    case X86_INST_SETG:
-    case X86_INST_SETGE:
-    case X86_INST_SETL:
-    case X86_INST_SETLE: {
-      if (instruction->operand1.typ == X86_OPERAND_PSEUDO) {
-        instruction->operand1 = x86_stack_operand(find_name_stack_offset(
-            &unique_names, instruction->operand1.pseudo));
-      }
+    case X86_INST_SETCC: {
+      replace_pseudo_register(&unique_names, &instruction->setcc.op);
     } break;
     }
   }
@@ -411,21 +416,18 @@ static intptr_t replace_pseudo_registers(X86FunctionDef* function)
 static void fix_binary_instruction(X86InstructionVector* new_instructions,
                                    X86Instruction instruction)
 {
-  if (instruction.operand1.typ == X86_OPERAND_STACK &&
-      instruction.operand2.typ == X86_OPERAND_STACK) {
+  if (instruction.binary.src.typ == X86_OPERAND_STACK &&
+      instruction.binary.dest.typ == X86_OPERAND_STACK) {
+    const X86Operand temp_register = x86_register_operand(X86_REG_R10);
     push_instruction(
         new_instructions,
-        (X86Instruction){.typ = X86_INST_MOV,
-                         .size = instruction.size,
-                         .operand1 = x86_register_operand(X86_REG_R10),
-                         .operand2 = instruction.operand2});
+        x86_binary_instruction(X86_INST_MOV, instruction.binary.size,
+                               temp_register, instruction.binary.src));
 
     push_instruction(
         new_instructions,
-        (X86Instruction){.typ = instruction.typ,
-                         .size = instruction.size,
-                         .operand1 = instruction.operand1,
-                         .operand2 = x86_register_operand(X86_REG_R10)});
+        x86_binary_instruction(instruction.typ, instruction.binary.size,
+                               instruction.binary.dest, temp_register));
   } else {
     push_instruction(new_instructions, instruction);
   }
@@ -434,15 +436,13 @@ static void fix_binary_instruction(X86InstructionVector* new_instructions,
 static void fix_shift_instruction(X86InstructionVector* new_instructions,
                                   X86Instruction instruction)
 {
-  if (instruction.operand2.typ == X86_OPERAND_STACK) {
-    push_instruction(
-        new_instructions,
-        (X86Instruction){.typ = X86_INST_MOV,
-                         .size = X86_SZ_1,
-                         .operand1 = x86_register_operand(X86_REG_CX),
-                         .operand2 = instruction.operand2});
+  if (instruction.binary.dest.typ == X86_OPERAND_STACK) {
+    push_instruction(new_instructions,
+                     x86_binary_instruction(X86_INST_MOV, X86_SZ_1,
+                                            x86_register_operand(X86_REG_CX),
+                                            instruction.binary.src));
 
-    instruction.operand2 = x86_register_operand(X86_REG_CX);
+    instruction.binary.src = x86_register_operand(X86_REG_CX);
     push_instruction(new_instructions, instruction);
   } else {
     push_instruction(new_instructions, instruction);
@@ -459,10 +459,9 @@ static void fix_invalid_instructions(X86FunctionDef* function,
   if (stack_size > 0) {
     push_instruction(
         &new_instructions,
-        (X86Instruction){.typ = X86_INST_SUB,
-                         .size = X86_SZ_8,
-                         .operand1 = x86_register_operand(X86_REG_SP),
-                         .operand2 = x86_immediate_operand((int)stack_size)});
+        x86_binary_instruction(X86_INST_SUB, X86_SZ_8,
+                               x86_register_operand(X86_REG_SP),
+                               x86_immediate_operand((int)stack_size)));
   }
   for (size_t j = 0; j < function->instruction_count; ++j) {
     X86Instruction instruction = function->instructions[j];
@@ -482,25 +481,22 @@ static void fix_invalid_instructions(X86FunctionDef* function,
       // imul can't use a memory address as its destination, regardless of its
       // source operand
     case X86_INST_IMUL: {
-      if (instruction.operand1.typ == X86_OPERAND_STACK) {
+      if (instruction.binary.dest.typ == X86_OPERAND_STACK) {
+        const X86Operand temp_register = x86_register_operand(X86_REG_R11);
         push_instruction(
             &new_instructions,
-            (X86Instruction){.typ = X86_INST_MOV,
-                             .size = instruction.size,
-                             .operand1 = x86_register_operand(X86_REG_R11),
-                             .operand2 = instruction.operand1});
+            x86_binary_instruction(X86_INST_MOV, instruction.binary.size,
+                                   temp_register, instruction.binary.dest));
+
         push_instruction(
             &new_instructions,
-            (X86Instruction){.typ = X86_INST_IMUL,
-                             .size = instruction.size,
-                             .operand1 = x86_register_operand(X86_REG_R11),
-                             .operand2 = instruction.operand2});
+            x86_binary_instruction(X86_INST_IMUL, instruction.binary.size,
+                                   temp_register, instruction.binary.src));
+
         push_instruction(
             &new_instructions,
-            (X86Instruction){.typ = X86_INST_MOV,
-                             .size = instruction.size,
-                             .operand1 = instruction.operand1,
-                             .operand2 = x86_register_operand(X86_REG_R11)});
+            x86_binary_instruction(X86_INST_MOV, instruction.binary.size,
+                                   instruction.binary.dest, temp_register));
       } else {
         push_instruction(&new_instructions, instruction);
       }
@@ -510,18 +506,16 @@ static void fix_invalid_instructions(X86FunctionDef* function,
 
       // idiv can't take an immediate operand
     case X86_INST_IDIV:
-      if (instruction.operand1.typ == X86_OPERAND_IMMEDIATE) {
+      if (instruction.unary.op.typ == X86_OPERAND_IMMEDIATE) {
+        const X86Operand temp_register = x86_register_operand(X86_REG_R10);
         push_instruction(
             &new_instructions,
-            (X86Instruction){.typ = X86_INST_MOV,
-                             .size = instruction.size,
-                             .operand1 = x86_register_operand(X86_REG_R10),
-                             .operand2 = instruction.operand1});
-        push_instruction(
-            &new_instructions,
-            (X86Instruction){.typ = X86_INST_IDIV,
-                             .size = instruction.size,
-                             .operand1 = x86_register_operand(X86_REG_R10)});
+            x86_binary_instruction(X86_INST_MOV, instruction.unary.size,
+                                   temp_register, instruction.unary.op));
+        push_instruction(&new_instructions,
+                         x86_unary_instruction(X86_INST_IDIV,
+                                               instruction.unary.size,
+                                               temp_register));
       } else {
         push_instruction(&new_instructions, instruction);
       }
@@ -532,27 +526,24 @@ static void fix_invalid_instructions(X86FunctionDef* function,
       break;
 
     case X86_INST_CMP: {
+      const X86Operand first = instruction.binary.dest;
+      const X86Operand second = instruction.binary.src;
+
       // the first argument of cmp can't be an immediate operands
-      const bool fisrt_is_immediate =
-          instruction.operand1.typ == X86_OPERAND_IMMEDIATE;
-
+      const bool first_is_immediate = first.typ == X86_OPERAND_IMMEDIATE;
       const bool both_are_address =
-          instruction.operand1.typ == X86_OPERAND_STACK &&
-          instruction.operand2.typ == X86_OPERAND_STACK;
+          first.typ == X86_OPERAND_STACK && second.typ == X86_OPERAND_STACK;
 
-      if (fisrt_is_immediate || both_are_address) {
+      if (first_is_immediate || both_are_address) {
+        const X86Operand temp_register = x86_register_operand(X86_REG_R10);
+        const X86Size size = instruction.binary.size;
+
         push_instruction(
             &new_instructions,
-            (X86Instruction){.typ = X86_INST_MOV,
-                             .size = instruction.size,
-                             .operand1 = x86_register_operand(X86_REG_R10),
-                             .operand2 = instruction.operand1});
+            x86_binary_instruction(X86_INST_MOV, size, temp_register, first));
         push_instruction(
             &new_instructions,
-            (X86Instruction){.typ = X86_INST_CMP,
-                             .size = instruction.size,
-                             .operand1 = x86_register_operand(X86_REG_R10),
-                             .operand2 = instruction.operand2});
+            x86_binary_instruction(X86_INST_CMP, size, temp_register, second));
       } else {
         push_instruction(&new_instructions, instruction);
       }
