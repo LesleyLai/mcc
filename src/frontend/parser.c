@@ -381,7 +381,11 @@ static CompoundStmt parse_compound_stmt(Parser* parser)
   if (has_error) {
     parser->in_panic_mode = false;
     while (parser_current_token(parser).type != TOKEN_EOF) {
-      if (parser_previous_token(parser).type != TOKEN_RIGHT_BRACE) { break; }
+      const TokenType previous_type = parser_previous_token(parser).type;
+      if (previous_type != TOKEN_RIGHT_BRACE &&
+          previous_type != TOKEN_SEMICOLON) {
+        break;
+      }
       parse_advance(parser);
     }
   } else {
@@ -390,7 +394,9 @@ static CompoundStmt parse_compound_stmt(Parser* parser)
 
   Stmt* stmts =
       ARENA_ALLOC_ARRAY(parser->permanent_arena, Stmt, stmt_vector.length);
-  memcpy(stmts, stmt_vector.data, stmt_vector.length * sizeof(Stmt));
+  if (stmt_vector.length != 0) {
+    memcpy(stmts, stmt_vector.data, stmt_vector.length * sizeof(Stmt));
+  }
 
   return (CompoundStmt){.statements = stmts,
                         .statement_count = stmt_vector.length};
