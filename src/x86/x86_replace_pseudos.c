@@ -51,7 +51,7 @@ static void replace_pseudo_register(struct UniqueNameMap* unique_names,
                                     X86Operand* operand)
 {
   if (operand->typ == X86_OPERAND_PSEUDO) {
-    *operand = x86_stack_operand(
+    *operand = stack_operand(
         find_name_stack_offset(unique_names, operand->pseudo));
   }
 }

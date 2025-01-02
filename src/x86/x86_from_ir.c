@@ -4,8 +4,7 @@
 static X86Operand x86_operand_from_ir(IRValue ir_operand)
 {
   switch (ir_operand.typ) {
-  case IR_VALUE_TYPE_CONSTANT:
-    return x86_immediate_operand(ir_operand.constant);
+  case IR_VALUE_TYPE_CONSTANT: return immediate_operand(ir_operand.constant);
   case IR_VALUE_TYPE_VARIABLE:
     return (X86Operand){.typ = X86_OPERAND_PSEUDO,
                         .pseudo = ir_operand.variable};
@@ -22,8 +21,8 @@ static void push_unary_instruction(X86InstructionVector* instructions,
   const X86Operand src = x86_operand_from_ir(ir_instruction->operand2);
 
   push_instruction(instructions,
-                   x86_binary_instruction(X86_INST_MOV, X86_SZ_4, dst, src));
-  push_instruction(instructions, x86_unary_instruction(type, X86_SZ_4, dst));
+                   binary_instruction(X86_INST_MOV, X86_SZ_4, dst, src));
+  push_instruction(instructions, unary_instruction(type, X86_SZ_4, dst));
 }
 
 static void push_binary_instruction(X86InstructionVector* instructions,
@@ -35,9 +34,8 @@ static void push_binary_instruction(X86InstructionVector* instructions,
   const X86Operand rhs = x86_operand_from_ir(ir_instruction->operand3);
 
   push_instruction(instructions,
-                   x86_binary_instruction(X86_INST_MOV, X86_SZ_4, dst, lhs));
-  push_instruction(instructions,
-                   x86_binary_instruction(type, X86_SZ_4, dst, rhs));
+                   binary_instruction(X86_INST_MOV, X86_SZ_4, dst, lhs));
+  push_instruction(instructions, binary_instruction(type, X86_SZ_4, dst, rhs));
 }
 
 static void push_div_mod_instruction(X86InstructionVector* instructions,
@@ -48,23 +46,23 @@ static void push_div_mod_instruction(X86InstructionVector* instructions,
   const X86Operand rhs = x86_operand_from_ir(ir_instruction->operand3);
 
   // mov eax, <lhs>
-  push_instruction(instructions, x86_binary_instruction(
-                                     X86_INST_MOV, X86_SZ_4,
-                                     x86_register_operand(X86_REG_AX), lhs));
+  push_instruction(instructions,
+                   binary_instruction(X86_INST_MOV, X86_SZ_4,
+                                      register_operand(X86_REG_AX), lhs));
 
   // cdq
   push_instruction(instructions, (X86Instruction){.typ = X86_INST_CDQ});
 
   // idiv <rhs>
   push_instruction(instructions,
-                   x86_unary_instruction(X86_INST_IDIV, X86_SZ_4, rhs));
+                   unary_instruction(X86_INST_IDIV, X86_SZ_4, rhs));
 
   // if div: mov <dst>, eax
   // if mod: mov <dst>, edx
-  const X86Operand src = x86_register_operand(
-      ir_instruction->typ == IR_DIV ? X86_REG_AX : X86_REG_DX);
+  const X86Operand src =
+      register_operand(ir_instruction->typ == IR_DIV ? X86_REG_AX : X86_REG_DX);
   push_instruction(instructions,
-                   x86_binary_instruction(X86_INST_MOV, X86_SZ_4, dst, src));
+                   binary_instruction(X86_INST_MOV, X86_SZ_4, dst, src));
 }
 
 static void generate_comparison_instruction(X86InstructionVector* instructions,
@@ -86,13 +84,13 @@ static void generate_comparison_instruction(X86InstructionVector* instructions,
   }
 
   // mov dest, 0
-  push_instruction(instructions,
-                   x86_binary_instruction(X86_INST_MOV, X86_SZ_4, dest,
-                                          x86_immediate_operand(0)));
+  push_instruction(
+      instructions,
+      binary_instruction(X86_INST_MOV, X86_SZ_4, dest, immediate_operand(0)));
 
   // cmp lhs, rhs
   push_instruction(instructions,
-                   x86_binary_instruction(X86_INST_CMP, X86_SZ_4, lhs, rhs));
+                   binary_instruction(X86_INST_CMP, X86_SZ_4, lhs, rhs));
 
   // setcc dest
   push_instruction(instructions,
@@ -101,10 +99,10 @@ static void generate_comparison_instruction(X86InstructionVector* instructions,
 }
 
 // First pass to generate assembly. Still need fixing later
-X86FunctionDef generate_x86_function_def(const IRFunctionDef* ir_function,
+X86FunctionDef x86_function_from_ir(const IRFunctionDef* ir_function,
                                          Arena* scratch_arena)
 {
-  X86InstructionVector instructions = new_instruction_vector(scratch_arena);
+  X86InstructionVector instructions = {.arena = scratch_arena};
 
   for (size_t j = 0; j < ir_function->instruction_count; ++j) {
     const IRInstruction* ir_instruction = &ir_function->instructions[j];
@@ -113,9 +111,8 @@ X86FunctionDef generate_x86_function_def(const IRFunctionDef* ir_function,
     case IR_RETURN: {
       // move eax, <op>
       push_instruction(&instructions,
-                       x86_binary_instruction(
-                           X86_INST_MOV, X86_SZ_4,
-                           x86_register_operand(X86_REG_AX),
+                       binary_instruction(
+                           X86_INST_MOV, X86_SZ_4, register_operand(X86_REG_AX),
                            x86_operand_from_ir(ir_instruction->operand1)));
 
       push_instruction(&instructions, (X86Instruction){.typ = X86_INST_RET});
@@ -131,14 +128,14 @@ X86FunctionDef generate_x86_function_def(const IRFunctionDef* ir_function,
     case IR_NOT: {
       X86Operand dest = x86_operand_from_ir(ir_instruction->operand1);
       X86Operand src = x86_operand_from_ir(ir_instruction->operand2);
-      X86Operand zero = x86_immediate_operand(0);
+      X86Operand zero = immediate_operand(0);
       // mov dest 0
-      push_instruction(&instructions, x86_binary_instruction(
-                                          X86_INST_MOV, X86_SZ_4, dest, zero));
+      push_instruction(&instructions,
+                       binary_instruction(X86_INST_MOV, X86_SZ_4, dest, zero));
 
       // cmp src, 0
-      push_instruction(&instructions, x86_binary_instruction(
-                                          X86_INST_CMP, X86_SZ_4, src, zero));
+      push_instruction(&instructions,
+                       binary_instruction(X86_INST_CMP, X86_SZ_4, src, zero));
 
       // sete dest
       push_instruction(

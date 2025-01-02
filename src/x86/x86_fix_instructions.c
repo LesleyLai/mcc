@@ -7,16 +7,15 @@ static void fix_binary_instruction(X86InstructionVector* new_instructions,
   // addresses
   if (instruction.binary.src.typ == X86_OPERAND_STACK &&
       instruction.binary.dest.typ == X86_OPERAND_STACK) {
-    const X86Operand temp_register = x86_register_operand(X86_REG_R10);
-    push_instruction(
-        new_instructions,
-        x86_binary_instruction(X86_INST_MOV, instruction.binary.size,
-                               temp_register, instruction.binary.src));
+    const X86Operand temp_register = register_operand(X86_REG_R10);
+    push_instruction(new_instructions,
+                     binary_instruction(X86_INST_MOV, instruction.binary.size,
+                                        temp_register, instruction.binary.src));
 
     push_instruction(
         new_instructions,
-        x86_binary_instruction(instruction.typ, instruction.binary.size,
-                               instruction.binary.dest, temp_register));
+        binary_instruction(instruction.typ, instruction.binary.size,
+                           instruction.binary.dest, temp_register));
   } else {
     push_instruction(new_instructions, instruction);
   }
@@ -27,11 +26,11 @@ static void fix_shift_instruction(X86InstructionVector* new_instructions,
 {
   if (instruction.binary.dest.typ == X86_OPERAND_STACK) {
     push_instruction(new_instructions,
-                     x86_binary_instruction(X86_INST_MOV, X86_SZ_1,
-                                            x86_register_operand(X86_REG_CX),
-                                            instruction.binary.src));
+                     binary_instruction(X86_INST_MOV, X86_SZ_1,
+                                        register_operand(X86_REG_CX),
+                                        instruction.binary.src));
 
-    instruction.binary.src = x86_register_operand(X86_REG_CX);
+    instruction.binary.src = register_operand(X86_REG_CX);
     push_instruction(new_instructions, instruction);
   } else {
     push_instruction(new_instructions, instruction);
@@ -44,21 +43,20 @@ static void fix_imul_instruction(X86InstructionVector* new_instructions,
   // imul can't use a memory address as its destination, regardless of its
   // source operand
   if (instruction.binary.dest.typ == X86_OPERAND_STACK) {
-    const X86Operand temp_register = x86_register_operand(X86_REG_R11);
-    push_instruction(
-        new_instructions,
-        x86_binary_instruction(X86_INST_MOV, instruction.binary.size,
-                               temp_register, instruction.binary.dest));
+    const X86Operand temp_register = register_operand(X86_REG_R11);
+    push_instruction(new_instructions,
+                     binary_instruction(X86_INST_MOV, instruction.binary.size,
+                                        temp_register,
+                                        instruction.binary.dest));
 
-    push_instruction(
-        new_instructions,
-        x86_binary_instruction(X86_INST_IMUL, instruction.binary.size,
-                               temp_register, instruction.binary.src));
+    push_instruction(new_instructions,
+                     binary_instruction(X86_INST_IMUL, instruction.binary.size,
+                                        temp_register, instruction.binary.src));
 
-    push_instruction(
-        new_instructions,
-        x86_binary_instruction(X86_INST_MOV, instruction.binary.size,
-                               instruction.binary.dest, temp_register));
+    push_instruction(new_instructions,
+                     binary_instruction(X86_INST_MOV, instruction.binary.size,
+                                        instruction.binary.dest,
+                                        temp_register));
   } else {
     push_instruction(new_instructions, instruction);
   }
@@ -69,14 +67,13 @@ static void fix_idiv_instruction(X86InstructionVector* new_instructions,
 {
   // idiv can't take an immediate operand
   if (instruction.unary.op.typ == X86_OPERAND_IMMEDIATE) {
-    const X86Operand temp_register = x86_register_operand(X86_REG_R10);
-    push_instruction(
-        new_instructions,
-        x86_binary_instruction(X86_INST_MOV, instruction.unary.size,
-                               temp_register, instruction.unary.op));
+    const X86Operand temp_register = register_operand(X86_REG_R10);
     push_instruction(new_instructions,
-                     x86_unary_instruction(
-                         X86_INST_IDIV, instruction.unary.size, temp_register));
+                     binary_instruction(X86_INST_MOV, instruction.unary.size,
+                                        temp_register, instruction.unary.op));
+    push_instruction(new_instructions,
+                     unary_instruction(X86_INST_IDIV, instruction.unary.size,
+                                       temp_register));
   } else {
     push_instruction(new_instructions, instruction);
   }
@@ -94,37 +91,33 @@ static void fix_cmp_instruction(X86InstructionVector* new_instructions,
       first.typ == X86_OPERAND_STACK && second.typ == X86_OPERAND_STACK;
 
   if (first_is_immediate || both_are_address) {
-    const X86Operand temp_register = x86_register_operand(X86_REG_R10);
+    const X86Operand temp_register = register_operand(X86_REG_R10);
     const X86Size size = instruction.binary.size;
 
     push_instruction(
         new_instructions,
-        x86_binary_instruction(X86_INST_MOV, size, temp_register, first));
+        binary_instruction(X86_INST_MOV, size, temp_register, first));
     push_instruction(
         new_instructions,
-        x86_binary_instruction(X86_INST_CMP, size, temp_register, second));
+        binary_instruction(X86_INST_CMP, size, temp_register, second));
   } else {
     push_instruction(new_instructions, instruction);
   }
 }
 
-X86InstructionVector fix_invalid_instructions(X86Instruction* instructions,
-                                              size_t instruction_count,
-                                              intptr_t stack_size,
-                                              Arena* permanent_arena)
+void fix_invalid_instructions(X86FunctionDef* function, intptr_t stack_size,
+                              Arena* permanent_arena)
 {
-  X86InstructionVector new_instructions =
-      new_instruction_vector(permanent_arena);
+  X86InstructionVector new_instructions = {.arena = permanent_arena};
 
   if (stack_size > 0) {
-    push_instruction(
-        &new_instructions,
-        x86_binary_instruction(X86_INST_SUB, X86_SZ_8,
-                               x86_register_operand(X86_REG_SP),
-                               x86_immediate_operand((int)stack_size)));
+    push_instruction(&new_instructions,
+                     binary_instruction(X86_INST_SUB, X86_SZ_8,
+                                        register_operand(X86_REG_SP),
+                                        immediate_operand((int)stack_size)));
   }
-  for (size_t j = 0; j < instruction_count; ++j) {
-    X86Instruction instruction = instructions[j];
+  for (size_t j = 0; j < function->instruction_count; ++j) {
+    X86Instruction instruction = function->instructions[j];
 
     switch (instruction.typ) {
     case X86_INST_MOV:
@@ -154,5 +147,6 @@ X86InstructionVector fix_invalid_instructions(X86Instruction* instructions,
     }
   }
 
-  return new_instructions;
+  function->instruction_count = new_instructions.length;
+  function->instructions = new_instructions.data;
 }

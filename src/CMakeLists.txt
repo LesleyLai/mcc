@@ -13,6 +13,7 @@ add_library(mcc_lib
         ${include_dir}/token.h
         ${include_dir}/ir.h
         ${include_dir}/x86.h
+        ${include_dir}/dynarray.h
 
         utils/format.c
         utils/str.c

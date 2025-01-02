@@ -10,14 +10,9 @@ static X86FunctionDef x86_generate_function(const IRFunctionDef* ir_function,
                                             Arena scratch_arena)
 {
   // passes to generate an x86 assembly function
-  X86FunctionDef function =
-      generate_x86_function_def(ir_function, &scratch_arena);
+  X86FunctionDef function = x86_function_from_ir(ir_function, &scratch_arena);
   const intptr_t stack_size = replace_pseudo_registers(&function);
-  const X86InstructionVector fixed_instructions = fix_invalid_instructions(
-      function.instructions, function.instruction_count, stack_size,
-      permanent_arena);
-  function.instruction_count = fixed_instructions.length;
-  function.instructions = fixed_instructions.data;
+  fix_invalid_instructions(&function, stack_size, permanent_arena);
 
   return function;
 }
