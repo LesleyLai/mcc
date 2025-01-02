@@ -83,7 +83,7 @@ typedef enum X86InstructionType {
   X86_INST_OR,  // bitwise or
   X86_INST_XOR, // bitwise xor
   X86_INST_SHL, // Left Shift
-  X86_INST_SAR, // Arithemtic Right Shift
+  X86_INST_SAR, // Arithmetic Right Shift
   X86_INST_CMP, // Compare
 
   X86_INST_SETCC,

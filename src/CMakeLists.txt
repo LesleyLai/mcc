@@ -28,9 +28,15 @@ add_library(mcc_lib
 
         ir/ir_generator.c
         ir/ir_printer.c
-        
-        x86/x86_generator.c
+
+        x86/x86_passes.h
+        x86/x86.c
+        x86/x86_helpers.h
+        x86/x86_helpers.c
         x86/x86_printer.c
+        x86/x86_fix_instructions.c
+        x86/x86_replace_pseudos.c
+        x86/x86_from_ir.c
 )
 target_link_libraries(mcc_lib
         PUBLIC mcc::compiler_options
