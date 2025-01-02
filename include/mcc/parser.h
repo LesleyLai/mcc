@@ -10,7 +10,7 @@
 typedef struct TranslationUnit TranslationUnit;
 
 typedef struct ParseErrorsView {
-  size_t size;
+  size_t length;
   ParseError* data;
 } ParseErrorsView;
 

@@ -44,6 +44,7 @@ void write_diagnostics(StringBuffer* output, const char* file_path,
       string_buffer_printf(output, "%d |     ", line);
     }
   }
+  string_buffer_printf(output, "\n");
 }
 
 static void write_diagnostic_line(StringBuffer* output, const char* source,
@@ -61,5 +62,4 @@ static void write_diagnostic_line(StringBuffer* output, const char* source,
       string_buffer_printf(output, " ");
     }
   }
-  string_buffer_printf(output, "\n");
 }

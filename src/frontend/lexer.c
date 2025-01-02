@@ -1,6 +1,7 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include <mcc/dynarray.h>
 #include <mcc/parser.h>
 
 // The lexer consumes source code and produces tokens lazily
@@ -277,36 +278,26 @@ static Token scan_token(Lexer* lexer)
   return error_token(lexer, string_view_from_c_str("Unexpected character."));
 }
 
+struct TokenDynArray {
+  size_t length;
+  size_t capacity;
+  Token* data;
+};
+
 Tokens lex(const char* source, Arena* permanent_arena, Arena scratch_arena)
 {
   Lexer lexer = lexer_create(source);
 
-  // Accumulate tokens to a temporary linked list, and then flatten it to an
-  // array
-  typedef struct Node {
-    Token token;
-    struct Node* previous;
-  } Node;
+  struct TokenDynArray token_dyn_array = {};
 
-  Node* current = NULL;
-
-  ptrdiff_t token_count = 0;
   while (true) {
     Token token = scan_token(&lexer);
-    Node* previous = current;
-    current = ARENA_ALLOC_OBJECT(&scratch_arena, Node);
-    *current = (Node){.token = token, .previous = previous};
-    ++token_count;
-
+    DYNARRAY_PUSH_BACK(&token_dyn_array, Token, &scratch_arena, token);
     if (token.type == TOKEN_EOF) { break; }
   }
 
   Token* tokens =
-      ARENA_ALLOC_ARRAY(permanent_arena, Token, (size_t)token_count);
-  for (ptrdiff_t i = token_count - 1; i >= 0; --i) {
-    tokens[i] = current->token;
-    current = current->previous;
-  }
-
-  return (Tokens){.begin = tokens, .end = tokens + token_count};
+      ARENA_ALLOC_ARRAY(permanent_arena, Token, token_dyn_array.length);
+  memcpy(tokens, token_dyn_array.data, token_dyn_array.length * sizeof(Token));
+  return (Tokens){.begin = tokens, .end = tokens + token_dyn_array.length};
 }

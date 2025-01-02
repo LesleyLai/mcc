@@ -1,13 +1,19 @@
 #include <mcc/parser.h>
 
 #include <mcc/ast.h>
+#include <mcc/dynarray.h>
 #include <mcc/format.h>
 
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 
-#define MAX_ERROR_COUNT 16 // TODO: use vector
+struct ParseErrorVec {
+  size_t length;
+  size_t capacity;
+  ParseError* data;
+};
 
 typedef struct Parser {
   Arena* permanent_arena;
@@ -19,7 +25,7 @@ typedef struct Parser {
   bool has_error;
   bool in_panic_mode;
 
-  ParseErrorsView errors;
+  struct ParseErrorVec errors;
 } Parser;
 
 static SourceRange token_source_range(Token token)
@@ -43,18 +49,11 @@ static void parse_error_at(Parser* parser, StringView error_msg, Token token)
   if (parser->in_panic_mode) return;
 
   // TODO: proper error handling
-  MCC_ASSERT_MSG(parser->errors.size < MAX_ERROR_COUNT,
-                 "Too many data for mcc to handle");
-
-  if (parser->errors.data == NULL) {
-    parser->errors.data =
-        ARENA_ALLOC_ARRAY(parser->permanent_arena, ParseError, MAX_ERROR_COUNT);
-  }
-
-  parser->errors.data[parser->errors.size++] =
+  ParseError error =
       (ParseError){.msg = error_msg, .range = token_source_range(token)};
+  DYNARRAY_PUSH_BACK(&parser->errors, ParseError, parser->permanent_arena,
+                     error);
 
-  parser->has_error = true;
   parser->in_panic_mode = true;
 }
 
@@ -267,7 +266,7 @@ static Expr* parse_unary_op(Parser* parser)
   case TOKEN_MINUS: operator_type = UNARY_OP_NEGATION; break;
   case TOKEN_TILDE: operator_type = UNARY_OP_BITWISE_TYPE_COMPLEMENT; break;
   case TOKEN_NOT: operator_type = UNARY_OP_NOT; break;
-  default: MCC_ASSERT_MSG(false, "Unexpected operator");
+  default: MCC_UNREACHABLE();
   }
 
   // Inner expression
@@ -344,42 +343,57 @@ static Expr* parse_expr(Parser* parser)
   return parse_precedence(parser, PREC_ASSIGNMENT);
 }
 
-static void parse_return_stmt(Parser* parser, ReturnStmt* out_ret_stmt)
+static ReturnStmt parse_return_stmt(Parser* parser)
 {
   Expr* expr = parse_expr(parser);
   parse_consume(parser, TOKEN_SEMICOLON, "Expect ;");
-  *out_ret_stmt = (ReturnStmt){.expr = expr};
+  return (ReturnStmt){.expr = expr};
 }
 
 static void parse_stmt(Parser* parser, Stmt* out_stmt);
 
-// TODO: Implement proper vector and use it for compound statement
-#define MAX_STMT_COUNT_IN_COMPOUND_STMT 16
+struct StmtVector {
+  size_t capacity;
+  size_t length;
+  Stmt* data;
+};
 
-static void parse_compound_stmt(Parser* parser, CompoundStmt* out_compount_stmt)
+static CompoundStmt parse_compound_stmt(Parser* parser)
 {
-  Stmt* statements = ARENA_ALLOC_ARRAY(parser->permanent_arena, Stmt,
-                                       MAX_STMT_COUNT_IN_COMPOUND_STMT);
-  size_t statement_count = 0;
+  struct StmtVector stmt_vector = {};
+
+  Arena scratch_arena = parser->scratch_arena;
+
+  bool has_error = false;
 
   while (parser_current_token(parser).type != TOKEN_RIGHT_BRACE) {
-    // TODO: proper handle the case with more compound statements
-    if (statement_count == MAX_STMT_COUNT_IN_COMPOUND_STMT) {
-      parse_error_at(parser,
-                     string_view_from_c_str(
-                         "Too many statement in compound statement to handle"),
-                     parser_current_token(parser));
-      return;
-    }
+    Stmt stmt;
+    parse_stmt(parser, &stmt);
 
-    parse_stmt(parser, &statements[statement_count]);
-    ++statement_count;
+    if (parser->in_panic_mode) {
+      has_error = true;
+      break;
+    } else {
+      DYNARRAY_PUSH_BACK(&stmt_vector, Stmt, &scratch_arena, stmt);
+    }
   }
 
-  parse_consume(parser, TOKEN_RIGHT_BRACE, "Expect }");
+  if (has_error) {
+    parser->in_panic_mode = false;
+    while (parser_current_token(parser).type != TOKEN_EOF) {
+      if (parser_previous_token(parser).type != TOKEN_RIGHT_BRACE) { break; }
+      parse_advance(parser);
+    }
+  } else {
+    parse_consume(parser, TOKEN_RIGHT_BRACE, "Expect }");
+  }
 
-  *out_compount_stmt = (CompoundStmt){.statements = statements,
-                                      .statement_count = statement_count};
+  Stmt* stmts =
+      ARENA_ALLOC_ARRAY(parser->permanent_arena, Stmt, stmt_vector.length);
+  memcpy(stmts, stmt_vector.data, stmt_vector.length * sizeof(Stmt));
+
+  return (CompoundStmt){.statements = stmts,
+                        .statement_count = stmt_vector.length};
 }
 
 static void parse_stmt(Parser* parser, Stmt* out_stmt)
@@ -391,8 +405,7 @@ static void parse_stmt(Parser* parser, Stmt* out_stmt)
   case TOKEN_KEYWORD_RETURN: {
     parse_advance(parser);
 
-    ReturnStmt return_stmt;
-    parse_return_stmt(parser, &return_stmt);
+    ReturnStmt return_stmt = parse_return_stmt(parser);
 
     *out_stmt =
         (Stmt){.type = STMT_RETURN,
@@ -405,8 +418,7 @@ static void parse_stmt(Parser* parser, Stmt* out_stmt)
   case TOKEN_LEFT_BRACE: {
     parse_advance(parser);
 
-    CompoundStmt compound;
-    parse_compound_stmt(parser, &compound);
+    CompoundStmt compound = parse_compound_stmt(parser);
 
     *out_stmt =
         (Stmt){.type = STMT_COMPOUND,
@@ -456,7 +468,7 @@ static FunctionDecl* parse_function_decl(Parser* parser)
   if (parser_current_token(parser).type == TOKEN_LEFT_BRACE) { // is definition
     parse_advance(parser);
     body = ARENA_ALLOC_OBJECT(parser->permanent_arena, CompoundStmt);
-    parse_compound_stmt(parser, body);
+    *body = parse_compound_stmt(parser);
   } else {
     parse_consume(parser, TOKEN_SEMICOLON, "Expect ;");
   }
@@ -490,19 +502,18 @@ static TranslationUnit* parse_translation_unit(Parser* parser)
 
 ParseResult parse(Tokens tokens, Arena* permanent_arena, Arena scratch_arena)
 {
-  Parser parser = {.permanent_arena = permanent_arena,
-                   .scratch_arena = scratch_arena,
-                   .tokens = tokens,
-                   .current_token_index = 0,
-                   .has_error = false,
-                   .in_panic_mode = false,
-                   .errors = {
-                       .size = 0,
-                       .data = NULL,
-                   }};
+  Parser parser = {
+      .permanent_arena = permanent_arena,
+      .scratch_arena = scratch_arena,
+      .tokens = tokens,
+  };
 
   TranslationUnit* tu = parse_translation_unit(&parser);
 
-  return (ParseResult){.ast = parser.has_error ? NULL : tu,
-                       .errors = parser.errors};
+  const bool has_error = parser.errors.data != NULL;
+  const ParseErrorsView errors = (ParseErrorsView){
+      .length = parser.errors.length,
+      .data = parser.errors.data,
+  };
+  return (ParseResult){.ast = has_error ? NULL : tu, .errors = errors};
 }

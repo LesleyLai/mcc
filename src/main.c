@@ -82,14 +82,12 @@ static void print_parse_diagnostics(ParseErrorsView errors,
   Arena diagnostics_arena =
       arena_init(diagnostics_buffer, diagnostics_arena_size);
 
-  if (errors.size > 0) {
-    for (size_t i = 0; i < errors.size; ++i) {
-      StringBuffer output = string_buffer_new(&diagnostics_arena);
-      write_diagnostics(&output, src_filename, source, errors.data[i]);
-      StringView output_view = string_view_from_buffer(&output);
-      fprintf(stderr, "%*s", (int)output_view.size, output_view.start);
-      arena_reset(&diagnostics_arena);
-    }
+  for (size_t i = 0; i < errors.length; ++i) {
+    StringBuffer output = string_buffer_new(&diagnostics_arena);
+    write_diagnostics(&output, src_filename, source, errors.data[i]);
+    StringView output_view = string_view_from_buffer(&output);
+    fprintf(stderr, "%*s\n", (int)output_view.size, output_view.start);
+    arena_reset(&diagnostics_arena);
   }
 }
 

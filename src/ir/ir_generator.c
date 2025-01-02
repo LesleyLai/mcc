@@ -1,6 +1,8 @@
 #include <mcc/ir.h>
+#include <string.h>
 
 #include <mcc/ast.h>
+#include <mcc/dynarray.h>
 #include <mcc/format.h>
 
 /*
@@ -62,18 +64,23 @@ static IRInstructionType instruction_typ_from_binary_op(BinaryOpType op_type)
   MCC_UNREACHABLE();
 }
 
+typedef struct IRInstructions {
+  IRInstruction* data;
+  uint32_t length;
+  uint32_t capacity;
+} IRInstructions;
+
 typedef struct IRGenContext {
   Arena* permanent_arena;
-  size_t instruction_count;
-  IRInstruction* instructions;
+  Arena* scratch_arena;
+  IRInstructions instructions;
   int fresh_variable_counter;
 } IRGenContext;
 
 static void push_instruction(IRGenContext* context, IRInstruction instruction)
 {
-  // TODO: implement vector
-  MCC_ASSERT_MSG(context->instruction_count < 16, "Too many instructions!");
-  context->instructions[context->instruction_count++] = instruction;
+  DYNARRAY_PUSH_BACK(&context->instructions, IRInstruction,
+                     context->scratch_arena, instruction);
 }
 
 static StringView create_fresh_variable_name(IRGenContext* context)
@@ -138,13 +145,10 @@ generate_ir_function_def(const FunctionDecl* decl, Arena* permanent_arena,
                          Arena scratch_arena)
 
 {
-  (void)scratch_arena;
-
-  IRGenContext context = (IRGenContext){
-      .permanent_arena = permanent_arena,
-      .instruction_count = 0,
-      .instructions = ARENA_ALLOC_ARRAY(permanent_arena, IRInstruction, 16),
-      .fresh_variable_counter = 0};
+  IRGenContext context = (IRGenContext){.permanent_arena = permanent_arena,
+                                        .scratch_arena = &scratch_arena,
+                                        .instructions = {},
+                                        .fresh_variable_counter = 0};
 
   for (size_t i = 0; i < decl->body->statement_count; ++i) {
     const Stmt stmt = decl->body->statements[i];
@@ -163,9 +167,15 @@ generate_ir_function_def(const FunctionDecl* decl, Arena* permanent_arena,
     // TODO: handle other kinds of statements
   }
 
+  // allocate and copy instructions to permanent arena
+  IRInstruction* instructions = ARENA_ALLOC_ARRAY(
+      permanent_arena, IRInstruction, context.instructions.length);
+  memcpy(instructions, context.instructions.data,
+         context.instructions.length * sizeof(IRInstruction));
+
   return (IRFunctionDef){.name = decl->name,
-                         .instruction_count = context.instruction_count,
-                         .instructions = context.instructions};
+                         .instruction_count = context.instructions.length,
+                         .instructions = instructions};
 }
 
 IRProgram* ir_generate(TranslationUnit* ast, Arena* permanent_arena,
