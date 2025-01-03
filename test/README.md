@@ -28,7 +28,8 @@ The configuration file should follow this format:
 
 ```toml
 command = "{mcc} {filename} ; {base}"
-return_code = 1
+return_code = 1 # optional: 0 by default
+snapshot_test_stderr = false # optional: false by default
 ```
 
 #### `command`
@@ -46,6 +47,10 @@ The shell command to execute tests. The command is templated and the test runner
 By default, the test runner expect a return value of `0`. We can manually specify an expectedreturn value via
 `return_code`.
 
+#### `snapshot_test_stderr`
+
+If set to true, the test runner will perform snapshot testing for the standard error of the executed command.
+
 ### Override Test Configuration in Source
 
 Test configurations can also be overridden directly in the source files. These overrides take precedence over the
@@ -58,3 +63,9 @@ Currently, the only supported override is:
 ```
 
 Which override the expected return code to something else.
+
+Snapshot Testing
+
+To update snapshots interactively while running the test runner, use the `-i` argument.
+
+Currently, snapshot testing is limited to verifying standard error. If the output includes the base folder's path, the test runner automatically replaces it with `{{base_dir}}` to ensure deterministic outputs.

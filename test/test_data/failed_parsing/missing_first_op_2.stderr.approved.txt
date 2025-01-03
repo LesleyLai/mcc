@@ -1,0 +1,14 @@
+{{base_dir}}/failed_parsing/missing_first_op_2.c:2:12: Error: Expect valid expression
+1 |     int main(void) {
+2 |         return <= 2;
+  |                ^~   
+3 |     }
+4 |     
+
+{{base_dir}}/failed_parsing/missing_first_op_2.c:2:16: Error: Expect end of the file
+1 |     int main(void) {
+2 |         return <= 2;
+  |                    ^
+3 |     }
+4 |     
+

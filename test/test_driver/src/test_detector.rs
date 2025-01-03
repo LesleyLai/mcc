@@ -13,6 +13,9 @@ struct TestTomlConfig {
 
     #[serde(default)]
     return_code: i32,
+
+    #[serde(default)]
+    snapshot_test_stderr: bool,
 }
 
 #[derive(Deserialize, Debug)]
@@ -52,6 +55,7 @@ fn detect_tests_with_command(
                 path: path_handle,
                 expect_code: toml_config.return_code,
                 working_dir: current_dir_handle,
+                snapshot_test_stderr: toml_config.snapshot_test_stderr,
                 suffix,
             };
 

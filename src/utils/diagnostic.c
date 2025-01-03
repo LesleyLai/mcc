@@ -62,4 +62,5 @@ static void write_diagnostic_line(StringBuffer* output, const char* source,
       string_buffer_printf(output, " ");
     }
   }
+  string_buffer_printf(output, "\n");
 }

@@ -15,6 +15,9 @@ pub struct TestConfig {
     // Is non-empty when a test file has multiple configurations
     pub suffix: StringHandle,
     pub working_dir: PathHandle,
+
+    // snapshot stderr
+    pub snapshot_test_stderr: bool,
 }
 
 fn return_regex() -> &'static Regex {

@@ -1,0 +1,14 @@
+{{base_dir}}/failed_parsing/keyword_wrong_case.c:2:5: Error: Expect statement
+1 |     int main(void) {
+2 |         RETURN 0;
+  |         ^~~~~~   
+3 |     }
+4 |     
+
+{{base_dir}}/failed_parsing/keyword_wrong_case.c:2:5: Error: Expect end of the file
+1 |     int main(void) {
+2 |         RETURN 0;
+  |         ^~~~~~   
+3 |     }
+4 |     
+

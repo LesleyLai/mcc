@@ -1,0 +1,5 @@
+{{base_dir}}/failed_parsing/unclosed_brace.c:3:1: Error: Expect statement
+1 |     int main(void) {
+2 |         return 0;
+3 |     
+

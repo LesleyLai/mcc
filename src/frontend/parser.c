@@ -48,7 +48,6 @@ static void parse_error_at(Parser* parser, StringView error_msg, Token token)
 {
   if (parser->in_panic_mode) return;
 
-  // TODO: proper error handling
   ParseError error =
       (ParseError){.msg = error_msg, .range = token_source_range(token)};
   DYNARRAY_PUSH_BACK(&parser->errors, ParseError, parser->permanent_arena,

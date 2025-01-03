@@ -1,0 +1,7 @@
+{{base_dir}}/failed_parsing/no_parameter.c:1:10: Error: Expect keyword void
+1 |     int main() {
+  |              ^  
+2 |       return 0;
+3 |     }
+4 |     
+

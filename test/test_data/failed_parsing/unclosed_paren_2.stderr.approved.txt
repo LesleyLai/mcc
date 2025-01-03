@@ -1,0 +1,8 @@
+{{base_dir}}/failed_parsing/unclosed_paren_2.c:3:14: Error: Expect )
+1 |     int main(void)
+2 |     {
+3 |         return (1;
+  |                  ^
+4 |     }
+5 |     
+

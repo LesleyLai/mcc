@@ -1,0 +1,7 @@
+{{base_dir}}/failed_parsing/missing_type.c:1:1: Error: Expect keyword int
+1 |     main(void) {
+  |     ^~~~        
+2 |         return 0;
+3 |     }
+4 |     
+

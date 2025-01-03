@@ -1,0 +1,7 @@
+{{base_dir}}/failed_parsing/parenthesize_operand.c:2:14: Error: Expect valid expression
+1 |     int main(void) {
+2 |         return (-)3;
+  |                  ^  
+3 |     }
+4 |     
+
