@@ -51,8 +51,8 @@ static void replace_pseudo_register(struct UniqueNameMap* unique_names,
                                     X86Operand* operand)
 {
   if (operand->typ == X86_OPERAND_PSEUDO) {
-    *operand = stack_operand(
-        find_name_stack_offset(unique_names, operand->pseudo));
+    *operand =
+        stack_operand(find_name_stack_offset(unique_names, operand->pseudo));
   }
 }
 
@@ -76,10 +76,13 @@ intptr_t replace_pseudo_registers(X86FunctionDef* function)
       add_unique_name_if_pseudo(&unique_names, instruction->binary.src);
       add_unique_name_if_pseudo(&unique_names, instruction->binary.dest);
     } break;
-    case X86_INST_CDQ: break;
+    case X86_INST_CDQ:
+    case X86_INST_JMP:
+    case X86_INST_JMPCC: break;
     case X86_INST_SETCC: {
       add_unique_name_if_pseudo(&unique_names, instruction->setcc.op);
     } break;
+    case X86_INST_LABEL: break;
     }
   }
 
@@ -97,10 +100,13 @@ intptr_t replace_pseudo_registers(X86FunctionDef* function)
       replace_pseudo_register(&unique_names, &instruction->binary.src);
       replace_pseudo_register(&unique_names, &instruction->binary.dest);
     } break;
-    case X86_INST_CDQ: break;
+    case X86_INST_CDQ:
+    case X86_INST_JMP:
+    case X86_INST_JMPCC: break;
     case X86_INST_SETCC: {
       replace_pseudo_register(&unique_names, &instruction->setcc.op);
     } break;
+    case X86_INST_LABEL: break;
     }
   }
   return unique_names.count * 4;

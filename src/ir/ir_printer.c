@@ -45,6 +45,7 @@ void print_ir(const IRProgram* ir)
         print_ir_value(instruction.operand1);
         printf("\n");
       } break;
+      case IR_COPY: print_unary_op(instruction, "copy"); break;
       case IR_NEG: print_unary_op(instruction, "neg"); break;
       case IR_COMPLEMENT: print_unary_op(instruction, "complement"); break;
       case IR_NOT: print_unary_op(instruction, "not"); break;
@@ -67,6 +68,21 @@ void print_ir(const IRProgram* ir)
       case IR_LESS_EQUAL: print_binary_op(instruction, "le"); break;
       case IR_GREATER: print_binary_op(instruction, "gt"); break;
       case IR_GREATER_EQUAL: print_binary_op(instruction, "ge"); break;
+      case IR_JMP: {
+        printf("  jmp ");
+        printf(".%.*s\n", (int)instruction.label.size, instruction.label.start);
+      } break;
+      case IR_BR: {
+        printf("  br ");
+        print_ir_value(instruction.cond);
+        printf(" .%.*s .%.*s\n",                                           //
+               (int)instruction.if_label.size, instruction.if_label.start, //
+               (int)instruction.else_label.size, instruction.else_label.start);
+      } break;
+      case IR_LABEL: {
+        printf(".%.*s:\n", (int)instruction.label.size,
+               instruction.label.start);
+      } break;
       }
     }
   }

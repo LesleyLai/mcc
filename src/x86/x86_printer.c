@@ -81,6 +81,23 @@ static void print_x86_operand(X86Operand operand, X86Size size, FILE* stream)
   }
 }
 
+static void print_cond_jmp_instruction(X86Instruction instruction, FILE* stream)
+{
+  const char* name = nullptr;
+  switch (instruction.jmpcc.cond) {
+  case X86_COND_INVALID: MCC_UNREACHABLE(); break;
+  case X86_COND_E: name = "je"; break;
+  case X86_COND_NE: name = "jne"; break;
+  case X86_COND_G: name = "jg"; break;
+  case X86_COND_GE: name = "jge"; break;
+  case X86_COND_L: name = "jl"; break;
+  case X86_COND_LE: name = "jle"; break;
+  }
+  (void)fprintf(stream, "  %-6s ", name);
+  (void)fprintf(stream, ".L%*s", (int)instruction.jmpcc.label.size,
+                instruction.jmpcc.label.start);
+}
+
 static void print_cond_set_instruction(X86Instruction instruction, FILE* stream)
 {
   const char* name = nullptr;
@@ -157,7 +174,18 @@ void x86_print_instruction(X86Instruction instruction, FILE* stream)
   case X86_INST_CMP:
     print_binary_instruction("cmp", instruction, stream);
     break;
+  case X86_INST_JMP: {
+    (void)fprintf(stream, "  jmp .L%*s", (int)instruction.label.size,
+                  instruction.label.start);
+    break;
+  }
+  case X86_INST_JMPCC: print_cond_jmp_instruction(instruction, stream); break;
   case X86_INST_SETCC: print_cond_set_instruction(instruction, stream); break;
+  case X86_INST_LABEL: {
+    (void)fprintf(stream, ".L%*s:", (int)instruction.label.size,
+                  instruction.label.start);
+    break;
+  }
   }
 }
 

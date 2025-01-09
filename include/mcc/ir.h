@@ -41,6 +41,7 @@ typedef enum IRInstructionType {
   IR_RETURN, // return val
 
   // unary
+  IR_COPY,       // dest = src
   IR_NEG,        // dest = -src
   IR_COMPLEMENT, // dest = ~src
   IR_NOT,        // dest = !src
@@ -63,13 +64,36 @@ typedef enum IRInstructionType {
   IR_LESS_EQUAL,             // dest = src1 <= src2
   IR_GREATER,                // dest = src1 > src2
   IR_GREATER_EQUAL,          // dest = src1 >= src2
+
+  // unconditional jump
+  // jmp <label>
+  IR_JMP,
+  // conditional jump
+  // br <cond> <if_label> <else_label>
+  IR_BR,
+
+  IR_LABEL,
 } IRInstructionType;
 
 typedef struct IRInstruction {
   IRInstructionType typ;
-  IRValue operand1; // often dest
-  IRValue operand2;
-  IRValue operand3;
+  union {
+    struct {
+      IRValue operand1; // often dest
+      IRValue operand2;
+      IRValue operand3;
+    };
+    // Label or JMP
+    struct {
+      StringView label;
+    };
+    // Br
+    struct {
+      IRValue cond;
+      StringView if_label;
+      StringView else_label;
+    };
+  };
 } IRInstruction;
 
 #endif // MCC_IR_H

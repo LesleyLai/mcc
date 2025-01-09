@@ -86,7 +86,11 @@ typedef enum X86InstructionType {
   X86_INST_SAR, // Arithmetic Right Shift
   X86_INST_CMP, // Compare
 
+  X86_INST_JMP,   // unconditional jump
+  X86_INST_JMPCC, // conditional jump
   X86_INST_SETCC,
+  X86_INST_LABEL,
+
 } X86InstructionType;
 
 typedef enum X86CondCode {
@@ -113,8 +117,13 @@ struct X86Instruction {
     } binary;
     struct {
       X86CondCode cond;
+      StringView label;
+    } jmpcc;
+    struct {
+      X86CondCode cond;
       X86Operand op;
     } setcc;
+    StringView label; // label or jmp
   };
 };
 

@@ -1,3 +1,4 @@
+#include "mcc/prelude.h"
 #include "x86_passes.h"
 #include <mcc/ir.h>
 
@@ -98,14 +99,20 @@ static void generate_comparison_instruction(X86InstructionVector* instructions,
                                     .setcc = {.cond = cond_code, .op = dest}});
 }
 
+static const IRInstruction* get_instruction(const IRFunctionDef* function,
+                                            size_t i)
+{
+  return i < function->instruction_count ? &function->instructions[i] : nullptr;
+}
+
 // First pass to generate assembly. Still need fixing later
 X86FunctionDef x86_function_from_ir(const IRFunctionDef* ir_function,
-                                         Arena* scratch_arena)
+                                    Arena* scratch_arena)
 {
   X86InstructionVector instructions = {.arena = scratch_arena};
 
-  for (size_t j = 0; j < ir_function->instruction_count; ++j) {
-    const IRInstruction* ir_instruction = &ir_function->instructions[j];
+  for (size_t i = 0; i < ir_function->instruction_count; ++i) {
+    const IRInstruction* ir_instruction = get_instruction(ir_function, i);
     switch (ir_instruction->typ) {
     case IR_INVALID: MCC_UNREACHABLE(); break;
     case IR_RETURN: {
@@ -118,7 +125,13 @@ X86FunctionDef x86_function_from_ir(const IRFunctionDef* ir_function,
       push_instruction(&instructions, (X86Instruction){.typ = X86_INST_RET});
       break;
     }
-
+    case IR_COPY: {
+      X86Operand dest = x86_operand_from_ir(ir_instruction->operand1);
+      X86Operand src = x86_operand_from_ir(ir_instruction->operand2);
+      // mov dest src
+      push_instruction(&instructions,
+                       binary_instruction(X86_INST_MOV, X86_SZ_4, dest, src));
+    } break;
     case IR_NEG:
       push_unary_instruction(&instructions, X86_INST_NEG, ir_instruction);
       break;
@@ -178,6 +191,49 @@ X86FunctionDef x86_function_from_ir(const IRFunctionDef* ir_function,
     case IR_GREATER:
     case IR_GREATER_EQUAL:
       generate_comparison_instruction(&instructions, ir_instruction);
+      break;
+    case IR_JMP:
+      push_instruction(&instructions, (X86Instruction){
+                                          .typ = X86_INST_JMP,
+                                          .label = ir_instruction->label,
+                                      });
+      break;
+    case IR_BR: {
+      const X86Operand cond = x86_operand_from_ir(ir_instruction->cond);
+      const StringView if_label = ir_instruction->if_label;
+      const StringView else_label = ir_instruction->else_label;
+
+      const IRInstruction* next_instruction =
+          get_instruction(ir_function, i + 1);
+
+      if (next_instruction != nullptr && next_instruction->typ == IR_LABEL) {
+        // If the if_label is directly follow this instruction
+        if (string_view_eq(next_instruction->label, if_label)) {
+          // cmp cond, 0
+          push_instruction(&instructions,
+                           binary_instruction(X86_INST_CMP, X86_SZ_4, cond,
+                                              immediate_operand(0)));
+          // je .else_label
+          push_instruction(&instructions,
+                           (X86Instruction){.typ = X86_INST_JMPCC,
+                                            .jmpcc = {
+                                                .cond = X86_COND_E,
+                                                .label = else_label,
+                                            }});
+
+          break;
+        } else if (string_view_eq(next_instruction->label, else_label)) {
+          MCC_UNIMPLEMENTED();
+        }
+      }
+
+      MCC_UNIMPLEMENTED();
+    } break;
+    case IR_LABEL:
+      push_instruction(&instructions, (X86Instruction){
+                                          .typ = X86_INST_LABEL,
+                                          .label = ir_instruction->label,
+                                      });
       break;
     }
   }

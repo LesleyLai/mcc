@@ -10,6 +10,16 @@
  * Convenient "constructors"
  * =============================================================================
  */
+static IRValue ir_constant(int32_t constant)
+{
+  return (IRValue){.typ = IR_VALUE_TYPE_CONSTANT, .constant = constant};
+}
+
+static IRValue ir_variable(StringView name)
+{
+  return (IRValue){.typ = IR_VALUE_TYPE_VARIABLE, .variable = name};
+}
+
 static IRInstruction ir_single_operand_instr(IRInstructionType typ,
                                              IRValue operand)
 {
@@ -22,9 +32,23 @@ static IRInstruction ir_unary_instr(IRInstructionType typ, IRValue dst,
   return (IRInstruction){.typ = typ, .operand1 = dst, .operand2 = src};
 }
 
-static IRValue ir_variable(StringView name)
+static IRInstruction ir_label(StringView label)
 {
-  return (IRValue){.typ = IR_VALUE_TYPE_VARIABLE, .variable = name};
+  return (IRInstruction){.typ = IR_LABEL, .label = label};
+}
+
+static IRInstruction ir_jmp(StringView label)
+{
+  return (IRInstruction){.typ = IR_JMP, .label = label};
+}
+
+static IRInstruction ir_br(IRValue cond, StringView if_label,
+                           StringView else_label)
+{
+  return (IRInstruction){.typ = IR_BR,
+                         .cond = cond,
+                         .if_label = if_label,
+                         .else_label = else_label};
 }
 
 static IRInstructionType instruction_typ_from_unary_op(UnaryOpType op_type)
@@ -52,8 +76,8 @@ static IRInstructionType instruction_typ_from_binary_op(BinaryOpType op_type)
   case BINARY_OP_BITWISE_XOR: return IR_BITWISE_XOR;
   case BINARY_OP_SHIFT_LEFT: return IR_SHIFT_LEFT;
   case BINARY_OP_SHIFT_RIGHT: return IR_SHIFT_RIGHT_ARITHMETIC;
-  case BINARY_OP_AND: MCC_UNIMPLEMENTED();
-  case BINARY_OP_OR: MCC_UNIMPLEMENTED();
+  case BINARY_OP_AND: MCC_UNREACHABLE();
+  case BINARY_OP_OR: MCC_UNREACHABLE();
   case BINARY_OP_EQUAL: return IR_EQUAL;
   case BINARY_OP_NOT_EQUAL: return IR_NOT_EQUAL;
   case BINARY_OP_LESS: return IR_LESS;
@@ -75,6 +99,7 @@ typedef struct IRGenContext {
   Arena* scratch_arena;
   IRInstructions instructions;
   int fresh_variable_counter;
+  int fresh_label_counter;
 } IRGenContext;
 
 static void push_instruction(IRGenContext* context, IRInstruction instruction)
@@ -89,6 +114,43 @@ static StringView create_fresh_variable_name(IRGenContext* context)
                                                context->fresh_variable_counter);
   ++context->fresh_variable_counter;
   return string_view_from_c_str(variable_name_buffer);
+}
+
+static StringView create_fresh_label_name(IRGenContext* context,
+                                          const char* name)
+{
+  char* variable_name_buffer = allocate_printf(
+      context->permanent_arena, "%s_%d", name, context->fresh_label_counter);
+  ++context->fresh_label_counter;
+  return string_view_from_c_str(variable_name_buffer);
+}
+
+static IRValue emit_ir_instructions_from_expr(const Expr* expr,
+                                              IRGenContext* context);
+
+static IRValue emit_ir_instructions_from_binary_expr(const Expr* expr,
+                                                     IRGenContext* context)
+{
+  const IRInstructionType instruction_type =
+      instruction_typ_from_binary_op(expr->binary_op.binary_op_type);
+
+  const IRValue lhs =
+      emit_ir_instructions_from_expr(expr->binary_op.lhs, context);
+
+  const IRValue rhs =
+      emit_ir_instructions_from_expr(expr->binary_op.rhs, context);
+
+  const StringView dst_name = create_fresh_variable_name(context);
+  const IRValue dst = ir_variable(dst_name);
+
+  push_instruction(context, (IRInstruction){
+                                .typ = instruction_type,
+                                .operand1 = dst,
+                                .operand2 = lhs,
+                                .operand3 = rhs,
+                            });
+
+  return dst;
 }
 
 static IRValue emit_ir_instructions_from_expr(const Expr* expr,
@@ -114,26 +176,48 @@ static IRValue emit_ir_instructions_from_expr(const Expr* expr,
     return dst;
   }
   case EXPR_BINARY: {
-    const IRInstructionType instruction_type =
-        instruction_typ_from_binary_op(expr->binary_op.binary_op_type);
+    switch (expr->binary_op.binary_op_type) {
+    case BINARY_OP_AND: {
+      const IRValue lhs =
+          emit_ir_instructions_from_expr(expr->binary_op.lhs, context);
+      const StringView lhs_true_label =
+          create_fresh_label_name(context, "and_lhs_true");
+      const StringView rhs_true_label =
+          create_fresh_label_name(context, "and_rhs_true");
+      const StringView false_label =
+          create_fresh_label_name(context, "and_false");
+      const StringView end_label = create_fresh_label_name(context, "and_end");
 
-    const IRValue lhs =
-        emit_ir_instructions_from_expr(expr->binary_op.lhs, context);
+      const IRValue result = ir_variable(string_view_from_c_str("result"));
 
-    const IRValue rhs =
-        emit_ir_instructions_from_expr(expr->binary_op.rhs, context);
+      push_instruction(context, ir_br(lhs, lhs_true_label, false_label));
+      push_instruction(context, ir_label(lhs_true_label));
 
-    const StringView dst_name = create_fresh_variable_name(context);
-    const IRValue dst = ir_variable(dst_name);
+      const IRValue rhs =
+          emit_ir_instructions_from_expr(expr->binary_op.rhs, context);
 
-    push_instruction(context, (IRInstruction){
-                                  .typ = instruction_type,
-                                  .operand1 = dst,
-                                  .operand2 = lhs,
-                                  .operand3 = rhs,
-                              });
+      push_instruction(context, ir_br(rhs, rhs_true_label, false_label));
 
-    return dst;
+      // .if2:
+      // result = 1
+      push_instruction(context, ir_label(rhs_true_label));
+      push_instruction(context,
+                       ir_unary_instr(IR_COPY, result, ir_constant(1)));
+      push_instruction(context, ir_jmp(end_label));
+
+      // .false
+      push_instruction(context, ir_label(false_label));
+      // result = 0
+      push_instruction(context,
+                       ir_unary_instr(IR_COPY, result, ir_constant(0)));
+
+      push_instruction(context, ir_label(end_label));
+
+      return result;
+    }
+    case BINARY_OP_OR: MCC_UNIMPLEMENTED();
+    default: return emit_ir_instructions_from_binary_expr(expr, context);
+    }
   }
   }
 

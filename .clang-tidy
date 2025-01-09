@@ -19,6 +19,7 @@ readability-simplify-*,
 -*-no-recursion,
 -*-use-nullptr,
 -*-use-anonymous-namespace,
+-*-include-cleaner,
 '
 HeaderFilterRegex: 'catch.hpp'
 FormatStyle: 'file'
