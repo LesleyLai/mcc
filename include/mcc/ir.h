@@ -70,6 +70,7 @@ typedef enum IRInstructionType {
   IR_JMP,
   // conditional jump
   // br <cond> <if_label> <else_label>
+  // jump to <if_label> if <cond> is not zero, otherwise jump to <else_label>
   IR_BR,
 
   IR_LABEL,

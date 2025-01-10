@@ -153,6 +153,92 @@ static IRValue emit_ir_instructions_from_binary_expr(const Expr* expr,
   return dst;
 }
 
+static IRValue emit_ir_instructions_from_logical_and(const Expr* expr,
+                                                     IRGenContext* context)
+{
+  const IRValue lhs =
+      emit_ir_instructions_from_expr(expr->binary_op.lhs, context);
+  const StringView lhs_true_label =
+      create_fresh_label_name(context, "and_lhs_true");
+  const StringView rhs_true_label =
+      create_fresh_label_name(context, "and_rhs_true");
+  const StringView false_label = create_fresh_label_name(context, "and_false");
+  const StringView end_label = create_fresh_label_name(context, "and_end");
+
+  const IRValue result = ir_variable(string_view_from_c_str("result"));
+
+  // br lhs .and_lhs_true .and_false
+  push_instruction(context, ir_br(lhs, lhs_true_label, false_label));
+  // .and_lhs_true:
+  push_instruction(context, ir_label(lhs_true_label));
+
+  const IRValue rhs =
+      emit_ir_instructions_from_expr(expr->binary_op.rhs, context);
+
+  // br rhs .and_rhs_true .and_false
+  push_instruction(context, ir_br(rhs, rhs_true_label, false_label));
+
+  // .and_rhs_true:
+  // result = 1
+  // jmp .and_end
+  push_instruction(context, ir_label(rhs_true_label));
+  push_instruction(context, ir_unary_instr(IR_COPY, result, ir_constant(1)));
+  push_instruction(context, ir_jmp(end_label));
+
+  // .and_false:
+  // result = 0
+  push_instruction(context, ir_label(false_label));
+  push_instruction(context, ir_unary_instr(IR_COPY, result, ir_constant(0)));
+
+  // .and_end
+  push_instruction(context, ir_label(end_label));
+
+  return result;
+}
+
+static IRValue emit_ir_instructions_from_logical_or(const Expr* expr,
+                                                    IRGenContext* context)
+{
+  const IRValue lhs =
+      emit_ir_instructions_from_expr(expr->binary_op.lhs, context);
+  const StringView lhs_false_label =
+      create_fresh_label_name(context, "or_lhs_false");
+  const StringView rhs_false_label =
+      create_fresh_label_name(context, "or_rhs_false");
+  const StringView true_label = create_fresh_label_name(context, "or_true");
+  const StringView end_label = create_fresh_label_name(context, "or_end");
+
+  const IRValue result = ir_variable(string_view_from_c_str("result"));
+
+  // br lhs .or_true .or_lhs_false
+  push_instruction(context, ir_br(lhs, true_label, lhs_false_label));
+  // .or_lhs_false:
+  push_instruction(context, ir_label(lhs_false_label));
+
+  const IRValue rhs =
+      emit_ir_instructions_from_expr(expr->binary_op.rhs, context);
+
+  // br rhs .or_true .or_rhs_false
+  push_instruction(context, ir_br(rhs, true_label, rhs_false_label));
+
+  // .or_rhs_false:
+  // result = 0
+  // jmp .or_end
+  push_instruction(context, ir_label(rhs_false_label));
+  push_instruction(context, ir_unary_instr(IR_COPY, result, ir_constant(0)));
+  push_instruction(context, ir_jmp(end_label));
+
+  // .or_true:
+  // result = 1
+  push_instruction(context, ir_label(true_label));
+  push_instruction(context, ir_unary_instr(IR_COPY, result, ir_constant(1)));
+
+  // .or_end:
+  push_instruction(context, ir_label(end_label));
+
+  return result;
+}
+
 static IRValue emit_ir_instructions_from_expr(const Expr* expr,
                                               IRGenContext* context)
 {
@@ -177,45 +263,10 @@ static IRValue emit_ir_instructions_from_expr(const Expr* expr,
   }
   case EXPR_BINARY: {
     switch (expr->binary_op.binary_op_type) {
-    case BINARY_OP_AND: {
-      const IRValue lhs =
-          emit_ir_instructions_from_expr(expr->binary_op.lhs, context);
-      const StringView lhs_true_label =
-          create_fresh_label_name(context, "and_lhs_true");
-      const StringView rhs_true_label =
-          create_fresh_label_name(context, "and_rhs_true");
-      const StringView false_label =
-          create_fresh_label_name(context, "and_false");
-      const StringView end_label = create_fresh_label_name(context, "and_end");
-
-      const IRValue result = ir_variable(string_view_from_c_str("result"));
-
-      push_instruction(context, ir_br(lhs, lhs_true_label, false_label));
-      push_instruction(context, ir_label(lhs_true_label));
-
-      const IRValue rhs =
-          emit_ir_instructions_from_expr(expr->binary_op.rhs, context);
-
-      push_instruction(context, ir_br(rhs, rhs_true_label, false_label));
-
-      // .if2:
-      // result = 1
-      push_instruction(context, ir_label(rhs_true_label));
-      push_instruction(context,
-                       ir_unary_instr(IR_COPY, result, ir_constant(1)));
-      push_instruction(context, ir_jmp(end_label));
-
-      // .false
-      push_instruction(context, ir_label(false_label));
-      // result = 0
-      push_instruction(context,
-                       ir_unary_instr(IR_COPY, result, ir_constant(0)));
-
-      push_instruction(context, ir_label(end_label));
-
-      return result;
-    }
-    case BINARY_OP_OR: MCC_UNIMPLEMENTED();
+    case BINARY_OP_AND:
+      return emit_ir_instructions_from_logical_and(expr, context);
+    case BINARY_OP_OR:
+      return emit_ir_instructions_from_logical_or(expr, context);
     default: return emit_ir_instructions_from_binary_expr(expr, context);
     }
   }

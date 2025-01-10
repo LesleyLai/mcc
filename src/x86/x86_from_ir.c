@@ -222,8 +222,21 @@ X86FunctionDef x86_function_from_ir(const IRFunctionDef* ir_function,
                                             }});
 
           break;
+          // If the else_label is directly follow this instruction
         } else if (string_view_eq(next_instruction->label, else_label)) {
-          MCC_UNIMPLEMENTED();
+          // cmp cond, 0
+          push_instruction(&instructions,
+                           binary_instruction(X86_INST_CMP, X86_SZ_4, cond,
+                                              immediate_operand(0)));
+          // jne .if_label
+          push_instruction(&instructions,
+                           (X86Instruction){.typ = X86_INST_JMPCC,
+                                            .jmpcc = {
+                                                .cond = X86_COND_NE,
+                                                .label = if_label,
+                                            }});
+
+          break;
         }
       }
 
