@@ -85,9 +85,7 @@ typedef struct IRInstruction {
       IRValue operand3;
     };
     // Label or JMP
-    struct {
-      StringView label;
-    };
+    StringView label;
     // Br
     struct {
       IRValue cond;

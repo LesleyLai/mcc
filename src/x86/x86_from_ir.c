@@ -105,6 +105,15 @@ static const IRInstruction* get_instruction(const IRFunctionDef* function,
   return i < function->instruction_count ? &function->instructions[i] : nullptr;
 }
 
+static X86Instruction jmpcc(X86CondCode cond_code, StringView label)
+{
+  return (X86Instruction){.typ = X86_INST_JMPCC,
+                          .jmpcc = {
+                              .cond = cond_code,
+                              .label = label,
+                          }};
+}
+
 // First pass to generate assembly. Still need fixing later
 X86FunctionDef x86_function_from_ir(const IRFunctionDef* ir_function,
                                     Arena* scratch_arena)
@@ -203,44 +212,39 @@ X86FunctionDef x86_function_from_ir(const IRFunctionDef* ir_function,
       const StringView if_label = ir_instruction->if_label;
       const StringView else_label = ir_instruction->else_label;
 
+      // cmp cond, 0
+      push_instruction(&instructions,
+                       binary_instruction(X86_INST_CMP, X86_SZ_4, cond,
+                                          immediate_operand(0)));
+
       const IRInstruction* next_instruction =
           get_instruction(ir_function, i + 1);
 
+      bool skip_if = false;
+      bool skip_else = false;
+
       if (next_instruction != nullptr && next_instruction->typ == IR_LABEL) {
-        // If the if_label is directly follow this instruction
         if (string_view_eq(next_instruction->label, if_label)) {
-          // cmp cond, 0
-          push_instruction(&instructions,
-                           binary_instruction(X86_INST_CMP, X86_SZ_4, cond,
-                                              immediate_operand(0)));
-          // je .else_label
-          push_instruction(&instructions,
-                           (X86Instruction){.typ = X86_INST_JMPCC,
-                                            .jmpcc = {
-                                                .cond = X86_COND_E,
-                                                .label = else_label,
-                                            }});
-
-          break;
-          // If the else_label is directly follow this instruction
+          // If the if_label is directly follow this instruction
+          skip_if = true;
         } else if (string_view_eq(next_instruction->label, else_label)) {
-          // cmp cond, 0
-          push_instruction(&instructions,
-                           binary_instruction(X86_INST_CMP, X86_SZ_4, cond,
-                                              immediate_operand(0)));
-          // jne .if_label
-          push_instruction(&instructions,
-                           (X86Instruction){.typ = X86_INST_JMPCC,
-                                            .jmpcc = {
-                                                .cond = X86_COND_NE,
-                                                .label = if_label,
-                                            }});
-
-          break;
+          // If the else_label is directly follow this instruction
+          skip_else = true;
         }
       }
 
-      MCC_UNIMPLEMENTED();
+      MCC_ASSERT_MSG(
+          !(skip_if && skip_else),
+          "Need to at least generate jump instruction for one branch");
+      if (!skip_if) {
+        // jne .if_label
+        push_instruction(&instructions, jmpcc(X86_COND_NE, if_label));
+      }
+      if (!skip_else) {
+        // je .else_label
+        push_instruction(&instructions, jmpcc(X86_COND_E, else_label));
+      }
+
     } break;
     case IR_LABEL:
       push_instruction(&instructions, (X86Instruction){
