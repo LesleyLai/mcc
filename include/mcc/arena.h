@@ -24,8 +24,8 @@ __attribute((malloc))
 #endif
 void* arena_aligned_alloc(Arena* arena, size_t alignment, size_t size);
 
-void* arena_aligned_grow(Arena* arena, void* p, size_t new_alignment,
-                         size_t new_size);
+void* arena_aligned_realloc(Arena* arena, void* old_p, size_t alignment,
+                            size_t old_size, size_t new_size);
 
 #define ARENA_ALLOC_OBJECT(arena, Type)                                        \
   (Type*)arena_aligned_alloc((arena), alignof(Type), sizeof(Type))
@@ -33,7 +33,8 @@ void* arena_aligned_grow(Arena* arena, void* p, size_t new_alignment,
 #define ARENA_ALLOC_ARRAY(arena, Type, n)                                      \
   (Type*)arena_aligned_alloc((arena), alignof(Type), sizeof(Type) * (n))
 
-#define ARENA_GROW_ARRAY(arena, Type, p, n)                                    \
-  (Type*)arena_aligned_grow((arena), (p), alignof(Type), sizeof(Type) * (n))
+#define ARENA_REALLOC_ARRAY(arena, Type, old_p, old_n, new_n)                  \
+  (Type*)arena_aligned_realloc((arena), (old_p), alignof(Type),                \
+                               sizeof(Type) * (old_n), sizeof(Type) * (new_n))
 
 #endif // MCC_ARENA_H

@@ -14,9 +14,11 @@
 #define DYNARRAY_PUSH_BACK(arr, T, arena, elem)                                \
   do {                                                                         \
     if ((arr)->length == (arr)->capacity) {                                    \
+      const size_t old_capacity = (arr)->capacity;                             \
       (arr)->capacity = (arr)->capacity ? (arr)->capacity * 2 : 16;            \
-      (arr)->data = (T*)arena_aligned_grow((arena), (arr)->data, alignof(T),   \
-                                           (arr)->capacity * sizeof(T));       \
+      (arr)->data = (T*)arena_aligned_realloc(                                 \
+          (arena), (arr)->data, alignof(T), old_capacity * sizeof(T),          \
+          (arr)->capacity * sizeof(T));                                        \
     }                                                                          \
     (arr)->data[(arr)->length++] = elem;                                       \
   } while (0)

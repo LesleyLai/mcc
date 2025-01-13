@@ -1,4 +1,4 @@
-#include <mcc/parser.h>
+#include <mcc/frontend.h>
 
 #include <mcc/ast.h>
 #include <mcc/dynarray.h>
@@ -16,25 +16,33 @@ struct ParseErrorVec {
 };
 
 typedef struct Parser {
+  const char* src;
+
   Arena* permanent_arena;
   Arena scratch_arena;
 
   Tokens tokens;
-  int current_token_index;
+  uint32_t current_token_index;
 
   bool has_error;
   bool in_panic_mode;
 
   struct ParseErrorVec errors;
+  const LineNumTable* line_num_table;
 } Parser;
 
-static SourceRange token_source_range(Token token)
+static SourceRange token_source_range(const Parser* parser, Token token)
 {
-  return (SourceRange){
-      .begin = token.location,
-      .end = {.line = token.location.line,
-              .column = token.location.column + (uint32_t)token.src.size,
-              .offset = token.location.offset + token.src.size}};
+  const LineColumn start_line_column =
+      calculate_line_and_column(parser->line_num_table, token.start);
+  const LineColumn end_line_column = calculate_line_and_column(
+      parser->line_num_table, token.start + token.size);
+  return (SourceRange){.begin = {.line = start_line_column.line,
+                                 .column = start_line_column.column,
+                                 .offset = token.start},
+                       .end = {.line = end_line_column.line,
+                               .column = end_line_column.column,
+                               .offset = token.start + token.size}};
 }
 
 static SourceRange source_range_union(SourceRange lhs, SourceRange rhs)
@@ -48,41 +56,26 @@ static void parse_error_at(Parser* parser, StringView error_msg, Token token)
 {
   if (parser->in_panic_mode) return;
 
-  ParseError error =
-      (ParseError){.msg = error_msg, .range = token_source_range(token)};
+  ParseError error = (ParseError){.msg = error_msg,
+                                  .range = token_source_range(parser, token)};
   DYNARRAY_PUSH_BACK(&parser->errors, ParseError, parser->permanent_arena,
                      error);
 
   parser->in_panic_mode = true;
 }
 
-static void assert_in_range(Parser* parser, int token_index)
-{
-  if (token_index < 0) {
-    (void)fprintf(stderr, "Negative token index %i!\n", token_index);
-    exit(1);
-  }
-
-  if (parser->tokens.begin + token_index >= parser->tokens.end) {
-    (void)fprintf(stderr, "Token index out of bound: %i (total %li)!\n",
-                  token_index, parser->tokens.end - parser->tokens.begin);
-    exit(1);
-  }
-}
-
 // gets the current token
 static Token parser_current_token(Parser* parser)
 {
-  assert_in_range(parser, parser->current_token_index);
-  return parser->tokens.begin[parser->current_token_index];
+  return get_token(&parser->tokens, parser->current_token_index);
 }
 
 // gets the current token
 static Token parser_previous_token(Parser* parser)
 {
-  int previous_token_index = parser->current_token_index - 1;
-  assert_in_range(parser, previous_token_index);
-  return parser->tokens.begin[previous_token_index];
+  MCC_ASSERT(parser->current_token_index > 0);
+  const uint32_t previous_token_index = parser->current_token_index - 1;
+  return get_token(&parser->tokens, previous_token_index);
 }
 
 // whether we are at the end
@@ -101,7 +94,8 @@ static void parse_advance(Parser* parser)
     parser->current_token_index++;
     Token current = parser_current_token(parser);
     if (current.type != TOKEN_ERROR) break;
-    parse_error_at(parser, current.src, current);
+    parse_error_at(parser, string_view_from_c_str("unexpected character"),
+                   current);
   }
 }
 
@@ -123,15 +117,15 @@ static Expr* parse_number_literal(Parser* parser)
   const Token token = parser_previous_token(parser);
 
   char* end_ptr;
-  const int val =
-      (int)strtol(token.src.start, &end_ptr, 10); // TODO(llai): replace strtol
+  const int val = (int)strtol(parser->src + token.start, &end_ptr,
+                              10); // TODO(llai): replace strtol
 
-  MCC_ASSERT_MSG(end_ptr == token.src.start + token.src.size,
+  MCC_ASSERT_MSG(end_ptr == parser->src + token.start + token.size,
                  "Not used all characters for numbers");
 
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
   *result = (Expr){.type = EXPR_CONST,
-                   .source_range = token_source_range(token),
+                   .source_range = token_source_range(parser, token),
                    .const_expr = (struct ConstExpr){.val = val}};
   return result;
 }
@@ -274,9 +268,10 @@ static Expr* parse_unary_op(Parser* parser)
   // build result
   // TODO: better way to handle the case where expr == NULL
   SourceRange result_source_range =
-      expr == NULL ? token_source_range(operator_token)
-                   : source_range_union(token_source_range(operator_token),
-                                        expr->source_range);
+      expr == NULL
+          ? token_source_range(parser, operator_token)
+          : source_range_union(token_source_range(parser, operator_token),
+                               expr->source_range);
 
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
   *result = (Expr){.type = EXPR_UNARY,
@@ -324,7 +319,7 @@ static Expr* parse_binary_op_left_associative(Parser* parser, Expr* lhs_expr)
 
   // build result
   // TODO: Fix this
-  SourceRange result_source_range = token_source_range(operator_token);
+  SourceRange result_source_range = token_source_range(parser, operator_token);
 
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
   *result = (Expr){.type = EXPR_BINARY,
@@ -401,10 +396,19 @@ static CompoundStmt parse_compound_stmt(Parser* parser)
                         .statement_count = stmt_vector.length};
 }
 
+static SourceLocation token_source_location(const Parser* parser, Token token)
+{
+  const LineColumn line_column =
+      calculate_line_and_column(parser->line_num_table, token.start);
+  return (SourceLocation){.offset = token.start,
+                          .line = line_column.line,
+                          .column = line_column.column};
+}
+
 static void parse_stmt(Parser* parser, Stmt* out_stmt)
 {
   const Token current_token = parser_current_token(parser);
-  const SourceLocation first_loc = current_token.location;
+  const SourceLocation first_loc = token_source_location(parser, current_token);
 
   switch (current_token.type) {
   case TOKEN_KEYWORD_RETURN: {
@@ -415,7 +419,8 @@ static void parse_stmt(Parser* parser, Stmt* out_stmt)
     *out_stmt =
         (Stmt){.type = STMT_RETURN,
                .source_range = {.begin = first_loc,
-                                .end = parser_previous_token(parser).location},
+                                .end = token_source_location(
+                                    parser, parser_previous_token(parser))},
                .ret = return_stmt};
 
     return;
@@ -428,7 +433,8 @@ static void parse_stmt(Parser* parser, Stmt* out_stmt)
     *out_stmt =
         (Stmt){.type = STMT_COMPOUND,
                .source_range = {.begin = first_loc,
-                                .end = parser_previous_token(parser).location},
+                                .end = token_source_location(
+                                    parser, parser_previous_token(parser))},
                .compound = compound};
     return;
   }
@@ -456,12 +462,14 @@ static StringView parse_identifier(Parser* parser)
                    current_token);
   }
   parse_advance(parser);
-  return current_token.src;
+  return (StringView){.start = parser->src + current_token.start,
+                      .size = current_token.size};
 }
 
 static FunctionDecl* parse_function_decl(Parser* parser)
 {
-  const SourceLocation first_location = parser_current_token(parser).location;
+  const SourceLocation first_location =
+      token_source_location(parser, parser_current_token(parser));
 
   parse_consume(parser, TOKEN_KEYWORD_INT, "Expect keyword int");
   StringView function_name = parse_identifier(parser);
@@ -478,7 +486,8 @@ static FunctionDecl* parse_function_decl(Parser* parser)
     parse_consume(parser, TOKEN_SEMICOLON, "Expect ;");
   }
 
-  const SourceLocation last_location = parser_current_token(parser).location;
+  const SourceLocation last_location =
+      token_source_location(parser, parser_current_token(parser));
 
   FunctionDecl* decl =
       ARENA_ALLOC_OBJECT(parser->permanent_arena, FunctionDecl);
@@ -505,12 +514,17 @@ static TranslationUnit* parse_translation_unit(Parser* parser)
   return tu;
 }
 
-ParseResult parse(Tokens tokens, Arena* permanent_arena, Arena scratch_arena)
+ParseResult parse(const char* src_filename, const char* src, Tokens tokens,
+                  Arena* permanent_arena, Arena scratch_arena)
 {
   Parser parser = {
+      .src = src,
+      .tokens = tokens,
       .permanent_arena = permanent_arena,
       .scratch_arena = scratch_arena,
-      .tokens = tokens,
+      .line_num_table =
+          get_line_num_table(src_filename, string_view_from_c_str(src),
+                             permanent_arena, scratch_arena),
   };
 
   TranslationUnit* tu = parse_translation_unit(&parser);

@@ -6,7 +6,7 @@ add_library(mcc_lib
         ${include_dir}/prelude.h
         ${include_dir}/format.h
         ${include_dir}/ast.h
-        ${include_dir}/parser.h
+        ${include_dir}/frontend.h
         ${include_dir}/source_location.h
         ${include_dir}/diagnostic.h
         ${include_dir}/cli_args.h
@@ -22,6 +22,7 @@ add_library(mcc_lib
         utils/diagnostic.c
         utils/cli_args.c
 
+        frontend/line_numbers.c
         frontend/lexer.c
         frontend/ast_printer.c
         frontend/parser.c

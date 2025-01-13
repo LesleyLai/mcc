@@ -79,9 +79,10 @@ static void string_buffer_grow(StringBuffer* self, size_t new_capacity)
   MCC_ASSERT_MSG(new_capacity > self->capacity_,
                  "Only call string_buffer_grow when the capacity of self is "
                  "not big enough");
+  self->data_ =
+      arena_aligned_realloc(self->allocator, self->data_, alignof(char),
+                            self->capacity_ + 1, new_capacity + 1);
   self->capacity_ = new_capacity;
-  self->data_ = arena_aligned_grow(self->allocator, self->data_, alignof(char),
-                                   new_capacity + 1);
 }
 
 void string_buffer_push(StringBuffer* self, char c)

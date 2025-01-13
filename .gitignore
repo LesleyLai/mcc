@@ -6,6 +6,7 @@ cmake-build-*
 *.obj
 *.o
 .venv
+*.i
 
 test/test_driver/target
 

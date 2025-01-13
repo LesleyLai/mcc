@@ -1,3 +1,4 @@
+#include <mcc/frontend.h>
 #include <mcc/token.h>
 
 #include <stdio.h>
@@ -63,18 +64,22 @@ static const char* token_type_string(TokenType type)
   return "unknown";
 }
 
-void print_tokens(Tokens* tokens)
+void print_tokens(const char* src, const Tokens* tokens,
+                  const LineNumTable* line_num_table)
 {
-  for (Token* token_itr = tokens->begin; token_itr != tokens->end;
-       ++token_itr) {
-    Token token = *token_itr;
+  // TODO: fix this
+  for (uint32_t i = 0; i < tokens->token_count; ++i) {
+    const Token token = get_token(tokens, i);
 
-    int src_padding_size = 10 - (int)token.src.size;
+    const LineColumn line_column =
+        calculate_line_and_column(line_num_table, token.start);
+
+    int src_padding_size = 10 - (int)(token.size);
     if (src_padding_size < 0) src_padding_size = 0;
 
-    printf("%-10s src=\"%.*s\"%*s line=%-2i column=%-2i offset=%li\n",
-           token_type_string(token.type), (int)token.src.size, token.src.start,
-           src_padding_size, "", token.location.line, token.location.column,
-           token.location.offset);
+    printf("%-10s src=\"%.*s\"%*s line=%-2i column=%-2i offset=%u\n",
+           token_type_string(token.type), (int)token.size, src + token.start,
+           src_padding_size, "", line_column.line, line_column.column,
+           token.start);
   }
 }

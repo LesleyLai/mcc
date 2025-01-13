@@ -4,7 +4,7 @@
 #include "source_location.h"
 #include "str.h"
 
-typedef enum TokenType {
+typedef enum TokenType : char {
   TOKEN_INVALID = 0,
 
   TOKEN_LEFT_PAREN,    // (
@@ -69,18 +69,25 @@ typedef enum TokenType {
 } TokenType;
 
 typedef struct Token {
-  StringView src;
   TokenType type;
-  SourceLocation location;
+  uint32_t start; // The offset of the starting character in a token
+  uint32_t size;
 } Token;
 
-/// @brief A view of tokens
+/// @brief An SOA view of tokens
 typedef struct Tokens {
-  Token* begin; // Points to the first element of the token array
-  Token* end;   // Points to one plus the last element of the token array
+  TokenType* token_types;
+  uint32_t* token_starts;
+  uint32_t* token_sizes;
+  uint32_t token_count;
 } Tokens;
 
-/// @brief Print Tokens
-void print_tokens(Tokens* tokens);
+inline static Token get_token(const Tokens* tokens, uint32_t i)
+{
+  MCC_ASSERT(i < tokens->token_count);
+  return MCC_COMPOUND_LITERAL(Token){.type = tokens->token_types[i],
+                                     .start = tokens->token_starts[i],
+                                     .size = tokens->token_sizes[i]};
+}
 
 #endif // MCC_TOKEN_H

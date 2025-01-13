@@ -6,8 +6,8 @@
 #include <mcc/ast.h>
 #include <mcc/cli_args.h>
 #include <mcc/diagnostic.h>
+#include <mcc/frontend.h>
 #include <mcc/ir.h>
-#include <mcc/parser.h>
 #include <mcc/prelude.h>
 #include <mcc/str.h>
 #include <mcc/x86.h>
@@ -166,17 +166,21 @@ int main(int argc, char* argv[])
 
   Tokens tokens = lex(source, &permanent_arena, scratch_arena);
   if (args.stop_after_lexer) {
-    print_tokens(&tokens);
+    const LineNumTable* line_num_table =
+        get_line_num_table(src_filename, string_view_from_c_str(source),
+                           &permanent_arena, scratch_arena);
+
+    print_tokens(source, &tokens, line_num_table);
 
     bool has_error = false;
-    for (Token* token_itr = tokens.begin; token_itr != tokens.end;
-         ++token_itr) {
-      if (token_itr->type == TOKEN_ERROR) { has_error = true; }
+    for (uint32_t i = 0; i < tokens.token_count; ++i) {
+      if (tokens.token_types[i] == TOKEN_ERROR) { has_error = true; }
     }
     exit(has_error ? 1 : 0);
   }
 
-  ParseResult parse_result = parse(tokens, &permanent_arena, scratch_arena);
+  ParseResult parse_result =
+      parse(src_filename, source, tokens, &permanent_arena, scratch_arena);
   print_parse_diagnostics(parse_result.errors, src_filename, source);
 
   if (parse_result.ast == NULL) {

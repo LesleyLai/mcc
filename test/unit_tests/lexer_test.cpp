@@ -1,33 +1,14 @@
-
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_range_equals.hpp>
 
-#include <fmt/format.h>
-
-#include <algorithm>
-#include <ranges>
+#include <span>
 
 extern "C" {
 #include <mcc/arena.h>
-#include <mcc/parser.h>
+#include <mcc/frontend.h>
 }
 
-namespace stdr = std::ranges;
-namespace stdv = std::views;
 using Catch::Matchers::RangeEquals;
-
-class TokensView : public std::ranges::view_interface<TokensView> {
-public:
-  TokensView() = default;
-  explicit TokensView(Tokens tokens) : begin_(tokens.begin), end_(tokens.end) {}
-
-  [[nodiscard]] auto begin() const { return begin_; }
-  [[nodiscard]] auto end() const { return end_; }
-
-private:
-  Token* begin_;
-  Token* end_;
-};
 
 TEST_CASE("Lexer lex symbols", "[lexer]")
 {
@@ -79,6 +60,8 @@ TEST_CASE("Lexer lex symbols", "[lexer]")
                                            TOKEN_SEMICOLON,
                                            TOKEN_EOF};
 
-  const TokensView tokens{lex(input, &permanent_arena, scratch_arena)};
-  REQUIRE_THAT(stdv::transform(tokens, &Token::type), RangeEquals(expected));
+  const auto tokens = lex(input, &permanent_arena, scratch_arena);
+  const std::span<const TokenType> token_types(tokens.token_types,
+                                               tokens.token_count);
+  REQUIRE_THAT(expected, RangeEquals(token_types));
 }

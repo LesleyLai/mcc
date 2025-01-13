@@ -34,55 +34,52 @@ void* arena_aligned_alloc(Arena* arena, size_t alignment, size_t size)
   return aligned_ptr;
 }
 
-// Reallocate and copy old data
-static void* _arena_reallocate(Arena* arena, size_t new_alignment,
-                               size_t old_size, size_t new_size)
-{
-  const void* old_p = arena->previous;
-  void* new_p = arena_aligned_alloc(arena, new_alignment, new_size);
-  memcpy(new_p, old_p, old_size);
-  return new_p;
-}
-
 /**
- * @brief Attempts to extends the memory block pointed by `p`, or allocate a new
- * memory block if `p` is null
+ * @brief Attempts to extends the memory block pointed by `old_p`, or allocate a
+ * new memory block if `old_p` is null
  * @pre The old size is smaller than the new size
  * @pre The arena has enough memory to allocate
- * @pre `p` point to either the most recent allocated block of the arena or null
+ *
+ * @warning If the old size does not match the actual size of the allocation
+ * pointed by `old_p`, the behavior is undefined. Similarly, if the specified
+ * alignment does not mathc the actual alignment
  *
  * The growth is done either by:
- * - extending the existing area of `p` when possible. The content of the
+ * - extending the existing area of `old_p` when possible. The content of the
  * old part of the area is unchanged, and the content of the new part of the
  * area is undefined.
  * - Allocating a new chunk of memory and copying memory area of the old
  * block to there.
  *
- * This function always perform reallocation if p does not satisfy the
- * alignment requirement of `new_alignment`.
+ * This function always perform reallocation if old_p does not satisfy the
+ * alignment requirement of `alignment`.
  *
  * If successful, returns a pointer to the new allocated block. The memory
- * pointed by `p` should be considered inaccessible afterward.
+ * pointed by `old_p` should be considered inaccessible afterward.
  */
-void* arena_aligned_grow(Arena* arena, void* p, size_t new_alignment,
-                         size_t new_size)
+void* arena_aligned_realloc(Arena* arena, void* old_p, size_t alignment,
+                            size_t old_size, size_t new_size)
 {
-  // TODO: test this
-  // If p is null, allocate a new memory block
-  if (p == NULL) { return arena_aligned_alloc(arena, new_alignment, new_size); }
+  if (old_p == NULL) { return arena_aligned_alloc(arena, alignment, new_size); }
 
-  MCC_ASSERT_MSG(p == arena->previous,
-                 "Can't grow a point that does not point to the most recent "
-                 "allocated block of the arena");
+  if (old_p != arena->previous) {
+    // old_p does not point to the latest allocation of arena, reallocate
+    void* new_p = arena_aligned_alloc(arena, alignment, new_size);
+    memcpy(new_p, old_p, old_size);
+    return new_p;
+  }
 
   MCC_ASSERT_MSG(arena->size_remain >= new_size, "arena is too small");
 
-  Byte* aligned_ptr = align_forward(arena->previous, new_alignment);
-  const size_t old_size = (size_t)(arena->current - arena->previous);
+  Byte* aligned_ptr = align_forward(arena->previous, alignment);
+  MCC_ASSERT(old_size == (size_t)(arena->current - arena->previous));
   MCC_ASSERT_MSG(old_size < new_size, "Old size is too small");
 
-  if (p != aligned_ptr) {
-    return _arena_reallocate(arena, new_alignment, old_size, new_size);
+  if (old_p != aligned_ptr) {
+    // can't extend previous allocation, realloc
+    void* new_p = arena_aligned_alloc(arena, alignment, new_size);
+    memcpy(new_p, old_p, old_size);
+    return new_p;
   }
 
   arena->size_remain = arena->size_remain + old_size - new_size;

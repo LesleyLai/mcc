@@ -50,7 +50,7 @@ TEST_CASE("Arena allocation")
   }
 }
 
-TEST_CASE("Arena growing")
+TEST_CASE("Arena realloc")
 {
   constexpr auto size = 100;
   std::uint8_t buffer[size] = {};
@@ -68,26 +68,46 @@ TEST_CASE("Arena growing")
   p1[0] = '4';
   p1[1] = '2';
 
+  SECTION("realloc without a previous allocation")
+  {
+    static constexpr std::size_t new_alloc_size = 32;
+    [[maybe_unused]] auto* p =
+        ARENA_REALLOC_ARRAY(&arena, uint8_t, nullptr, 0, new_alloc_size);
+    REQUIRE(arena.current == buffer + total_old_alloc_size + new_alloc_size);
+  }
+
   SECTION("Inplace grow")
   {
     static constexpr std::size_t new_alloc_size = 32;
-    auto* p2 = ARENA_GROW_ARRAY(&arena, uint8_t, p1, new_alloc_size);
+    auto* p2 = ARENA_REALLOC_ARRAY(&arena, uint8_t, p1, second_alloc_size,
+                                   new_alloc_size);
     REQUIRE(p2 == p1);
     REQUIRE(arena.current == buffer + first_alloc_size + new_alloc_size);
     REQUIRE(p2[0] == '4');
     REQUIRE(p2[1] == '2');
   }
 
-  SECTION("Calling grow with mismatched alignment should reallocate")
+  SECTION("mismatched alignment")
   {
     static constexpr std::size_t new_alloc_size = 8;
-    auto* p2 = static_cast<uint8_t*>(
-        arena_aligned_grow(&arena, p1, 4, new_alloc_size));
+    auto* p2 = static_cast<uint8_t*>(arena_aligned_realloc(
+        &arena, p1, 4, second_alloc_size, new_alloc_size));
     REQUIRE(p2 != nullptr);
     REQUIRE(p2 != p1);
     REQUIRE(p2[0] == '4');
     REQUIRE(p2[1] == '2');
     REQUIRE(arena.current ==
             buffer + total_old_alloc_size + 1 + new_alloc_size);
+  }
+
+  SECTION("pointer not point to the last allocation")
+  {
+    static constexpr std::size_t new_alloc_size = 8;
+    auto* p2 = ARENA_REALLOC_ARRAY(&arena, uint8_t, p0, first_alloc_size,
+                                   new_alloc_size);
+    REQUIRE(p2 != nullptr);
+    REQUIRE(p2 != p0);
+    REQUIRE(p2[0] == 'x');
+    REQUIRE(arena.current == buffer + total_old_alloc_size + new_alloc_size);
   }
 }
