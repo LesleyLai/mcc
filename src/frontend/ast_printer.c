@@ -3,12 +3,14 @@
 
 static void print_source_range(SourceRange range)
 {
-  if (range.begin.line != range.end.line) {
-    printf("lines: %d..%d", range.begin.line, range.end.line);
-  } else {
-    printf("line: %d column: %d..%d", //
-           range.begin.line, range.begin.column, range.end.column);
-  }
+  // TODO: fix this
+  (void)range;
+  //  if (range.begin.line != range.end.line) {
+  //    printf("lines: %d..%d", range.begin.line, range.end.line);
+  //  } else {
+  //    printf("line: %d column: %d..%d", //
+  //           range.begin.line, range.begin.column, range.end.column);
+  //  }
 }
 
 static const char* unary_op_name(UnaryOpType unary_op_type)

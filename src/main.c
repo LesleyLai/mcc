@@ -73,24 +73,6 @@ static char* string_from_file(FILE* file, Arena* permanent_arena)
   return buffer;
 }
 
-static void print_parse_diagnostics(ParseErrorsView errors,
-                                    const char* src_filename,
-                                    const char* source)
-{
-  enum { diagnostics_arena_size = 40000 }; // 40 Mb virtual memory
-  uint8_t diagnostics_buffer[diagnostics_arena_size];
-  Arena diagnostics_arena =
-      arena_init(diagnostics_buffer, diagnostics_arena_size);
-
-  for (size_t i = 0; i < errors.length; ++i) {
-    StringBuffer output = string_buffer_new(&diagnostics_arena);
-    write_diagnostics(&output, src_filename, source, errors.data[i]);
-    StringView output_view = str_from_buffer(&output);
-    fprintf(stderr, "%*s\n", (int)output_view.size, output_view.start);
-    arena_reset(&diagnostics_arena);
-  }
-}
-
 static StringBuffer replace_extension(const char* filename, const char* ext,
                                       Arena* permanent_arena)
 {
@@ -161,15 +143,16 @@ int main(int argc, char* argv[])
     return 1;
   }
 
-  const char* source = string_from_file(preprocessed_file, &permanent_arena);
+  const char* src_start = string_from_file(preprocessed_file, &permanent_arena);
+  StringView source_str = str(src_start);
   fclose(preprocessed_file);
 
-  Tokens tokens = lex(source, &permanent_arena, scratch_arena);
+  Tokens tokens = lex(src_start, &permanent_arena, scratch_arena);
   if (args.stop_after_lexer) {
     const LineNumTable* line_num_table = get_line_num_table(
-        src_filename, str(source), &permanent_arena, scratch_arena);
+        src_filename, source_str, &permanent_arena, scratch_arena);
 
-    print_tokens(source, &tokens, line_num_table);
+    print_tokens(src_start, &tokens, line_num_table);
 
     bool has_error = false;
     for (uint32_t i = 0; i < tokens.token_count; ++i) {
@@ -179,8 +162,10 @@ int main(int argc, char* argv[])
   }
 
   ParseResult parse_result =
-      parse(src_filename, source, tokens, &permanent_arena, scratch_arena);
-  print_parse_diagnostics(parse_result.errors, src_filename, source);
+      parse(src_start, tokens, &permanent_arena, scratch_arena);
+  const DiagnosticsContext diagnostics_context = create_diagnostic_context(
+      src_filename, source_str, &permanent_arena, scratch_arena);
+  print_parse_diagnostics(parse_result.errors, &diagnostics_context);
 
   if (parse_result.ast == NULL) {
     // Failed to parse program

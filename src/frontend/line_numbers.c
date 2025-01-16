@@ -16,19 +16,20 @@ static LineNumTable create_line_num_table(StringView src,
                                           Arena* permanent_arena,
                                           Arena scratch_arena);
 
-const LineNumTable* get_line_num_table(const char* file_name, StringView src,
+const LineNumTable* get_line_num_table(const char* filename, StringView source,
                                        Arena* permanent_arena,
                                        Arena scratch_arena)
 {
   if (cached_file_name == nullptr) {
-    cached_file_name = file_name;
+    cached_file_name = filename;
   } else {
-    MCC_ASSERT_MSG(strcmp(file_name, cached_file_name) == 0,
+    MCC_ASSERT_MSG(strcmp(filename, cached_file_name) == 0,
                    "We currently only support one file");
   }
 
   if (!table_initialized) {
-    cached_table = create_line_num_table(src, permanent_arena, scratch_arena);
+    cached_table =
+        create_line_num_table(source, permanent_arena, scratch_arena);
     table_initialized = true;
   }
 

@@ -1,45 +1,61 @@
 #include <mcc/diagnostic.h>
+#include <mcc/frontend.h>
 
 #include <mcc/format.h>
 #include <stdio.h>
 
-static void write_diagnostic_line(StringBuffer* output, const char* source,
-                                  SourceRange range, const char* line_start,
-                                  const char* line_end);
-
-void write_diagnostics(StringBuffer* output, const char* file_path,
-                       const char* source, ParseError error)
+DiagnosticsContext create_diagnostic_context(const char* filename,
+                                             StringView source,
+                                             Arena* permanent_arena,
+                                             Arena scratch_arena)
 {
-  const StringView msg = error.msg;
-  const SourceRange range = error.range;
+  const LineNumTable* line_num_table =
+      get_line_num_table(filename, source, permanent_arena, scratch_arena);
+  return (DiagnosticsContext){
+      .filename = filename, .source = source, .line_num_table = line_num_table};
+}
 
+static void write_diagnostic_line(StringBuffer* output, SourceRange error_range,
+                                  uint32_t line_begin, uint32_t line_end);
+
+void write_diagnostics(StringBuffer* output, const Error* error,
+                       const DiagnosticsContext* context)
+{
+  const char* file_path = context->filename;
+  const StringView source = context->source;
+
+  const StringView msg = error->msg;
+  const SourceRange error_range = error->range;
+
+  const LineColumn line_column =
+      calculate_line_and_column(context->line_num_table, error_range.begin);
   string_buffer_printf(output, "%s:%u:%u: Error: %.*s\n", file_path,
-                       range.begin.line, range.begin.column, (int)msg.size,
+                       line_column.line, line_column.column, (int)msg.size,
                        msg.start);
 
   bool this_line_in_error = false;
-  const char* line_start = source;
+  uint32_t line_begin = 0;
   uint32_t line = 1;
   string_buffer_printf(output, "%d |     ", line);
 
-  for (const char* itr = source; *itr != '\0'; ++itr) {
-    const size_t offset = (size_t)(itr - source);
-    const bool in_error_range =
-        offset >= range.begin.offset && offset < range.end.offset;
+  for (uint32_t i = 0; i < source.size; ++i) {
+    const bool in_error_range = i >= error_range.begin && i < error_range.end;
     this_line_in_error |= in_error_range;
 
-    string_buffer_printf(output, "%c", *itr);
+    const char c = source.start[i];
 
-    if (*itr == '\n') {
+    string_buffer_printf(output, "%c", c);
+
+    if (c == '\n') {
       // handle windows line ending
-      const char* line_end =
-          (itr > source && *(itr - 1) == '\r') ? (itr - 1) : itr;
+      const uint32_t line_end =
+          (i != 0 && source.start[i - 1] == '\r') ? (i - 1) : i;
 
       if (this_line_in_error) {
-        write_diagnostic_line(output, source, range, line_start, line_end);
+        write_diagnostic_line(output, error_range, line_begin, line_end);
       }
       this_line_in_error = false;
-      line_start = itr + 1;
+      line_begin = i + 1;
       ++line;
       string_buffer_printf(output, "%d |     ", line);
     }
@@ -47,20 +63,35 @@ void write_diagnostics(StringBuffer* output, const char* file_path,
   string_buffer_printf(output, "\n");
 }
 
-static void write_diagnostic_line(StringBuffer* output, const char* source,
-                                  SourceRange range, const char* line_start,
-                                  const char* line_end)
+static void write_diagnostic_line(StringBuffer* output, SourceRange error_range,
+                                  uint32_t line_begin, uint32_t line_end)
 {
   string_buffer_printf(output, "  |     ");
-  for (const char* itr = line_start; itr < line_end; ++itr) {
-    const size_t offset = (size_t)(itr - source);
-    if (offset == range.begin.offset) {
+  for (uint32_t i = line_begin; i < line_end; ++i) {
+    if (i == error_range.begin) {
       string_buffer_printf(output, "^");
-    } else if (offset > range.begin.offset && offset < range.end.offset) {
+    } else if (i > error_range.begin && i < error_range.end) {
       string_buffer_printf(output, "~");
     } else {
       string_buffer_printf(output, " ");
     }
   }
   string_buffer_printf(output, "\n");
+}
+
+void print_parse_diagnostics(ErrorsView errors,
+                             const DiagnosticsContext* context)
+{
+  enum { diagnostics_arena_size = 40000 }; // 40 Mb
+  uint8_t diagnostics_buffer[diagnostics_arena_size];
+  Arena diagnostics_arena =
+      arena_init(diagnostics_buffer, diagnostics_arena_size);
+
+  for (size_t i = 0; i < errors.length; ++i) {
+    StringBuffer output = string_buffer_new(&diagnostics_arena);
+    write_diagnostics(&output, &errors.data[i], context);
+    StringView output_view = str_from_buffer(&output);
+    fprintf(stderr, "%*s\n", (int)output_view.size, output_view.start);
+    arena_reset(&diagnostics_arena);
+  }
 }

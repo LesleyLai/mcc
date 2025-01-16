@@ -4,7 +4,6 @@
 #include <mcc/dynarray.h>
 #include <mcc/format.h>
 
-#include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -12,7 +11,7 @@
 struct ParseErrorVec {
   size_t length;
   size_t capacity;
-  ParseError* data;
+  Error* data;
 };
 
 typedef struct Parser {
@@ -28,38 +27,25 @@ typedef struct Parser {
   bool in_panic_mode;
 
   struct ParseErrorVec errors;
-  const LineNumTable* line_num_table;
 } Parser;
 
-static SourceRange token_source_range(const Parser* parser, Token token)
+static SourceRange token_source_range(Token token)
 {
-  const LineColumn start_line_column =
-      calculate_line_and_column(parser->line_num_table, token.start);
-  const LineColumn end_line_column = calculate_line_and_column(
-      parser->line_num_table, token.start + token.size);
-  return (SourceRange){.begin = {.line = start_line_column.line,
-                                 .column = start_line_column.column,
-                                 .offset = token.start},
-                       .end = {.line = end_line_column.line,
-                               .column = end_line_column.column,
-                               .offset = token.start + token.size}};
+  return (SourceRange){.begin = token.start, .end = token.start + token.size};
 }
 
 static SourceRange source_range_union(SourceRange lhs, SourceRange rhs)
 {
-  return (SourceRange){
-      .begin = (lhs.begin.offset < rhs.begin.offset) ? lhs.begin : rhs.begin,
-      .end = (lhs.end.offset > rhs.end.offset) ? lhs.end : rhs.end};
+  return (SourceRange){.begin = (lhs.begin < rhs.begin) ? lhs.begin : rhs.begin,
+                       .end = (lhs.end > rhs.end) ? lhs.end : rhs.end};
 }
 
 static void parse_error_at(Parser* parser, StringView error_msg, Token token)
 {
   if (parser->in_panic_mode) return;
 
-  ParseError error = (ParseError){.msg = error_msg,
-                                  .range = token_source_range(parser, token)};
-  DYNARRAY_PUSH_BACK(&parser->errors, ParseError, parser->permanent_arena,
-                     error);
+  Error error = (Error){.msg = error_msg, .range = token_source_range(token)};
+  DYNARRAY_PUSH_BACK(&parser->errors, Error, parser->permanent_arena, error);
 
   parser->in_panic_mode = true;
 }
@@ -104,9 +90,7 @@ static void parse_consume(Parser* parser, TokenType type, const char* error_msg)
 {
   const Token current = parser_current_token(parser);
 
-  if (current.type != type) {
-    parse_error_at(parser, str(error_msg), current);
-  }
+  if (current.type != type) { parse_error_at(parser, str(error_msg), current); }
 
   parse_advance(parser);
 }
@@ -124,7 +108,7 @@ static Expr* parse_number_literal(Parser* parser)
 
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
   *result = (Expr){.type = EXPR_CONST,
-                   .source_range = token_source_range(parser, token),
+                   .source_range = token_source_range(token),
                    .const_expr = (struct ConstExpr){.val = val}};
   return result;
 }
@@ -267,10 +251,9 @@ static Expr* parse_unary_op(Parser* parser)
   // build result
   // TODO: better way to handle the case where expr == NULL
   SourceRange result_source_range =
-      expr == NULL
-          ? token_source_range(parser, operator_token)
-          : source_range_union(token_source_range(parser, operator_token),
-                               expr->source_range);
+      expr == NULL ? token_source_range(operator_token)
+                   : source_range_union(token_source_range(operator_token),
+                                        expr->source_range);
 
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
   *result = (Expr){.type = EXPR_UNARY,
@@ -318,7 +301,7 @@ static Expr* parse_binary_op_left_associative(Parser* parser, Expr* lhs_expr)
 
   // build result
   // TODO: Fix this
-  SourceRange result_source_range = token_source_range(parser, operator_token);
+  SourceRange result_source_range = token_source_range(operator_token);
 
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
   *result = (Expr){.type = EXPR_BINARY,
@@ -395,19 +378,9 @@ static CompoundStmt parse_compound_stmt(Parser* parser)
                         .statement_count = stmt_vector.length};
 }
 
-static SourceLocation token_source_location(const Parser* parser, Token token)
-{
-  const LineColumn line_column =
-      calculate_line_and_column(parser->line_num_table, token.start);
-  return (SourceLocation){.offset = token.start,
-                          .line = line_column.line,
-                          .column = line_column.column};
-}
-
 static void parse_stmt(Parser* parser, Stmt* out_stmt)
 {
   const Token current_token = parser_current_token(parser);
-  const SourceLocation first_loc = token_source_location(parser, current_token);
 
   switch (current_token.type) {
   case TOKEN_KEYWORD_RETURN: {
@@ -417,9 +390,8 @@ static void parse_stmt(Parser* parser, Stmt* out_stmt)
 
     *out_stmt =
         (Stmt){.type = STMT_RETURN,
-               .source_range = {.begin = first_loc,
-                                .end = token_source_location(
-                                    parser, parser_previous_token(parser))},
+               .source_range = {.begin = current_token.start,
+                                .end = parser_previous_token(parser).start},
                .ret = return_stmt};
 
     return;
@@ -431,9 +403,8 @@ static void parse_stmt(Parser* parser, Stmt* out_stmt)
 
     *out_stmt =
         (Stmt){.type = STMT_COMPOUND,
-               .source_range = {.begin = first_loc,
-                                .end = token_source_location(
-                                    parser, parser_previous_token(parser))},
+               .source_range = {.begin = current_token.start,
+                                .end = parser_previous_token(parser).start},
                .compound = compound};
     return;
   }
@@ -465,8 +436,7 @@ static StringView parse_identifier(Parser* parser)
 
 static FunctionDecl* parse_function_decl(Parser* parser)
 {
-  const SourceLocation first_location =
-      token_source_location(parser, parser_current_token(parser));
+  const uint32_t start_offset = parser_current_token(parser).start;
 
   parse_consume(parser, TOKEN_KEYWORD_INT, "Expect keyword int");
   StringView function_name = parse_identifier(parser);
@@ -483,13 +453,11 @@ static FunctionDecl* parse_function_decl(Parser* parser)
     parse_consume(parser, TOKEN_SEMICOLON, "Expect ;");
   }
 
-  const SourceLocation last_location =
-      token_source_location(parser, parser_current_token(parser));
-
   FunctionDecl* decl =
       ARENA_ALLOC_OBJECT(parser->permanent_arena, FunctionDecl);
   *decl = (FunctionDecl){
-      .source_range = {.begin = first_location, .end = last_location},
+      .source_range = {.begin = start_offset,
+                       .end = parser_current_token(parser).start},
       .name = function_name,
       .body = body,
   };
@@ -511,22 +479,18 @@ static TranslationUnit* parse_translation_unit(Parser* parser)
   return tu;
 }
 
-ParseResult parse(const char* src_filename, const char* src, Tokens tokens,
-                  Arena* permanent_arena, Arena scratch_arena)
+ParseResult parse(const char* src, Tokens tokens, Arena* permanent_arena,
+                  Arena scratch_arena)
 {
-  Parser parser = {
-      .src = src,
-      .tokens = tokens,
-      .permanent_arena = permanent_arena,
-      .scratch_arena = scratch_arena,
-      .line_num_table = get_line_num_table(src_filename, str(src),
-                                           permanent_arena, scratch_arena),
-  };
+  Parser parser = {.src = src,
+                   .tokens = tokens,
+                   .permanent_arena = permanent_arena,
+                   .scratch_arena = scratch_arena};
 
   TranslationUnit* tu = parse_translation_unit(&parser);
 
   const bool has_error = parser.errors.data != NULL;
-  const ParseErrorsView errors = (ParseErrorsView){
+  const ErrorsView errors = (ErrorsView){
       .length = parser.errors.length,
       .data = parser.errors.data,
   };
