@@ -9,6 +9,23 @@ extern "C" {
 
 using namespace std::string_view_literals;
 
+TEST_CASE("String View")
+{
+  SECTION("str_eq")
+  {
+    REQUIRE(not str_eq(str("0"), str("012")));
+    REQUIRE(str_eq(str("123"), str("123")));
+    REQUIRE(not str_eq(str("123"), str("124")));
+  }
+
+  SECTION("str_start_with")
+  {
+    REQUIRE(not str_start_with(str("0"), str("012")));
+    REQUIRE(str_start_with(str("2134"), str("21")));
+    REQUIRE(not str_start_with(str("234"), str("21")));
+  }
+}
+
 TEST_CASE("String Buffer")
 {
   constexpr auto buffer_size = 1000;
@@ -24,10 +41,8 @@ TEST_CASE("String Buffer")
     string_buffer_push(&string, 'a');
     REQUIRE(string_buffer_size(string) == 1);
     REQUIRE(string_buffer_data(&string)[0] == 'a');
-    REQUIRE(string_view_eq(string_view_from_buffer(&string),
-                           string_view_from_c_str("a")));
-    REQUIRE(!string_view_eq(string_view_from_buffer(&string),
-                            string_view_from_c_str("")));
+    REQUIRE(str_eq(str_from_buffer(&string), str("a")));
+    REQUIRE(!str_eq(str_from_buffer(&string), str("")));
   }
 
   SECTION("StringBuffer can grow from small to large")
@@ -53,35 +68,31 @@ TEST_CASE("String Buffer")
     SECTION("Small to small")
     {
       auto string = string_buffer_from_c_str("Hello, ", &arena);
-      string_buffer_append(&string, string_view_from_c_str("world!"));
+      string_buffer_append(&string, str("world!"));
 
-      REQUIRE(string_view_eq(string_view_from_buffer(&string),
-                             string_view_from_c_str("Hello, world!")));
+      REQUIRE(str_eq(str_from_buffer(&string), str("Hello, world!")));
     }
 
     SECTION("Small to large")
     {
       auto string = string_buffer_from_c_str("Hello ", &arena);
       string_buffer_append(&string,
-                           string_view_from_c_str(
-                               "from this really really really weird string!"));
+                           str("from this really really really weird string!"));
 
-      REQUIRE(string_view_eq(
-          string_view_from_buffer(&string),
-          string_view_from_c_str(
-              "Hello from this really really really weird string!")));
+      REQUIRE(
+          str_eq(str_from_buffer(&string),
+                 str("Hello from this really really really weird string!")));
     }
 
     SECTION("Large to large")
     {
       auto string = string_buffer_from_c_str(
           "Hello from this really really really ", &arena);
-      string_buffer_append(&string, string_view_from_c_str("weird string!"));
+      string_buffer_append(&string, str("weird string!"));
 
-      REQUIRE(string_view_eq(
-          string_view_from_buffer(&string),
-          string_view_from_c_str(
-              "Hello from this really really really weird string!")));
+      REQUIRE(
+          str_eq(str_from_buffer(&string),
+                 str("Hello from this really really really weird string!")));
     }
   }
 }

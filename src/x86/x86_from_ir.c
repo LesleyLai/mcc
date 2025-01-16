@@ -224,10 +224,10 @@ X86FunctionDef x86_function_from_ir(const IRFunctionDef* ir_function,
       bool skip_else = false;
 
       if (next_instruction != nullptr && next_instruction->typ == IR_LABEL) {
-        if (string_view_eq(next_instruction->label, if_label)) {
+        if (str_eq(next_instruction->label, if_label)) {
           // If the if_label is directly follow this instruction
           skip_if = true;
-        } else if (string_view_eq(next_instruction->label, else_label)) {
+        } else if (str_eq(next_instruction->label, else_label)) {
           // If the else_label is directly follow this instruction
           skip_else = true;
         }

@@ -113,7 +113,7 @@ static StringView create_fresh_variable_name(IRGenContext* context)
   char* variable_name_buffer = allocate_printf(context->permanent_arena, "$%d",
                                                context->fresh_variable_counter);
   ++context->fresh_variable_counter;
-  return string_view_from_c_str(variable_name_buffer);
+  return str(variable_name_buffer);
 }
 
 static StringView create_fresh_label_name(IRGenContext* context,
@@ -122,7 +122,7 @@ static StringView create_fresh_label_name(IRGenContext* context,
   char* variable_name_buffer = allocate_printf(
       context->permanent_arena, "%s_%d", name, context->fresh_label_counter);
   ++context->fresh_label_counter;
-  return string_view_from_c_str(variable_name_buffer);
+  return str(variable_name_buffer);
 }
 
 static IRValue emit_ir_instructions_from_expr(const Expr* expr,
@@ -165,7 +165,7 @@ static IRValue emit_ir_instructions_from_logical_and(const Expr* expr,
   const StringView false_label = create_fresh_label_name(context, "and_false");
   const StringView end_label = create_fresh_label_name(context, "and_end");
 
-  const IRValue result = ir_variable(string_view_from_c_str("result"));
+  const IRValue result = ir_variable(str("result"));
 
   // br lhs .and_lhs_true .and_false
   push_instruction(context, ir_br(lhs, lhs_true_label, false_label));
@@ -208,7 +208,7 @@ static IRValue emit_ir_instructions_from_logical_or(const Expr* expr,
   const StringView true_label = create_fresh_label_name(context, "or_true");
   const StringView end_label = create_fresh_label_name(context, "or_end");
 
-  const IRValue result = ir_variable(string_view_from_c_str("result"));
+  const IRValue result = ir_variable(str("result"));
 
   // br lhs .or_true .or_lhs_false
   push_instruction(context, ir_br(lhs, true_label, lhs_false_label));

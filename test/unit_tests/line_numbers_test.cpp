@@ -14,7 +14,7 @@ using Catch::Matchers::RangeEquals;
 
 TEST_CASE("Line numbers calculation", "[lexer]")
 {
-  const StringView src = string_view_from_c_str(R"(int main(void)
+  const StringView src = str(R"(int main(void)
 {
   return 0;
 }

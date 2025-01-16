@@ -13,7 +13,7 @@ static intptr_t try_find_unique_name(const struct UniqueNameMap* map,
                                      StringView name)
 {
   for (intptr_t i = 0; i < map->count; ++i) {
-    if (string_view_eq(map->unique_names[i], name)) { return i; }
+    if (str_eq(map->unique_names[i], name)) { return i; }
   }
   return -1;
 }

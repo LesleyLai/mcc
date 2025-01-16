@@ -5,6 +5,8 @@ extern "C" {
 #include <mcc/dynarray.h>
 }
 
+#include "arenas.hpp"
+
 struct IntVector {
   uint32_t capacity = 0;
   uint32_t length = 0;
@@ -18,7 +20,7 @@ struct IntVector {
 
 TEST_CASE("DynArray", "[dynarray]")
 {
-  Arena arena = arena_from_virtual_mem(1024);
+  Arena arena = get_scratch_arena();
   IntVector vector;
 
   REQUIRE(vector.length == 0);

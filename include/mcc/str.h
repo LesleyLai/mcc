@@ -19,9 +19,10 @@ typedef struct StringBuffer {
   Arena* allocator;
 } StringBuffer;
 
-StringView string_view_from_c_str(const char* source);
-StringView string_view_from_buffer(const StringBuffer* buffer);
-bool string_view_eq(StringView lhs, StringView rhs);
+StringView str(const char* source); // Create a string view from c string
+StringView str_from_buffer(const StringBuffer* buffer);
+bool str_eq(StringView lhs, StringView rhs);
+bool str_start_with(StringView s, StringView start);
 
 StringBuffer string_buffer_new(Arena* allocator);
 StringBuffer string_buffer_from_c_str(const char* source, Arena* allocator);

@@ -1,4 +1,5 @@
 #include <mcc/cli_args.h>
+#include <mcc/str.h>
 
 #include <mcc/prelude.h>
 
@@ -39,28 +40,33 @@ CliArgs parse_cli_args(int argc, char** argv)
   CliArgs result = {0};
 
   for (int i = 1; i < argc; ++i) {
-    const char* arg = argv[i];
-    if (!strcmp(arg, "--help") || !strcmp(arg, "-h")) {
+    const StringView arg = str(argv[i]);
+
+    if (str_eq(arg, str("--help")) || str_eq(arg, str("-h"))) {
       print_usage(stdout);
       print_options();
       exit(0);
-    } else if (!strcmp(arg, "--lex")) {
+    } else if (str_eq(arg, str("--lex"))) {
       result.stop_after_lexer = true;
-    } else if (!strcmp(arg, "--parse")) {
+    } else if (str_eq(arg, str("--parse"))) {
       result.stop_after_parser = true;
-    } else if (!strcmp(arg, "-S")) {
+    } else if (str_eq(arg, str("-S"))) {
       result.compile_only = true;
-    } else if (!strcmp(arg, "-c")) {
+    } else if (str_eq(arg, str("-c"))) {
       result.stop_before_linker = true;
-    } else if (!strcmp(arg, "--ir") || !strcmp(arg, "--tacky")) {
+    } else if (str_eq(arg, str("--ir")) || str_eq(arg, str("--tacky"))) {
       // The --tacky command is used for "Writing a compiler" book's test cases
       result.gen_ir_only = true;
-    } else if (!strcmp(arg, "--codegen")) {
-      // The --tacky command is used for "Writing a compiler" book's test cases
+    } else if (str_eq(arg, str("--codegen"))) {
       result.codegen_only = true;
+    } else if (str_start_with(arg, str("-"))) {
+      (void)fprintf(
+          stderr,
+          "mcc: fatal error: unrecognized command-line option: '%.*s'\n",
+          (int)arg.size, arg.start);
     } else {
       // TODO: support more than one source file
-      result.source_filename = arg;
+      result.source_filename = argv[i];
     }
   }
 

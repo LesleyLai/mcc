@@ -9,18 +9,21 @@ static_assert(sizeof(StringView) == 2 * sizeof(void*),
 static_assert(sizeof(StringBuffer) == 4 * sizeof(void*),
               "Size of a StringView should be 4 pointer size");
 
-StringView string_view_from_c_str(const char* source)
+StringView str(const char* source)
 {
   return (StringView){.start = source, .size = strlen(source)};
 }
 
-bool string_view_eq(StringView lhs, StringView rhs)
+bool str_eq(StringView lhs, StringView rhs)
 {
   if (lhs.size != rhs.size) return false;
-  for (size_t i = 0; i < lhs.size; ++i) {
-    if (lhs.start[i] != rhs.start[i]) { return false; }
-  }
-  return true;
+  return strncmp(lhs.start, rhs.start, lhs.size) == 0;
+}
+
+bool str_start_with(StringView s, StringView start)
+{
+  if (s.size < start.size) { return false; }
+  return strncmp(s.start, start.start, start.size) == 0;
 }
 
 StringBuffer string_buffer_new(Arena* allocator)
@@ -30,7 +33,7 @@ StringBuffer string_buffer_new(Arena* allocator)
 
 StringBuffer string_buffer_from_c_str(const char* source, Arena* allocator)
 {
-  return string_buffer_from_view(string_view_from_c_str(source), allocator);
+  return string_buffer_from_view(str(source), allocator);
 }
 
 StringBuffer string_buffer_from_view(StringView source, Arena* allocator)
@@ -47,7 +50,7 @@ StringBuffer string_buffer_from_view(StringView source, Arena* allocator)
   return buffer;
 }
 
-StringView string_view_from_buffer(const StringBuffer* buffer)
+StringView str_from_buffer(const StringBuffer* buffer)
 {
   return (StringView){.start = string_buffer_c_str(buffer),
                       .size = string_buffer_size(*buffer)};

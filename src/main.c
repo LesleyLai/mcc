@@ -85,7 +85,7 @@ static void print_parse_diagnostics(ParseErrorsView errors,
   for (size_t i = 0; i < errors.length; ++i) {
     StringBuffer output = string_buffer_new(&diagnostics_arena);
     write_diagnostics(&output, src_filename, source, errors.data[i]);
-    StringView output_view = string_view_from_buffer(&output);
+    StringView output_view = str_from_buffer(&output);
     fprintf(stderr, "%*s\n", (int)output_view.size, output_view.start);
     arena_reset(&diagnostics_arena);
   }
@@ -101,7 +101,7 @@ static StringBuffer replace_extension(const char* filename, const char* ext,
 
   StringBuffer output = string_buffer_new(permanent_arena);
   string_buffer_append(&output, name_without_ext);
-  string_buffer_append(&output, string_view_from_c_str(ext));
+  string_buffer_append(&output, str(ext));
 
   return output;
 }
@@ -166,9 +166,8 @@ int main(int argc, char* argv[])
 
   Tokens tokens = lex(source, &permanent_arena, scratch_arena);
   if (args.stop_after_lexer) {
-    const LineNumTable* line_num_table =
-        get_line_num_table(src_filename, string_view_from_c_str(source),
-                           &permanent_arena, scratch_arena);
+    const LineNumTable* line_num_table = get_line_num_table(
+        src_filename, str(source), &permanent_arena, scratch_arena);
 
     print_tokens(source, &tokens, line_num_table);
 
@@ -216,8 +215,7 @@ int main(int argc, char* argv[])
 
   const StringBuffer obj_filename =
       replace_extension(src_filename, ".o", &permanent_arena);
-  assemble(string_view_from_buffer(&asm_filename),
-           string_view_from_buffer(&obj_filename));
+  assemble(str_from_buffer(&asm_filename), str_from_buffer(&obj_filename));
 
   if (args.stop_before_linker) { return 0; }
 

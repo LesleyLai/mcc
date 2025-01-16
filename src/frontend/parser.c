@@ -94,8 +94,7 @@ static void parse_advance(Parser* parser)
     parser->current_token_index++;
     Token current = parser_current_token(parser);
     if (current.type != TOKEN_ERROR) break;
-    parse_error_at(parser, string_view_from_c_str("unexpected character"),
-                   current);
+    parse_error_at(parser, str("unexpected character"), current);
   }
 }
 
@@ -106,7 +105,7 @@ static void parse_consume(Parser* parser, TokenType type, const char* error_msg)
   const Token current = parser_current_token(parser);
 
   if (current.type != type) {
-    parse_error_at(parser, string_view_from_c_str(error_msg), current);
+    parse_error_at(parser, str(error_msg), current);
   }
 
   parse_advance(parser);
@@ -225,7 +224,7 @@ static Expr* parse_precedence(Parser* parser, Precedence precedence)
   const PrefixParseFn prefix_rule =
       get_rule(parser_previous_token(parser).type)->prefix;
   if (prefix_rule == NULL) {
-    parse_error_at(parser, string_view_from_c_str("Expect valid expression"),
+    parse_error_at(parser, str("Expect valid expression"),
                    parser_previous_token(parser));
     return NULL;
   }
@@ -439,8 +438,7 @@ static void parse_stmt(Parser* parser, Stmt* out_stmt)
     return;
   }
   default: {
-    parse_error_at(parser, string_view_from_c_str("Expect statement"),
-                   current_token);
+    parse_error_at(parser, str("Expect statement"), current_token);
     break;
   }
   }
@@ -458,8 +456,7 @@ static StringView parse_identifier(Parser* parser)
   const Token current_token = parser_current_token(parser);
 
   if (current_token.type != TOKEN_IDENTIFIER) {
-    parse_error_at(parser, string_view_from_c_str("Expect Identifier"),
-                   current_token);
+    parse_error_at(parser, str("Expect Identifier"), current_token);
   }
   parse_advance(parser);
   return (StringView){.start = parser->src + current_token.start,
@@ -522,9 +519,8 @@ ParseResult parse(const char* src_filename, const char* src, Tokens tokens,
       .tokens = tokens,
       .permanent_arena = permanent_arena,
       .scratch_arena = scratch_arena,
-      .line_num_table =
-          get_line_num_table(src_filename, string_view_from_c_str(src),
-                             permanent_arena, scratch_arena),
+      .line_num_table = get_line_num_table(src_filename, str(src),
+                                           permanent_arena, scratch_arena),
   };
 
   TranslationUnit* tu = parse_translation_unit(&parser);
