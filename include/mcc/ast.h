@@ -9,9 +9,10 @@
 typedef enum ExprType {
   EXPR_INVALID = 0,
   EXPR_CONST,
+  EXPR_VARIABLE,
   EXPR_UNARY,
   EXPR_BINARY
-} ExprType;
+} ExprTag;
 
 typedef enum UnaryOpType {
   UNARY_OP_INVALID = 0,
@@ -44,6 +45,18 @@ typedef enum BinaryOpType {
   BINARY_OP_LESS_EQUAL,
   BINARY_OP_GREATER,
   BINARY_OP_GREATER_EQUAL,
+
+  BINARY_OP_ASSIGNMENT, // a = b
+  BINARY_OP_PLUS_EQUAL,
+  BINARY_OP_MINUS_EQUAL,
+  BINARY_OP_MULT_EQUAL,
+  BINARY_OP_DIVIDE_EQUAL,
+  BINARY_OP_MOD_EQUAL,
+  BINARY_OP_BITWISE_AND_EQUAL,
+  BINARY_OP_BITWISE_OR_EQUAL,
+  BINARY_OP_BITWISE_XOR_EQUAL,
+  BINARY_OP_SHIFT_LEFT_EQUAL,
+  BINARY_OP_SHIFT_RIGHT_EQUAL,
 } BinaryOpType;
 
 typedef struct Expr Expr;
@@ -65,26 +78,34 @@ struct BinaryOpExpr {
 
 typedef struct Expr {
   SourceRange source_range;
-  ExprType type;
+  ExprTag tag;
   union {
     struct ConstExpr const_expr;
     struct UnaryOpExpr unary_op;
     struct BinaryOpExpr binary_op;
+    struct StringView variable;
   };
 } Expr;
 
+typedef struct VariableDecl {
+  StringView name;
+  const Expr* initializer; // An optional initializer
+} VariableDecl;
+
 typedef enum StatementType {
   STMT_INVALID = 0,
+  STMT_EMPTY,
+  STMT_EXPR, // An expression statement
   STMT_COMPOUND,
   STMT_RETURN
 } StatementType;
 
-typedef struct Stmt Stmt;
+typedef struct BlockItem BlockItem;
 
-typedef struct CompoundStmt {
-  size_t statement_count;
-  Stmt* statements;
-} CompoundStmt;
+typedef struct Block {
+  size_t child_count;
+  BlockItem* children;
+} Block;
 
 typedef struct ReturnStmt {
   Expr* expr;
@@ -94,15 +115,28 @@ typedef struct Stmt {
   SourceRange source_range;
   StatementType type;
   union {
-    CompoundStmt compound;
+    Block compound;
     ReturnStmt ret;
   };
 } Stmt;
 
+enum BlockItemTag {
+  BLOCK_ITEM_STMT,
+  BLOCK_ITEM_DECL,
+};
+
+typedef struct BlockItem {
+  enum BlockItemTag tag;
+  union {
+    Stmt stmt;
+    VariableDecl decl;
+  };
+} BlockItem;
+
 typedef struct FunctionDecl {
   SourceRange source_range;
   StringView name;
-  CompoundStmt* body;
+  Block* body;
 } FunctionDecl;
 
 typedef struct TranslationUnit {
@@ -110,6 +144,6 @@ typedef struct TranslationUnit {
   FunctionDecl* decls;
 } TranslationUnit;
 
-void ast_print_translation_unit(TranslationUnit* tu);
+void ast_print_translation_unit(const TranslationUnit* tu);
 
 #endif // MCC_AST_H

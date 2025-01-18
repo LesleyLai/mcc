@@ -92,7 +92,7 @@ void print_parse_diagnostics(ErrorsView errors,
     StringBuffer output = string_buffer_new(&diagnostics_arena);
     write_diagnostics(&output, &errors.data[i], context);
     StringView output_view = str_from_buffer(&output);
-    fprintf(stderr, "%*s\n", (int)output_view.size, output_view.start);
+    (void)fprintf(stderr, "%*s\n", (int)output_view.size, output_view.start);
     arena_reset(&diagnostics_arena);
   }
 }

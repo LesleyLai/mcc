@@ -84,6 +84,17 @@ static IRInstructionType instruction_typ_from_binary_op(BinaryOpType op_type)
   case BINARY_OP_LESS_EQUAL: return IR_LESS_EQUAL;
   case BINARY_OP_GREATER: return IR_GREATER;
   case BINARY_OP_GREATER_EQUAL: return IR_GREATER_EQUAL;
+  case BINARY_OP_ASSIGNMENT: MCC_UNIMPLEMENTED();
+  case BINARY_OP_PLUS_EQUAL: MCC_UNIMPLEMENTED();
+  case BINARY_OP_MINUS_EQUAL: MCC_UNIMPLEMENTED();
+  case BINARY_OP_MULT_EQUAL: MCC_UNIMPLEMENTED();
+  case BINARY_OP_DIVIDE_EQUAL: MCC_UNIMPLEMENTED();
+  case BINARY_OP_MOD_EQUAL: MCC_UNIMPLEMENTED();
+  case BINARY_OP_BITWISE_AND_EQUAL: MCC_UNIMPLEMENTED();
+  case BINARY_OP_BITWISE_OR_EQUAL: MCC_UNIMPLEMENTED();
+  case BINARY_OP_BITWISE_XOR_EQUAL: MCC_UNIMPLEMENTED();
+  case BINARY_OP_SHIFT_LEFT_EQUAL: MCC_UNIMPLEMENTED();
+  case BINARY_OP_SHIFT_RIGHT_EQUAL: MCC_UNIMPLEMENTED();
   }
   MCC_UNREACHABLE();
 }
@@ -242,7 +253,7 @@ static IRValue emit_ir_instructions_from_logical_or(const Expr* expr,
 static IRValue emit_ir_instructions_from_expr(const Expr* expr,
                                               IRGenContext* context)
 {
-  switch (expr->type) {
+  switch (expr->tag) {
   case EXPR_INVALID: MCC_UNREACHABLE();
   case EXPR_CONST:
     return (IRValue){.typ = IR_VALUE_TYPE_CONSTANT,
@@ -270,6 +281,7 @@ static IRValue emit_ir_instructions_from_expr(const Expr* expr,
     default: return emit_ir_instructions_from_binary_expr(expr, context);
     }
   }
+  case EXPR_VARIABLE: return ir_variable(expr->variable);
   }
 
   MCC_UNREACHABLE();
@@ -285,28 +297,38 @@ generate_ir_function_def(const FunctionDecl* decl, Arena* permanent_arena,
                                         .instructions = {},
                                         .fresh_variable_counter = 0};
 
-  for (size_t i = 0; i < decl->body->statement_count; ++i) {
-    const Stmt stmt = decl->body->statements[i];
-    switch (stmt.type) {
-    case STMT_INVALID: MCC_UNREACHABLE();
-    case STMT_RETURN: {
-      IRValue return_value =
-          emit_ir_instructions_from_expr(stmt.ret.expr, &context);
+  for (size_t i = 0; i < decl->body->child_count; ++i) {
+    const BlockItem item = decl->body->children[i];
+    switch (item.tag) {
+    case BLOCK_ITEM_STMT: {
+      const Stmt stmt = item.stmt;
+      switch (stmt.type) {
+      case STMT_INVALID: MCC_UNREACHABLE();
+      case STMT_EMPTY: MCC_UNIMPLEMENTED(); break;
+      case STMT_EXPR: MCC_UNIMPLEMENTED(); break;
+      case STMT_RETURN: {
+        const IRValue return_value =
+            emit_ir_instructions_from_expr(stmt.ret.expr, &context);
 
-      push_instruction(&context,
-                       ir_single_operand_instr(IR_RETURN, return_value));
-      break;
+        push_instruction(&context,
+                         ir_single_operand_instr(IR_RETURN, return_value));
+        break;
+      }
+      case STMT_COMPOUND: MCC_UNIMPLEMENTED(); break;
+      }
+    } break;
+    case BLOCK_ITEM_DECL: MCC_UNIMPLEMENTED(); break;
     }
-    case STMT_COMPOUND: MCC_UNIMPLEMENTED(); break;
-    }
-    // TODO: handle other kinds of statements
   }
 
   // allocate and copy instructions to permanent arena
-  IRInstruction* instructions = ARENA_ALLOC_ARRAY(
-      permanent_arena, IRInstruction, context.instructions.length);
-  memcpy(instructions, context.instructions.data,
-         context.instructions.length * sizeof(IRInstruction));
+  IRInstruction* instructions = nullptr;
+  if (context.instructions.data != nullptr) {
+    instructions = ARENA_ALLOC_ARRAY(permanent_arena, IRInstruction,
+                                     context.instructions.length);
+    memcpy(instructions, context.instructions.data,
+           context.instructions.length * sizeof(IRInstruction));
+  }
 
   return (IRFunctionDef){.name = decl->name,
                          .instruction_count = context.instructions.length,

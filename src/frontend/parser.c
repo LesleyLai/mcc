@@ -110,9 +110,26 @@ static Expr* parse_number_literal(Parser* parser)
                  "Not used all characters for numbers");
 
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
-  *result = (Expr){.type = EXPR_CONST,
+  *result = (Expr){.tag = EXPR_CONST,
                    .source_range = token_source_range(token),
                    .const_expr = (struct ConstExpr){.val = val}};
+  return result;
+}
+
+static Expr* parse_identifier_expr(Parser* parser)
+{
+  const Token token = parser_previous_token(parser);
+
+  MCC_ASSERT(token.type == TOKEN_IDENTIFIER);
+
+  // TODO: handle typedef
+  Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
+  *result = (Expr){.tag = EXPR_VARIABLE,
+                   .source_range = token_source_range(token),
+                   .variable = (struct StringView){
+                       .start = parser->src + token.start,
+                       .size = token.size,
+                   }};
   return result;
 }
 
@@ -190,7 +207,7 @@ static ParseRule rules[TOKEN_TYPES_COUNT] = {
     [TOKEN_KEYWORD_VOID] = {NULL, NULL, PREC_NONE},
     [TOKEN_KEYWORD_INT] = {NULL, NULL, PREC_NONE},
     [TOKEN_KEYWORD_RETURN] = {NULL, NULL, PREC_NONE},
-    [TOKEN_IDENTIFIER] = {NULL, NULL, PREC_NONE},
+    [TOKEN_IDENTIFIER] = {parse_identifier_expr, NULL, PREC_NONE},
     [TOKEN_INTEGER] = {parse_number_literal, NULL, PREC_NONE},
     [TOKEN_ERROR] = {NULL, NULL, PREC_NONE},
     [TOKEN_EOF] = {NULL, NULL, PREC_NONE},
@@ -259,7 +276,7 @@ static Expr* parse_unary_op(Parser* parser)
                                         expr->source_range);
 
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
-  *result = (Expr){.type = EXPR_UNARY,
+  *result = (Expr){.tag = EXPR_UNARY,
                    .source_range = result_source_range,
                    .unary_op = (struct UnaryOpExpr){
                        .unary_op_type = operator_type, .inner_expr = expr}};
@@ -307,7 +324,7 @@ static Expr* parse_binary_op_left_associative(Parser* parser, Expr* lhs_expr)
   SourceRange result_source_range = token_source_range(operator_token);
 
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
-  *result = (Expr){.type = EXPR_BINARY,
+  *result = (Expr){.tag = EXPR_BINARY,
                    .source_range = result_source_range,
                    .binary_op = (struct BinaryOpExpr){
                        .binary_op_type = binary_op_type,
@@ -331,15 +348,50 @@ static ReturnStmt parse_return_stmt(Parser* parser)
 
 static void parse_stmt(Parser* parser, Stmt* out_stmt);
 
-struct StmtVector {
+struct BlockItemVec {
   size_t capacity;
   size_t length;
-  Stmt* data;
+  BlockItem* data;
 };
 
-static CompoundStmt parse_compound_stmt(Parser* parser)
+static StringView str_from_token(const char* src, Token token)
 {
-  struct StmtVector stmt_vector = {};
+  return (StringView){.start = src + token.start, .size = token.size};
+}
+
+static BlockItem parse_block_item(Parser* parser)
+{
+  const Token current_token = parser_current_token(parser);
+  if (current_token.type == TOKEN_KEYWORD_INT) {
+    parse_advance(parser);
+
+    const Token name = parser_current_token(parser);
+    // TODO: proper error handling
+    MCC_ASSERT(name.type == TOKEN_IDENTIFIER);
+
+    parse_advance(parser);
+
+    const Expr* initializer = nullptr;
+    if (parser_current_token(parser).type == TOKEN_EQUAL) {
+      parse_advance(parser);
+      initializer = parse_expr(parser);
+    }
+    parse_consume(parser, TOKEN_SEMICOLON, "expect ';'");
+
+    return (BlockItem){
+        .tag = BLOCK_ITEM_DECL,
+        .decl = (VariableDecl){.name = str_from_token(parser->src, name),
+                               .initializer = initializer}};
+  } else {
+    Stmt stmt;
+    parse_stmt(parser, &stmt);
+    return (BlockItem){.tag = BLOCK_ITEM_STMT, .stmt = stmt};
+  }
+}
+
+static Block parse_block(Parser* parser)
+{
+  struct BlockItemVec items_vec = {};
 
   Arena scratch_arena = parser->scratch_arena;
 
@@ -347,14 +399,12 @@ static CompoundStmt parse_compound_stmt(Parser* parser)
 
   while (parser_current_token(parser).type != TOKEN_RIGHT_BRACE &&
          parser_current_token(parser).type != TOKEN_EOF) {
-    Stmt stmt;
-    parse_stmt(parser, &stmt);
-
+    BlockItem item = parse_block_item(parser);
     if (parser->in_panic_mode) {
       has_error = true;
       break;
     } else {
-      DYNARRAY_PUSH_BACK(&stmt_vector, Stmt, &scratch_arena, stmt);
+      DYNARRAY_PUSH_BACK(&items_vec, BlockItem, &scratch_arena, item);
     }
   }
 
@@ -372,21 +422,29 @@ static CompoundStmt parse_compound_stmt(Parser* parser)
     parse_consume(parser, TOKEN_RIGHT_BRACE, "Expect `}`");
   }
 
-  Stmt* stmts =
-      ARENA_ALLOC_ARRAY(parser->permanent_arena, Stmt, stmt_vector.length);
-  if (stmt_vector.length != 0) {
-    memcpy(stmts, stmt_vector.data, stmt_vector.length * sizeof(Stmt));
+  BlockItem* block_items =
+      ARENA_ALLOC_ARRAY(parser->permanent_arena, BlockItem, items_vec.length);
+  if (items_vec.length != 0) {
+    memcpy(block_items, items_vec.data, items_vec.length * sizeof(BlockItem));
   }
 
-  return (CompoundStmt){.statements = stmts,
-                        .statement_count = stmt_vector.length};
+  return (Block){.children = block_items, .child_count = items_vec.length};
 }
 
 static void parse_stmt(Parser* parser, Stmt* out_stmt)
 {
-  const Token current_token = parser_current_token(parser);
+  const Token start_token = parser_current_token(parser);
 
-  switch (current_token.type) {
+  switch (start_token.type) {
+  case TOKEN_SEMICOLON: {
+    parse_advance(parser);
+
+    *out_stmt = (Stmt){.type = STMT_EMPTY,
+                       .source_range = token_source_range(start_token)};
+
+    return;
+  }
+
   case TOKEN_KEYWORD_RETURN: {
     parse_advance(parser);
 
@@ -394,7 +452,7 @@ static void parse_stmt(Parser* parser, Stmt* out_stmt)
 
     *out_stmt =
         (Stmt){.type = STMT_RETURN,
-               .source_range = {.begin = current_token.start,
+               .source_range = {.begin = start_token.start,
                                 .end = parser_previous_token(parser).start},
                .ret = return_stmt};
 
@@ -403,17 +461,17 @@ static void parse_stmt(Parser* parser, Stmt* out_stmt)
   case TOKEN_LEFT_BRACE: {
     parse_advance(parser);
 
-    CompoundStmt compound = parse_compound_stmt(parser);
+    const Block compound = parse_block(parser);
 
     *out_stmt =
         (Stmt){.type = STMT_COMPOUND,
-               .source_range = {.begin = current_token.start,
+               .source_range = {.begin = start_token.start,
                                 .end = parser_previous_token(parser).start},
                .compound = compound};
     return;
   }
   default: {
-    parse_error_at(parser, str("Expect statement"), current_token);
+    parse_error_at(parser, str("Expect statement"), start_token);
     break;
   }
   }
@@ -447,12 +505,12 @@ static FunctionDecl* parse_function_decl(Parser* parser)
 
   parse_parameter_list(parser);
 
-  CompoundStmt* body = NULL;
+  Block* body = NULL;
 
   if (parser_current_token(parser).type == TOKEN_LEFT_BRACE) { // is definition
     parse_advance(parser);
-    body = ARENA_ALLOC_OBJECT(parser->permanent_arena, CompoundStmt);
-    *body = parse_compound_stmt(parser);
+    body = ARENA_ALLOC_OBJECT(parser->permanent_arena, Block);
+    *body = parse_block(parser);
   } else {
     parse_consume(parser, TOKEN_SEMICOLON, "Expect ;");
   }
