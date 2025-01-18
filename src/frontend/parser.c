@@ -31,7 +31,10 @@ typedef struct Parser {
 
 static SourceRange token_source_range(Token token)
 {
-  return (SourceRange){.begin = token.start, .end = token.start + token.size};
+  const uint32_t begin =
+      (token.type == TOKEN_EOF) ? token.start - 1 : token.start;
+
+  return (SourceRange){.begin = begin, .end = token.start + token.size};
 }
 
 static SourceRange source_range_union(SourceRange lhs, SourceRange rhs)
@@ -342,7 +345,8 @@ static CompoundStmt parse_compound_stmt(Parser* parser)
 
   bool has_error = false;
 
-  while (parser_current_token(parser).type != TOKEN_RIGHT_BRACE) {
+  while (parser_current_token(parser).type != TOKEN_RIGHT_BRACE &&
+         parser_current_token(parser).type != TOKEN_EOF) {
     Stmt stmt;
     parse_stmt(parser, &stmt);
 
@@ -365,7 +369,7 @@ static CompoundStmt parse_compound_stmt(Parser* parser)
       parse_advance(parser);
     }
   } else {
-    parse_consume(parser, TOKEN_RIGHT_BRACE, "Expect }");
+    parse_consume(parser, TOKEN_RIGHT_BRACE, "Expect `}`");
   }
 
   Stmt* stmts =
