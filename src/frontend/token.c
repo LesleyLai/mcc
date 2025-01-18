@@ -55,6 +55,7 @@ static const char* token_type_string(TokenType type)
   case TOKEN_KEYWORD_VOID: return "void";
   case TOKEN_KEYWORD_INT: return "int";
   case TOKEN_KEYWORD_RETURN: return "return";
+  case TOKEN_KEYWORD_TYPEDEF: return "typedef";
   case TOKEN_IDENTIFIER: return "identifier";
   case TOKEN_INTEGER: return "integer";
   case TOKEN_ERROR: return "error";

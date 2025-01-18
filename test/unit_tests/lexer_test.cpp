@@ -4,16 +4,17 @@
 #include <span>
 
 extern "C" {
-#include <mcc/arena.h>
 #include <mcc/frontend.h>
 }
+
+#include "arenas.hpp"
 
 using Catch::Matchers::RangeEquals;
 
 TEST_CASE("Lexer lex symbols", "[lexer]")
 {
-  Arena permanent_arena = arena_from_virtual_mem(4096);
-  const Arena scratch_arena = arena_from_virtual_mem(4096);
+  Arena& permanent_arena = get_permanent_arena();
+  const Arena scratch_arena = get_scratch_arena();
 
   static constexpr const char* input = R"(= == != < << <= > >> >=
 & && &= | || |= ! ^ ^= <<= >>=
@@ -59,6 +60,23 @@ TEST_CASE("Lexer lex symbols", "[lexer]")
                                            TOKEN_COLON,
                                            TOKEN_SEMICOLON,
                                            TOKEN_EOF};
+
+  const auto tokens = lex(input, &permanent_arena, scratch_arena);
+  const std::span<const TokenType> token_types(tokens.token_types,
+                                               tokens.token_count);
+  REQUIRE_THAT(expected, RangeEquals(token_types));
+}
+
+TEST_CASE("Lexer lex keywords", "[lexer]")
+{
+  Arena& permanent_arena = get_permanent_arena();
+  const Arena scratch_arena = get_scratch_arena();
+
+  static constexpr const char* input = R"(int void return typedef let)";
+
+  static constexpr TokenType expected[] = {
+      TOKEN_KEYWORD_INT,     TOKEN_KEYWORD_VOID, TOKEN_KEYWORD_RETURN,
+      TOKEN_KEYWORD_TYPEDEF, TOKEN_IDENTIFIER,   TOKEN_EOF};
 
   const auto tokens = lex(input, &permanent_arena, scratch_arena);
   const std::span<const TokenType> token_types(tokens.token_types,
