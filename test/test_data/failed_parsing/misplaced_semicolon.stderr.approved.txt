@@ -1,14 +1,8 @@
 {{base_dir}}/failed_parsing/misplaced_semicolon.c:2:18: Error: Expect )
-1 |     int main(void) {
 2 |         return 1 + (2;)
-  |                      ^ 
-3 |     }
-4 |     
+  |                      ^
 
 {{base_dir}}/failed_parsing/misplaced_semicolon.c:3:1: Error: Expect end of the file
-1 |     int main(void) {
-2 |         return 1 + (2;)
 3 |     }
   |     ^
-4 |     
 

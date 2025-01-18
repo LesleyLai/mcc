@@ -1,9 +1,4 @@
 {{base_dir}}/failed_parsing/extra_junk.c:5:1: Error: Expect end of the file
-1 |     int main(void)
-2 |     {
-3 |         return 2;
-4 |     }
 5 |     foo
   |     ^~~
-6 |     
 

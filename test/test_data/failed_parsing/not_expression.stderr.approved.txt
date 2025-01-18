@@ -1,7 +1,4 @@
 {{base_dir}}/failed_parsing/not_expression.c:2:12: Error: Expect valid expression
-1 |     int main(void) {
 2 |         return int;
-  |                ^~~ 
-3 |     }
-4 |     
+  |                ^~~
 

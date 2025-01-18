@@ -1,7 +1,4 @@
 {{base_dir}}/failed_parsing/missing_semicolon.c:3:1: Error: Expect ;
-1 |     int main(void) {
-2 |         return 1 || 2
 3 |     }
   |     ^
-4 |     
 

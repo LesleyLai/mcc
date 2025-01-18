@@ -1,7 +1,4 @@
 {{base_dir}}/failed_parsing/imbalanced_paren.c:2:18: Error: Expect )
-1 |     int main(void) {
 2 |         return 1 + (2;
   |                      ^
-3 |     }
-4 |     
 

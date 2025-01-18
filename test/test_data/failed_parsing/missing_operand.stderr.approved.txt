@@ -1,14 +1,8 @@
 {{base_dir}}/failed_parsing/missing_operand.c:2:16: Error: Expect valid expression
-1 |     int main(void) {
 2 |         return 1 < > 3;
-  |                    ^   
-3 |     }
-4 |     
+  |                    ^
 
 {{base_dir}}/failed_parsing/missing_operand.c:2:19: Error: Expect end of the file
-1 |     int main(void) {
 2 |         return 1 < > 3;
   |                       ^
-3 |     }
-4 |     
 

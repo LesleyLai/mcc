@@ -15,66 +15,67 @@ DiagnosticsContext create_diagnostic_context(const char* filename,
       .filename = filename, .source = source, .line_num_table = line_num_table};
 }
 
-static void write_diagnostic_line(StringBuffer* output, SourceRange error_range,
-                                  uint32_t line_begin, uint32_t line_end);
+static void write_diagnostic_position_indicator(StringBuffer* output,
+                                                SourceRange error_range,
+                                                uint32_t line_begin,
+                                                uint32_t line_end);
 
 void write_diagnostics(StringBuffer* output, const Error* error,
                        const DiagnosticsContext* context)
 {
   const char* file_path = context->filename;
   const StringView source = context->source;
+  const LineNumTable* line_num_table = context->line_num_table;
 
   const StringView msg = error->msg;
   const SourceRange error_range = error->range;
 
-  const LineColumn line_column =
-      calculate_line_and_column(context->line_num_table, error_range.begin);
+  const LineColumn begin_line_column =
+      calculate_line_and_column(line_num_table, error_range.begin);
+  const LineColumn end_line_column =
+      calculate_line_and_column(line_num_table, error_range.end);
+
   string_buffer_printf(output, "%s:%u:%u: Error: %.*s\n", file_path,
-                       line_column.line, line_column.column, (int)msg.size,
-                       msg.start);
+                       begin_line_column.line, begin_line_column.column,
+                       (int)msg.size, msg.start);
 
-  bool this_line_in_error = false;
-  uint32_t line_begin = 0;
-  uint32_t line = 1;
-  string_buffer_printf(output, "%d |     ", line);
+  MCC_ASSERT(end_line_column.column != 0);
 
-  for (uint32_t i = 0; i < source.size; ++i) {
-    const bool in_error_range = i >= error_range.begin && i < error_range.end;
-    this_line_in_error |= in_error_range;
+  uint32_t end_line_num = (end_line_column.column == 1)
+                              ? end_line_column.line - 1
+                              : end_line_column.line;
 
-    const char c = source.start[i];
+  for (uint32_t line_num = begin_line_column.line; line_num <= end_line_num;
+       ++line_num) {
+    MCC_ASSERT(line_num != 0);
+    const uint32_t line_begin = line_num_table->line_starts[line_num - 1];
+    const uint32_t line_end = line_num_table->line_starts[line_num];
 
-    string_buffer_printf(output, "%c", c);
+    const uint32_t line_length = line_end - line_begin;
 
-    if (c == '\n') {
-      // handle windows line ending
-      const uint32_t line_end =
-          (i != 0 && source.start[i - 1] == '\r') ? (i - 1) : i;
-
-      if (this_line_in_error) {
-        write_diagnostic_line(output, error_range, line_begin, line_end);
-      }
-      this_line_in_error = false;
-      line_begin = i + 1;
-      ++line;
-      string_buffer_printf(output, "%d |     ", line);
-    }
+    string_buffer_printf(output, "%d |     %.*s", line_num, (int)line_length,
+                         source.start + line_begin);
+    write_diagnostic_position_indicator(output, error_range, line_begin,
+                                        line_end);
   }
-  string_buffer_printf(output, "\n");
 }
 
-static void write_diagnostic_line(StringBuffer* output, SourceRange error_range,
-                                  uint32_t line_begin, uint32_t line_end)
+static void write_diagnostic_position_indicator(StringBuffer* output,
+                                                SourceRange error_range,
+                                                uint32_t line_begin,
+                                                uint32_t line_end)
 {
   string_buffer_printf(output, "  |     ");
-  for (uint32_t i = line_begin; i < line_end; ++i) {
-    if (i == error_range.begin) {
-      string_buffer_printf(output, "^");
-    } else if (i > error_range.begin && i < error_range.end) {
-      string_buffer_printf(output, "~");
-    } else {
-      string_buffer_printf(output, " ");
-    }
+  MCC_ASSERT(error_range.begin >= line_begin);
+  MCC_ASSERT(error_range.end > error_range.begin);
+  MCC_ASSERT(error_range.end <= line_end);
+
+  for (uint32_t i = line_begin; i < error_range.begin; ++i) {
+    string_buffer_printf(output, " ");
+  }
+  string_buffer_printf(output, "^");
+  for (uint32_t i = error_range.begin + 1; i < error_range.end; ++i) {
+    string_buffer_printf(output, "~");
   }
   string_buffer_printf(output, "\n");
 }

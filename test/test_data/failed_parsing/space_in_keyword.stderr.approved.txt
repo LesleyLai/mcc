@@ -1,14 +1,8 @@
 {{base_dir}}/failed_parsing/space_in_keyword.c:2:5: Error: Expect statement
-1 |     int main(void){
 2 |         retur n 0;
-  |         ^~~~~     
-3 |     }
-4 |     
+  |         ^~~~~
 
 {{base_dir}}/failed_parsing/space_in_keyword.c:2:5: Error: Expect end of the file
-1 |     int main(void){
 2 |         retur n 0;
-  |         ^~~~~     
-3 |     }
-4 |     
+  |         ^~~~~
 

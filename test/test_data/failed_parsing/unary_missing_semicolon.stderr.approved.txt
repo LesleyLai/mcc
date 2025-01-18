@@ -1,8 +1,4 @@
 {{base_dir}}/failed_parsing/unary_missing_semicolon.c:4:1: Error: Expect ;
-1 |     int main(void)
-2 |     {
-3 |         return !10
 4 |     }
   |     ^
-5 |     
 

@@ -1,14 +1,8 @@
 {{base_dir}}/failed_parsing/malformed_paren.c:2:14: Error: Expect ;
-1 |     int main(void) {
 2 |         return 2 (- 3);
-  |                  ^     
-3 |     }
-4 |     
+  |                  ^
 
 {{base_dir}}/failed_parsing/malformed_paren.c:2:15: Error: Expect end of the file
-1 |     int main(void) {
 2 |         return 2 (- 3);
-  |                   ^    
-3 |     }
-4 |     
+  |                   ^
 
