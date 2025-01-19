@@ -51,6 +51,7 @@ static void parse_error_at(Parser* parser, StringView error_msg, Token token)
   DYNARRAY_PUSH_BACK(&parser->errors, Error, parser->permanent_arena, error);
 
   parser->in_panic_mode = true;
+  parser->has_error = true;
 }
 
 // gets the current token
@@ -158,7 +159,10 @@ typedef enum Precedence {
 static Expr* parse_expr(Parser* parser);
 static Expr* parse_group(Parser* parser);
 static Expr* parse_unary_op(Parser* parser);
-static Expr* parse_binary_op_left_associative(Parser* parser, Expr* lhs_expr);
+static Expr* parse_binop_left(Parser* parser,
+                              Expr* lhs_expr); // left associative
+static Expr* parse_binop_right(Parser* parser,
+                               Expr* lhs_expr); // right associative
 
 typedef Expr* (*PrefixParseFn)(Parser*);
 typedef Expr* (*InfixParseFn)(Parser*, Expr*);
@@ -175,34 +179,36 @@ static ParseRule rules[TOKEN_TYPES_COUNT] = {
     [TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE},
     [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
     [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE},
-    [TOKEN_PLUS] = {NULL, parse_binary_op_left_associative, PREC_TERM},
-    [TOKEN_MINUS] = {parse_unary_op, parse_binary_op_left_associative,
-                     PREC_TERM},
-    [TOKEN_STAR] = {NULL, parse_binary_op_left_associative, PREC_FACTOR},
-    [TOKEN_SLASH] = {NULL, parse_binary_op_left_associative, PREC_FACTOR},
-    [TOKEN_PERCENT] = {NULL, parse_binary_op_left_associative, PREC_FACTOR},
-    [TOKEN_AMPERSAND] = {NULL, parse_binary_op_left_associative,
-                         PREC_BITWISE_AND},
-    [TOKEN_CARET] = {NULL, parse_binary_op_left_associative, PREC_BITWISE_XOR},
-    [TOKEN_BAR] = {NULL, parse_binary_op_left_associative, PREC_BITWISE_OR},
-
-    [TOKEN_AMPERSAND_AMPERSAND] = {NULL, parse_binary_op_left_associative,
-                                   PREC_AND},
-    [TOKEN_BAR_BAR] = {NULL, parse_binary_op_left_associative, PREC_OR},
-    [TOKEN_EQUAL_EQUAL] = {NULL, parse_binary_op_left_associative,
-                           PREC_EQUALITY},
+    [TOKEN_PLUS] = {NULL, parse_binop_left, PREC_TERM},
+    [TOKEN_PLUS_EQUAL] = {NULL, parse_binop_right, PREC_ASSIGNMENT},
+    [TOKEN_MINUS] = {parse_unary_op, parse_binop_left, PREC_TERM},
+    [TOKEN_MINUS_EQUAL] = {NULL, parse_binop_right, PREC_ASSIGNMENT},
+    [TOKEN_STAR] = {NULL, parse_binop_left, PREC_FACTOR},
+    [TOKEN_STAR_EQUAL] = {NULL, parse_binop_right, PREC_ASSIGNMENT},
+    [TOKEN_SLASH] = {NULL, parse_binop_left, PREC_FACTOR},
+    [TOKEN_SLASH_EQUAL] = {NULL, parse_binop_right, PREC_ASSIGNMENT},
+    [TOKEN_PERCENT] = {NULL, parse_binop_left, PREC_FACTOR},
+    [TOKEN_PERCENT_EQUAL] = {NULL, parse_binop_right, PREC_ASSIGNMENT},
+    [TOKEN_AMPERSAND] = {NULL, parse_binop_left, PREC_BITWISE_AND},
+    [TOKEN_AMPERSAND_EQUAL] = {NULL, parse_binop_right, PREC_ASSIGNMENT},
+    [TOKEN_AMPERSAND_AMPERSAND] = {NULL, parse_binop_left, PREC_AND},
+    [TOKEN_BAR] = {NULL, parse_binop_left, PREC_BITWISE_OR},
+    [TOKEN_BAR_EQUAL] = {NULL, parse_binop_right, PREC_ASSIGNMENT},
+    [TOKEN_BAR_BAR] = {NULL, parse_binop_left, PREC_OR},
+    [TOKEN_CARET] = {NULL, parse_binop_left, PREC_BITWISE_XOR},
+    [TOKEN_CARET_EQUAL] = {NULL, parse_binop_right, PREC_ASSIGNMENT},
+    [TOKEN_EQUAL] = {NULL, parse_binop_right, PREC_ASSIGNMENT},
+    [TOKEN_EQUAL_EQUAL] = {NULL, parse_binop_left, PREC_EQUALITY},
     [TOKEN_NOT] = {parse_unary_op, NULL, PREC_UNARY},
-    [TOKEN_NOT_EQUAL] = {NULL, parse_binary_op_left_associative, PREC_EQUALITY},
-
-    [TOKEN_LESS] = {NULL, parse_binary_op_left_associative, PREC_COMPARISON},
-    [TOKEN_LESS_EQUAL] = {NULL, parse_binary_op_left_associative,
-                          PREC_COMPARISON},
-    [TOKEN_LESS_LESS] = {NULL, parse_binary_op_left_associative, PREC_SHIFT},
-    [TOKEN_GREATER] = {NULL, parse_binary_op_left_associative, PREC_COMPARISON},
-    [TOKEN_GREATER_EQUAL] = {NULL, parse_binary_op_left_associative,
-                             PREC_COMPARISON},
-    [TOKEN_GREATER_GREATER] = {NULL, parse_binary_op_left_associative,
-                               PREC_SHIFT},
+    [TOKEN_NOT_EQUAL] = {NULL, parse_binop_left, PREC_EQUALITY},
+    [TOKEN_LESS] = {NULL, parse_binop_left, PREC_COMPARISON},
+    [TOKEN_LESS_EQUAL] = {NULL, parse_binop_left, PREC_COMPARISON},
+    [TOKEN_LESS_LESS] = {NULL, parse_binop_left, PREC_SHIFT},
+    [TOKEN_LESS_LESS_EQUAL] = {NULL, parse_binop_right, PREC_ASSIGNMENT},
+    [TOKEN_GREATER] = {NULL, parse_binop_left, PREC_COMPARISON},
+    [TOKEN_GREATER_EQUAL] = {NULL, parse_binop_left, PREC_COMPARISON},
+    [TOKEN_GREATER_GREATER] = {NULL, parse_binop_left, PREC_SHIFT},
+    [TOKEN_GREATER_GREATER_EQUAL] = {NULL, parse_binop_right, PREC_ASSIGNMENT},
     [TOKEN_TILDE] = {parse_unary_op, NULL, PREC_TERM},
     [TOKEN_KEYWORD_VOID] = {NULL, NULL, PREC_NONE},
     [TOKEN_KEYWORD_INT] = {NULL, NULL, PREC_NONE},
@@ -225,12 +231,17 @@ static Expr* parse_precedence(Parser* parser, Precedence precedence)
 {
   parse_advance(parser);
 
-  const PrefixParseFn prefix_rule =
-      get_rule(parser_previous_token(parser).type)->prefix;
+  const Token previous_token = parser_previous_token(parser);
+
+  const PrefixParseFn prefix_rule = get_rule(previous_token.type)->prefix;
   if (prefix_rule == NULL) {
-    parse_error_at(parser, str("Expect valid expression"),
-                   parser_previous_token(parser));
-    return NULL;
+    parse_error_at(parser, str("Expect valid expression"), previous_token);
+    Expr* error_expr = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
+    *error_expr = (Expr){
+        .tag = EXPR_INVALID,
+        .source_range = token_source_range(previous_token),
+    };
+    return error_expr;
   }
 
   Expr* expr = prefix_rule(parser);
@@ -288,17 +299,28 @@ static BinaryOpType binop_type_from_token_type(TokenType token_type)
 {
   switch (token_type) {
   case TOKEN_PLUS: return BINARY_OP_PLUS;
+  case TOKEN_PLUS_EQUAL: return BINARY_OP_PLUS_EQUAL;
   case TOKEN_MINUS: return BINARY_OP_MINUS;
+  case TOKEN_MINUS_EQUAL: return BINARY_OP_MINUS_EQUAL;
   case TOKEN_STAR: return BINARY_OP_MULT;
+  case TOKEN_STAR_EQUAL: return BINARY_OP_MULT_EQUAL;
   case TOKEN_SLASH: return BINARY_OP_DIVIDE;
+  case TOKEN_SLASH_EQUAL: return BINARY_OP_DIVIDE_EQUAL;
   case TOKEN_PERCENT: return BINARY_OP_MOD;
+  case TOKEN_PERCENT_EQUAL: return BINARY_OP_MOD_EQUAL;
   case TOKEN_LESS_LESS: return BINARY_OP_SHIFT_LEFT;
+  case TOKEN_LESS_LESS_EQUAL: return BINARY_OP_SHIFT_LEFT_EQUAL;
   case TOKEN_GREATER_GREATER: return BINARY_OP_SHIFT_RIGHT;
+  case TOKEN_GREATER_GREATER_EQUAL: return BINARY_OP_SHIFT_RIGHT_EQUAL;
   case TOKEN_AMPERSAND: return BINARY_OP_BITWISE_AND;
+  case TOKEN_AMPERSAND_EQUAL: return BINARY_OP_BITWISE_AND_EQUAL;
   case TOKEN_CARET: return BINARY_OP_BITWISE_XOR;
+  case TOKEN_CARET_EQUAL: return BINARY_OP_BITWISE_XOR_EQUAL;
   case TOKEN_BAR: return BINARY_OP_BITWISE_OR;
+  case TOKEN_BAR_EQUAL: return BINARY_OP_BITWISE_OR_EQUAL;
   case TOKEN_AMPERSAND_AMPERSAND: return BINARY_OP_AND;
   case TOKEN_BAR_BAR: return BINARY_OP_OR;
+  case TOKEN_EQUAL: return BINARY_OP_ASSIGNMENT;
   case TOKEN_EQUAL_EQUAL: return BINARY_OP_EQUAL;
   case TOKEN_NOT_EQUAL: return BINARY_OP_NOT_EQUAL;
   case TOKEN_LESS: return BINARY_OP_LESS;
@@ -309,13 +331,18 @@ static BinaryOpType binop_type_from_token_type(TokenType token_type)
   }
 }
 
-static Expr* parse_binary_op_left_associative(Parser* parser, Expr* lhs_expr)
+enum Associativity { ASSOCIATIVITY_LEFT, ASSOCIATIVITY_RIGHT };
+
+static Expr* parse_binary_op(Parser* parser, Expr* lhs_expr,
+                             enum Associativity associativity)
 {
   Token operator_token = parser_previous_token(parser);
 
   const TokenType operator_type = operator_token.type;
   const ParseRule* rule = get_rule(operator_type);
-  Expr* rhs_expr = parse_precedence(parser, (Precedence)(rule->precedence + 1));
+  Expr* rhs_expr = parse_precedence(
+      parser, (Precedence)(rule->precedence +
+                           ((associativity == ASSOCIATIVITY_LEFT) ? 1 : 0)));
 
   BinaryOpType binary_op_type = binop_type_from_token_type(operator_type);
 
@@ -332,6 +359,16 @@ static Expr* parse_binary_op_left_associative(Parser* parser, Expr* lhs_expr)
                        .rhs = rhs_expr,
                    }};
   return result;
+}
+
+static Expr* parse_binop_left(Parser* parser, Expr* lhs_expr)
+{
+  return parse_binary_op(parser, lhs_expr, ASSOCIATIVITY_LEFT);
+}
+
+static Expr* parse_binop_right(Parser* parser, Expr* lhs_expr)
+{
+  return parse_binary_op(parser, lhs_expr, ASSOCIATIVITY_RIGHT);
 }
 
 static Expr* parse_expr(Parser* parser)
@@ -471,7 +508,15 @@ static void parse_stmt(Parser* parser, Stmt* out_stmt)
     return;
   }
   default: {
-    parse_error_at(parser, str("Expect statement"), start_token);
+    const Expr* expr = parse_expr(parser);
+    parse_consume(parser, TOKEN_SEMICOLON, "expect ';'");
+
+    *out_stmt = (Stmt){.type = STMT_EXPR,
+                       .expr = expr,
+                       .source_range = source_range_union(
+                           token_source_range(start_token),
+                           token_source_range(parser_previous_token(parser)))};
+
     break;
   }
   }

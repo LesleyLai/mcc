@@ -103,7 +103,12 @@ static void ast_print_stmt(const Stmt* stmt, int indent)
     print_source_range(stmt->source_range);
     printf("\n");
   } break;
-  case STMT_EXPR: MCC_UNIMPLEMENTED(); break;
+  case STMT_EXPR: {
+    printf("%*sExprStmt ", indent, "");
+    print_source_range(stmt->source_range);
+    printf("\n");
+    ast_print_expr(stmt->ret.expr, indent + 2);
+  } break;
   case STMT_COMPOUND: ast_print_block(&stmt->compound, indent + 2); break;
   case STMT_RETURN: {
     printf("%*sReturnStmt ", indent, "");

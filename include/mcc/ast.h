@@ -117,6 +117,7 @@ typedef struct Stmt {
   union {
     Block compound;
     ReturnStmt ret;
+    const Expr* expr;
   };
 } Stmt;
 

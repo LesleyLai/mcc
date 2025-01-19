@@ -1,8 +1,4 @@
-{{base_dir}}/failed_parsing/missing_const.c:3:5: Error: Expect statement
+{{base_dir}}/failed_parsing/missing_const.c:3:12: Error: Expect valid expression
 3 |         10 <= !;
-  |         ^~
-
-{{base_dir}}/failed_parsing/missing_const.c:3:5: Error: Expect end of the file
-3 |         10 <= !;
-  |         ^~
+  |                ^
 

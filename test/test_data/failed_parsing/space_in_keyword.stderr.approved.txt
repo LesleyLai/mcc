@@ -1,8 +1,8 @@
-{{base_dir}}/failed_parsing/space_in_keyword.c:2:5: Error: Expect statement
+{{base_dir}}/failed_parsing/space_in_keyword.c:2:11: Error: expect ';'
 2 |         retur n 0;
-  |         ^~~~~
+  |               ^
 
-{{base_dir}}/failed_parsing/space_in_keyword.c:2:5: Error: Expect end of the file
+{{base_dir}}/failed_parsing/space_in_keyword.c:2:13: Error: Expect end of the file
 2 |         retur n 0;
-  |         ^~~~~
+  |                 ^
 
