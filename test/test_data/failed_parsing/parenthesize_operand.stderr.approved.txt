@@ -1,4 +1,4 @@
 {{base_dir}}/failed_parsing/parenthesize_operand.c:2:14: Error: Expect valid expression
-2 |         return (-)3;
-  |                  ^
+2 |     return (-)3;
+  |              ^
 

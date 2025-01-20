@@ -43,15 +43,22 @@ static SourceRange source_range_union(SourceRange lhs, SourceRange rhs)
                        .end = (lhs.end > rhs.end) ? lhs.end : rhs.end};
 }
 
-static void parse_error_at(Parser* parser, StringView error_msg, Token token)
+static void parse_error_at(Parser* parser, StringView error_msg,
+                           SourceRange range)
 {
   if (parser->in_panic_mode) return;
 
-  Error error = (Error){.msg = error_msg, .range = token_source_range(token)};
+  Error error = (Error){.msg = error_msg, .range = range};
   DYNARRAY_PUSH_BACK(&parser->errors, Error, parser->permanent_arena, error);
 
   parser->in_panic_mode = true;
   parser->has_error = true;
+}
+
+static void parse_error_at_token(Parser* parser, StringView error_msg,
+                                 Token token)
+{
+  parse_error_at(parser, error_msg, token_source_range(token));
 }
 
 // gets the current token
@@ -84,7 +91,7 @@ static void parse_advance(Parser* parser)
     parser->current_token_index++;
     Token current = parser_current_token(parser);
     if (current.type != TOKEN_ERROR) break;
-    parse_error_at(parser, str("unexpected character"), current);
+    parse_error_at_token(parser, str("unexpected character"), current);
   }
 }
 
@@ -94,11 +101,44 @@ static void parse_consume(Parser* parser, TokenType type, const char* error_msg)
 {
   const Token current = parser_current_token(parser);
 
-  if (current.type != type) { parse_error_at(parser, str(error_msg), current); }
+  if (current.type != type) {
+    parse_error_at_token(parser, str(error_msg), current);
+  }
 
   parse_advance(parser);
 }
 
+/* =============================================================================
+ * Local Variables are accumulated here
+ * =============================================================================
+ */
+
+// TODO: use hash table
+static struct Locals {
+  uint32_t length;
+  uint32_t capacity;
+  StringView* data;
+} locals = {};
+
+static bool has_local(StringView var)
+{
+  for (uint32_t i = 0; i < locals.length; ++i) {
+    if (str_eq(var, locals.data[i])) { return true; }
+  }
+  return false;
+}
+
+// Return false if a local variable already exist
+static bool add_local(StringView var, Arena* arena)
+{
+  if (has_local(var)) { return false; }
+  DYNARRAY_PUSH_BACK(&locals, StringView, arena, var);
+  return true;
+}
+
+// =============================================================================
+// Expression parsing
+// =============================================================================
 static Expr* parse_number_literal(Parser* parser)
 {
   const Token token = parser_previous_token(parser);
@@ -123,14 +163,27 @@ static Expr* parse_identifier_expr(Parser* parser)
 
   MCC_ASSERT(token.type == TOKEN_IDENTIFIER);
 
+  const StringView identifier = (struct StringView){
+      .start = parser->src + token.start,
+      .size = token.size,
+  };
+
   // TODO: handle typedef
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
-  *result = (Expr){.tag = EXPR_VARIABLE,
-                   .source_range = token_source_range(token),
-                   .variable = (struct StringView){
-                       .start = parser->src + token.start,
-                       .size = token.size,
-                   }};
+
+  // If local variable does not exist
+  if (!has_local(identifier)) {
+    const StringView error_msg = allocate_printf(
+        parser->permanent_arena, "use of undeclared identifier '%.*s'",
+        (int)identifier.size, identifier.start);
+    parse_error_at_token(parser, error_msg, token);
+    *result =
+        (Expr){.tag = EXPR_INVALID, .source_range = token_source_range(token)};
+  } else {
+    *result = (Expr){.tag = EXPR_VARIABLE,
+                     .source_range = token_source_range(token),
+                     .variable = identifier};
+  }
   return result;
 }
 
@@ -161,8 +214,8 @@ static Expr* parse_group(Parser* parser);
 static Expr* parse_unary_op(Parser* parser);
 static Expr* parse_binop_left(Parser* parser,
                               Expr* lhs_expr); // left associative
-static Expr* parse_binop_right(Parser* parser,
-                               Expr* lhs_expr); // right associative
+static Expr* parse_assignment(Parser* parser,
+                              Expr* lhs_expr); // right associative
 
 typedef Expr* (*PrefixParseFn)(Parser*);
 typedef Expr* (*InfixParseFn)(Parser*, Expr*);
@@ -180,35 +233,35 @@ static ParseRule rules[TOKEN_TYPES_COUNT] = {
     [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
     [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE},
     [TOKEN_PLUS] = {NULL, parse_binop_left, PREC_TERM},
-    [TOKEN_PLUS_EQUAL] = {NULL, parse_binop_right, PREC_ASSIGNMENT},
+    [TOKEN_PLUS_EQUAL] = {NULL, parse_assignment, PREC_ASSIGNMENT},
     [TOKEN_MINUS] = {parse_unary_op, parse_binop_left, PREC_TERM},
-    [TOKEN_MINUS_EQUAL] = {NULL, parse_binop_right, PREC_ASSIGNMENT},
+    [TOKEN_MINUS_EQUAL] = {NULL, parse_assignment, PREC_ASSIGNMENT},
     [TOKEN_STAR] = {NULL, parse_binop_left, PREC_FACTOR},
-    [TOKEN_STAR_EQUAL] = {NULL, parse_binop_right, PREC_ASSIGNMENT},
+    [TOKEN_STAR_EQUAL] = {NULL, parse_assignment, PREC_ASSIGNMENT},
     [TOKEN_SLASH] = {NULL, parse_binop_left, PREC_FACTOR},
-    [TOKEN_SLASH_EQUAL] = {NULL, parse_binop_right, PREC_ASSIGNMENT},
+    [TOKEN_SLASH_EQUAL] = {NULL, parse_assignment, PREC_ASSIGNMENT},
     [TOKEN_PERCENT] = {NULL, parse_binop_left, PREC_FACTOR},
-    [TOKEN_PERCENT_EQUAL] = {NULL, parse_binop_right, PREC_ASSIGNMENT},
+    [TOKEN_PERCENT_EQUAL] = {NULL, parse_assignment, PREC_ASSIGNMENT},
     [TOKEN_AMPERSAND] = {NULL, parse_binop_left, PREC_BITWISE_AND},
-    [TOKEN_AMPERSAND_EQUAL] = {NULL, parse_binop_right, PREC_ASSIGNMENT},
+    [TOKEN_AMPERSAND_EQUAL] = {NULL, parse_assignment, PREC_ASSIGNMENT},
     [TOKEN_AMPERSAND_AMPERSAND] = {NULL, parse_binop_left, PREC_AND},
     [TOKEN_BAR] = {NULL, parse_binop_left, PREC_BITWISE_OR},
-    [TOKEN_BAR_EQUAL] = {NULL, parse_binop_right, PREC_ASSIGNMENT},
+    [TOKEN_BAR_EQUAL] = {NULL, parse_assignment, PREC_ASSIGNMENT},
     [TOKEN_BAR_BAR] = {NULL, parse_binop_left, PREC_OR},
     [TOKEN_CARET] = {NULL, parse_binop_left, PREC_BITWISE_XOR},
-    [TOKEN_CARET_EQUAL] = {NULL, parse_binop_right, PREC_ASSIGNMENT},
-    [TOKEN_EQUAL] = {NULL, parse_binop_right, PREC_ASSIGNMENT},
+    [TOKEN_CARET_EQUAL] = {NULL, parse_assignment, PREC_ASSIGNMENT},
+    [TOKEN_EQUAL] = {NULL, parse_assignment, PREC_ASSIGNMENT},
     [TOKEN_EQUAL_EQUAL] = {NULL, parse_binop_left, PREC_EQUALITY},
     [TOKEN_NOT] = {parse_unary_op, NULL, PREC_UNARY},
     [TOKEN_NOT_EQUAL] = {NULL, parse_binop_left, PREC_EQUALITY},
     [TOKEN_LESS] = {NULL, parse_binop_left, PREC_COMPARISON},
     [TOKEN_LESS_EQUAL] = {NULL, parse_binop_left, PREC_COMPARISON},
     [TOKEN_LESS_LESS] = {NULL, parse_binop_left, PREC_SHIFT},
-    [TOKEN_LESS_LESS_EQUAL] = {NULL, parse_binop_right, PREC_ASSIGNMENT},
+    [TOKEN_LESS_LESS_EQUAL] = {NULL, parse_assignment, PREC_ASSIGNMENT},
     [TOKEN_GREATER] = {NULL, parse_binop_left, PREC_COMPARISON},
     [TOKEN_GREATER_EQUAL] = {NULL, parse_binop_left, PREC_COMPARISON},
     [TOKEN_GREATER_GREATER] = {NULL, parse_binop_left, PREC_SHIFT},
-    [TOKEN_GREATER_GREATER_EQUAL] = {NULL, parse_binop_right, PREC_ASSIGNMENT},
+    [TOKEN_GREATER_GREATER_EQUAL] = {NULL, parse_assignment, PREC_ASSIGNMENT},
     [TOKEN_TILDE] = {parse_unary_op, NULL, PREC_TERM},
     [TOKEN_KEYWORD_VOID] = {NULL, NULL, PREC_NONE},
     [TOKEN_KEYWORD_INT] = {NULL, NULL, PREC_NONE},
@@ -235,7 +288,8 @@ static Expr* parse_precedence(Parser* parser, Precedence precedence)
 
   const PrefixParseFn prefix_rule = get_rule(previous_token.type)->prefix;
   if (prefix_rule == NULL) {
-    parse_error_at(parser, str("Expect valid expression"), previous_token);
+    parse_error_at_token(parser, str("Expect valid expression"),
+                         previous_token);
     Expr* error_expr = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
     *error_expr = (Expr){
         .tag = EXPR_INVALID,
@@ -347,8 +401,10 @@ static Expr* parse_binary_op(Parser* parser, Expr* lhs_expr,
   BinaryOpType binary_op_type = binop_type_from_token_type(operator_type);
 
   // build result
-  // TODO: Fix this
-  SourceRange result_source_range = token_source_range(operator_token);
+  const SourceRange result_source_range =
+      source_range_union(source_range_union(token_source_range(operator_token),
+                                            lhs_expr->source_range),
+                         rhs_expr->source_range);
 
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
   *result = (Expr){.tag = EXPR_BINARY,
@@ -366,8 +422,13 @@ static Expr* parse_binop_left(Parser* parser, Expr* lhs_expr)
   return parse_binary_op(parser, lhs_expr, ASSOCIATIVITY_LEFT);
 }
 
-static Expr* parse_binop_right(Parser* parser, Expr* lhs_expr)
+static Expr* parse_assignment(Parser* parser, Expr* lhs_expr)
 {
+  // Check whether the left hand side is lvalue
+  if (lhs_expr->tag != EXPR_VARIABLE) {
+    parse_error_at(parser, str("expression is not assignable"),
+                   lhs_expr->source_range);
+  }
   return parse_binary_op(parser, lhs_expr, ASSOCIATIVITY_RIGHT);
 }
 
@@ -396,29 +457,38 @@ static StringView str_from_token(const char* src, Token token)
   return (StringView){.start = src + token.start, .size = token.size};
 }
 
+static VariableDecl parse_decl(Parser* parser)
+{
+  const Token name = parser_current_token(parser);
+  // TODO: proper error handling
+  MCC_ASSERT(name.type == TOKEN_IDENTIFIER);
+
+  const StringView identifier = str_from_token(parser->src, name);
+  if (!add_local(identifier, parser->permanent_arena)) {
+    const StringView error_msg =
+        allocate_printf(parser->permanent_arena, "redefinition of '%.*s'",
+                        (int)identifier.size, identifier.start);
+    parse_error_at_token(parser, error_msg, name);
+  }
+
+  parse_advance(parser);
+
+  const Expr* initializer = nullptr;
+  if (parser_current_token(parser).type == TOKEN_EQUAL) {
+    parse_advance(parser);
+    initializer = parse_expr(parser);
+  }
+  parse_consume(parser, TOKEN_SEMICOLON, "expect ';'");
+
+  return (VariableDecl){.name = identifier, .initializer = initializer};
+}
+
 static BlockItem parse_block_item(Parser* parser)
 {
   const Token current_token = parser_current_token(parser);
   if (current_token.type == TOKEN_KEYWORD_INT) {
     parse_advance(parser);
-
-    const Token name = parser_current_token(parser);
-    // TODO: proper error handling
-    MCC_ASSERT(name.type == TOKEN_IDENTIFIER);
-
-    parse_advance(parser);
-
-    const Expr* initializer = nullptr;
-    if (parser_current_token(parser).type == TOKEN_EQUAL) {
-      parse_advance(parser);
-      initializer = parse_expr(parser);
-    }
-    parse_consume(parser, TOKEN_SEMICOLON, "expect ';'");
-
-    return (BlockItem){
-        .tag = BLOCK_ITEM_DECL,
-        .decl = (VariableDecl){.name = str_from_token(parser->src, name),
-                               .initializer = initializer}};
+    return (BlockItem){.tag = BLOCK_ITEM_DECL, .decl = parse_decl(parser)};
   } else {
     Stmt stmt;
     parse_stmt(parser, &stmt);
@@ -534,7 +604,7 @@ static StringView parse_identifier(Parser* parser)
   const Token current_token = parser_current_token(parser);
 
   if (current_token.type != TOKEN_IDENTIFIER) {
-    parse_error_at(parser, str("Expect Identifier"), current_token);
+    parse_error_at_token(parser, str("Expect Identifier"), current_token);
   }
   parse_advance(parser);
   return (StringView){.start = parser->src + current_token.start,

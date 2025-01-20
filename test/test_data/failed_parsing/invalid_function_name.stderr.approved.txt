@@ -1,4 +1,4 @@
 {{base_dir}}/failed_parsing/invalid_function_name.c:1:5: Error: Expect Identifier
-1 |     int 3 (void) {
-  |         ^
+1 | int 3 (void) {
+  |     ^
 

@@ -1,8 +1,8 @@
-{{base_dir}}/failed_parsing/keyword_wrong_case.c:2:12: Error: expect ';'
-2 |         RETURN 0;
-  |                ^
+{{base_dir}}/failed_parsing/keyword_wrong_case.c:2:5: Error: use of undeclared identifier 'RETURN'
+2 |     RETURN 0;
+  |     ^~~~~~
 
 {{base_dir}}/failed_parsing/keyword_wrong_case.c:2:13: Error: Expect end of the file
-2 |         RETURN 0;
-  |                 ^
+2 |     RETURN 0;
+  |             ^
 

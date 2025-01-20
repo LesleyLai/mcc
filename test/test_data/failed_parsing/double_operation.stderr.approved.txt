@@ -1,8 +1,8 @@
 {{base_dir}}/failed_parsing/double_operation.c:2:16: Error: Expect valid expression
-2 |         return 1 * / 2;
-  |                    ^
+2 |     return 1 * / 2;
+  |                ^
 
 {{base_dir}}/failed_parsing/double_operation.c:2:19: Error: Expect end of the file
-2 |         return 1 * / 2;
-  |                       ^
+2 |     return 1 * / 2;
+  |                   ^
 

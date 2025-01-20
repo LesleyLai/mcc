@@ -1,4 +1,4 @@
 {{base_dir}}/failed_parsing/no_semicolon_2.c:3:1: Error: Expect ;
-3 |     }
-  |     ^
+3 | }
+  | ^
 

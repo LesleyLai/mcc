@@ -21,39 +21,45 @@ impl Display for Line {
     }
 }
 
+fn fmt_diff(f: &mut std::fmt::Formatter<'_>, expected: &str, actual: &str) -> std::fmt::Result
+{
+    let diff = TextDiff::from_lines(expected, actual);
+
+    for change in diff.iter_all_changes() {
+        let (sign, color) = match change.tag() {
+            ChangeTag::Delete => ("-", Some(Color::Red)),
+            ChangeTag::Insert => ("+", Some(Color::Green)),
+            ChangeTag::Equal => (" ", None),
+        };
+        write!(
+            f,
+            "{} {} |",
+            Line(change.old_index()),
+            Line(change.new_index())
+        )?;
+
+        let line = format!("{}{}", sign, change);
+        match color {
+            Some(c) => write!(f, "{}", line.color(c))?,
+            None => write!(f, "{}", line)?,
+        }
+    }
+
+    Ok(())
+}
+
 impl Display for SnapshotError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.expected {
             Ok(expected) => {
-                let diff = TextDiff::from_lines(expected.as_ref(), self.actual.as_ref());
-
-                for change in diff.iter_all_changes() {
-                    let (sign, color) = match change.tag() {
-                        ChangeTag::Delete => ("-", Some(Color::Red)),
-                        ChangeTag::Insert => ("+", Some(Color::Green)),
-                        ChangeTag::Equal => (" ", None),
-                    };
-                    write!(
-                        f,
-                        "{} {} |",
-                        Line(change.old_index()),
-                        Line(change.new_index())
-                    )?;
-
-                    let line = format!("{}{}", sign, change);
-                    match color {
-                        Some(c) => write!(f, "{}", line.color(c))?,
-                        None => write!(f, "{}", line)?,
-                    }
-                }
+                fmt_diff(f, expected.as_ref(), self.actual.as_ref())
             }
             Err(err) => {
                 writeln!(f, "failed to open {}", self.expected_path.display())?;
                 writeln!(f, "{}", err)?;
+                fmt_diff(f, "", self.actual.as_ref())
             }
         }
-
-        Ok(())
     }
 }
 

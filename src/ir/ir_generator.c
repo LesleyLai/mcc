@@ -5,6 +5,19 @@
 #include <mcc/dynarray.h>
 #include <mcc/format.h>
 
+#define ASSIGNMENTS                                                            \
+  case BINARY_OP_ASSIGNMENT:                                                   \
+  case BINARY_OP_PLUS_EQUAL:                                                   \
+  case BINARY_OP_MINUS_EQUAL:                                                  \
+  case BINARY_OP_MULT_EQUAL:                                                   \
+  case BINARY_OP_DIVIDE_EQUAL:                                                 \
+  case BINARY_OP_MOD_EQUAL:                                                    \
+  case BINARY_OP_BITWISE_AND_EQUAL:                                            \
+  case BINARY_OP_BITWISE_OR_EQUAL:                                             \
+  case BINARY_OP_BITWISE_XOR_EQUAL:                                            \
+  case BINARY_OP_SHIFT_LEFT_EQUAL:                                             \
+  case BINARY_OP_SHIFT_RIGHT_EQUAL
+
 /*
  * =============================================================================
  * Convenient "constructors"
@@ -83,18 +96,10 @@ static IRInstructionType instruction_typ_from_binary_op(BinaryOpType op_type)
   case BINARY_OP_LESS: return IR_LESS;
   case BINARY_OP_LESS_EQUAL: return IR_LESS_EQUAL;
   case BINARY_OP_GREATER: return IR_GREATER;
-  case BINARY_OP_GREATER_EQUAL: return IR_GREATER_EQUAL;
-  case BINARY_OP_ASSIGNMENT: MCC_UNIMPLEMENTED();
-  case BINARY_OP_PLUS_EQUAL: MCC_UNIMPLEMENTED();
-  case BINARY_OP_MINUS_EQUAL: MCC_UNIMPLEMENTED();
-  case BINARY_OP_MULT_EQUAL: MCC_UNIMPLEMENTED();
-  case BINARY_OP_DIVIDE_EQUAL: MCC_UNIMPLEMENTED();
-  case BINARY_OP_MOD_EQUAL: MCC_UNIMPLEMENTED();
-  case BINARY_OP_BITWISE_AND_EQUAL: MCC_UNIMPLEMENTED();
-  case BINARY_OP_BITWISE_OR_EQUAL: MCC_UNIMPLEMENTED();
-  case BINARY_OP_BITWISE_XOR_EQUAL: MCC_UNIMPLEMENTED();
-  case BINARY_OP_SHIFT_LEFT_EQUAL: MCC_UNIMPLEMENTED();
-  case BINARY_OP_SHIFT_RIGHT_EQUAL: MCC_UNIMPLEMENTED();
+  case BINARY_OP_GREATER_EQUAL:
+    return IR_GREATER_EQUAL;
+  ASSIGNMENTS:
+    MCC_UNREACHABLE();
   }
   MCC_UNREACHABLE();
 }
@@ -121,27 +126,77 @@ static void push_instruction(IRGenContext* context, IRInstruction instruction)
 
 static StringView create_fresh_variable_name(IRGenContext* context)
 {
-  char* variable_name_buffer = allocate_printf(context->permanent_arena, "$%d",
-                                               context->fresh_variable_counter);
+  const StringView variable_name_buffer = allocate_printf(
+      context->permanent_arena, "$%d", context->fresh_variable_counter);
   ++context->fresh_variable_counter;
-  return str(variable_name_buffer);
+  return variable_name_buffer;
 }
 
 static StringView create_fresh_label_name(IRGenContext* context,
                                           const char* name)
 {
-  char* variable_name_buffer = allocate_printf(
+  const StringView variable_name_buffer = allocate_printf(
       context->permanent_arena, "%s_%d", name, context->fresh_label_counter);
   ++context->fresh_label_counter;
-  return str(variable_name_buffer);
+  return variable_name_buffer;
 }
 
 static IRValue emit_ir_instructions_from_expr(const Expr* expr,
                                               IRGenContext* context);
 
+static bool is_assignment(BinaryOpType typ)
+{
+  switch (typ) {
+  ASSIGNMENTS:
+    return true;
+  default: return false;
+  }
+}
+
 static IRValue emit_ir_instructions_from_binary_expr(const Expr* expr,
                                                      IRGenContext* context)
 {
+  if (is_assignment(expr->binary_op.binary_op_type)) {
+    IRInstructionType compound_op_type = IR_INVALID;
+    switch (expr->binary_op.binary_op_type) {
+    case BINARY_OP_ASSIGNMENT: break;
+    case BINARY_OP_PLUS_EQUAL: compound_op_type = IR_ADD; break;
+    case BINARY_OP_MINUS_EQUAL: compound_op_type = IR_SUB; break;
+    case BINARY_OP_MULT_EQUAL: compound_op_type = IR_MUL; break;
+    case BINARY_OP_DIVIDE_EQUAL: compound_op_type = IR_DIV; break;
+    case BINARY_OP_MOD_EQUAL: compound_op_type = IR_MOD; break;
+    case BINARY_OP_BITWISE_AND_EQUAL: compound_op_type = IR_BITWISE_AND; break;
+    case BINARY_OP_BITWISE_OR_EQUAL: compound_op_type = IR_BITWISE_OR; break;
+    case BINARY_OP_BITWISE_XOR_EQUAL: compound_op_type = IR_BITWISE_XOR; break;
+    case BINARY_OP_SHIFT_LEFT_EQUAL: compound_op_type = IR_SHIFT_LEFT; break;
+    case BINARY_OP_SHIFT_RIGHT_EQUAL:
+      compound_op_type = IR_SHIFT_RIGHT_ARITHMETIC;
+      break;
+    default: MCC_UNREACHABLE();
+    }
+
+    const IRValue lhs =
+        emit_ir_instructions_from_expr(expr->binary_op.lhs, context);
+
+    const IRValue rhs =
+        emit_ir_instructions_from_expr(expr->binary_op.rhs, context);
+
+    if (compound_op_type != IR_INVALID) {
+      push_instruction(context, (IRInstruction){
+                                    .typ = compound_op_type,
+                                    .operand1 = lhs,
+                                    .operand2 = lhs,
+                                    .operand3 = rhs,
+                                });
+    } else {
+      push_instruction(
+          context,
+          (IRInstruction){.typ = IR_COPY, .operand1 = lhs, .operand2 = rhs});
+    }
+
+    return lhs;
+  }
+
   const IRInstructionType instruction_type =
       instruction_typ_from_binary_op(expr->binary_op.binary_op_type);
 
@@ -304,8 +359,10 @@ generate_ir_function_def(const FunctionDecl* decl, Arena* permanent_arena,
       const Stmt stmt = item.stmt;
       switch (stmt.type) {
       case STMT_INVALID: MCC_UNREACHABLE();
-      case STMT_EMPTY: MCC_UNIMPLEMENTED(); break;
-      case STMT_EXPR: MCC_UNIMPLEMENTED(); break;
+      case STMT_EMPTY: break;
+      case STMT_EXPR: {
+        emit_ir_instructions_from_expr(stmt.expr, &context);
+      } break;
       case STMT_RETURN: {
         const IRValue return_value =
             emit_ir_instructions_from_expr(stmt.ret.expr, &context);
@@ -317,8 +374,26 @@ generate_ir_function_def(const FunctionDecl* decl, Arena* permanent_arena,
       case STMT_COMPOUND: MCC_UNIMPLEMENTED(); break;
       }
     } break;
-    case BLOCK_ITEM_DECL: MCC_UNIMPLEMENTED(); break;
+    case BLOCK_ITEM_DECL: {
+      const VariableDecl var_decl = item.decl;
+      if (var_decl.initializer != nullptr) {
+        const IRValue value =
+            emit_ir_instructions_from_expr(var_decl.initializer, &context);
+        push_instruction(
+            &context,
+            ir_unary_instr(IR_COPY, ir_variable(var_decl.name), value));
+      }
+    } break;
     }
+  }
+
+  // return 0 for main if there is no return statement at the end
+  // TODO: should only do that for the main function
+  if (context.instructions.length == 0 ||
+      context.instructions.data[context.instructions.length - 1].typ !=
+          IR_RETURN) {
+    push_instruction(&context,
+                     ir_single_operand_instr(IR_RETURN, ir_constant(0)));
   }
 
   // allocate and copy instructions to permanent arena

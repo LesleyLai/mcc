@@ -30,7 +30,7 @@ void string_buffer_printf(StringBuffer* str, const char* restrict format, ...)
   va_end(args_copy);
 }
 
-char* allocate_printf(Arena* arena, const char* format, ...)
+StringView allocate_printf(Arena* arena, const char* format, ...)
 {
   va_list args;
   va_start(args, format);
@@ -47,5 +47,8 @@ char* allocate_printf(Arena* arena, const char* format, ...)
   const int result = vsnprintf(buffer, alloc_size, format, args_copy);
   MCC_ASSERT_MSG(result == buffer_size, "Successfully writing result");
 
-  return buffer;
+  return (StringView){
+      .start = buffer,
+      .size = (size_t)buffer_size,
+  };
 }

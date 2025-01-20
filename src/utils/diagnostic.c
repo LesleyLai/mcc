@@ -53,7 +53,7 @@ void write_diagnostics(StringBuffer* output, const Error* error,
 
     const uint32_t line_length = line_end - line_begin;
 
-    string_buffer_printf(output, "%d |     %.*s", line_num, (int)line_length,
+    string_buffer_printf(output, "%d | %.*s", line_num, (int)line_length,
                          source.start + line_begin);
     write_diagnostic_position_indicator(output, error_range, line_begin,
                                         line_end);
@@ -65,7 +65,7 @@ static void write_diagnostic_position_indicator(StringBuffer* output,
                                                 uint32_t line_begin,
                                                 uint32_t line_end)
 {
-  string_buffer_printf(output, "  |     ");
+  string_buffer_printf(output, "  | ");
   MCC_ASSERT(error_range.begin >= line_begin);
   MCC_ASSERT(error_range.end > error_range.begin);
   MCC_ASSERT(error_range.end <= line_end);

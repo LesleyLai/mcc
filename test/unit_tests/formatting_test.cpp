@@ -9,6 +9,11 @@ extern "C" {
 #include <mcc/str.h>
 }
 
+[[nodiscard]] constexpr auto operator==(StringView lhs, std::string_view rhs)
+{
+  return std::string_view(lhs.start, lhs.size) == rhs;
+}
+
 using namespace std::string_view_literals;
 
 TEST_CASE("Allocate Formatting", "[format]")
@@ -17,7 +22,7 @@ TEST_CASE("Allocate Formatting", "[format]")
   std::uint8_t buffer[buffer_size];
 
   Arena arena = arena_init(buffer, buffer_size);
-  const char* result = allocate_printf(&arena, "Hello, %s!", "world");
+  StringView result = allocate_printf(&arena, "Hello, %s!", "world");
 
   const auto expected = "Hello, world!"sv;
   REQUIRE(result == expected);

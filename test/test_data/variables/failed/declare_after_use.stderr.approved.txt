@@ -1,0 +1,8 @@
+{{base_dir}}/variables/failed/declare_after_use.c:3:3: Error: use of undeclared identifier 'x'
+3 |   x = 42;
+  |   ^
+
+{{base_dir}}/variables/failed/declare_after_use.c:4:7: Error: Expect end of the file
+4 |   int x;
+  |       ^
+
