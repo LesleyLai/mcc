@@ -1,0 +1,8 @@
+{{base_dir}}/variables/failed/redefinition_after_scope.c:7:7: Error: redefinition of 'x'
+7 |   int x = 2;
+  |       ^
+
+{{base_dir}}/variables/failed/redefinition_after_scope.c:8:10: Error: Expect end of the file
+8 |   return x;
+  |          ^
+

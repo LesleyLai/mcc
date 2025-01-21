@@ -1,0 +1,4 @@
+{{base_dir}}/variables/failed/use_inner_var_in_outer.c:6:10: Error: use of undeclared identifier 'x'
+6 |   return x;
+  |          ^
+

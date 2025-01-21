@@ -1,0 +1,8 @@
+{{base_dir}}/variables/failed/redefinition_inner.c:5:9: Error: redefinition of 'x'
+5 |     int x = 42;
+  |         ^
+
+{{base_dir}}/variables/failed/redefinition_inner.c:7:2: Error: Expect `}`
+7 | }
+  |  ^
+

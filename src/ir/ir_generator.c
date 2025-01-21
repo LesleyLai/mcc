@@ -342,9 +342,48 @@ static IRValue emit_ir_instructions_from_expr(const Expr* expr,
   MCC_UNREACHABLE();
 }
 
-__attribute__((nonnull)) static IRFunctionDef
-generate_ir_function_def(const FunctionDecl* decl, Arena* permanent_arena,
-                         Arena scratch_arena)
+static void emit_ir_instructions_from_block_item(const BlockItem* item,
+                                                 IRGenContext* context)
+{
+  switch (item->tag) {
+  case BLOCK_ITEM_STMT: {
+    const Stmt stmt = item->stmt;
+    switch (stmt.tag) {
+    case STMT_INVALID: MCC_UNREACHABLE();
+    case STMT_EMPTY: break;
+    case STMT_EXPR: {
+      emit_ir_instructions_from_expr(stmt.expr, context);
+    } break;
+    case STMT_RETURN: {
+      const IRValue return_value =
+          emit_ir_instructions_from_expr(stmt.ret.expr, context);
+
+      push_instruction(context,
+                       ir_single_operand_instr(IR_RETURN, return_value));
+    } break;
+    case STMT_COMPOUND: {
+      for (size_t i = 0; i < stmt.compound.child_count; ++i) {
+        emit_ir_instructions_from_block_item(&stmt.compound.children[i],
+                                             context);
+      }
+    } break;
+    }
+  } break;
+  case BLOCK_ITEM_DECL: {
+    const VariableDecl var_decl = item->decl;
+    if (var_decl.initializer != nullptr) {
+      const IRValue value =
+          emit_ir_instructions_from_expr(var_decl.initializer, context);
+      push_instruction(
+          context, ir_unary_instr(IR_COPY, ir_variable(var_decl.name), value));
+    }
+  } break;
+  }
+}
+
+static IRFunctionDef generate_ir_function_def(const FunctionDecl* decl,
+                                              Arena* permanent_arena,
+                                              Arena scratch_arena)
 
 {
   IRGenContext context = (IRGenContext){.permanent_arena = permanent_arena,
@@ -353,38 +392,7 @@ generate_ir_function_def(const FunctionDecl* decl, Arena* permanent_arena,
                                         .fresh_variable_counter = 0};
 
   for (size_t i = 0; i < decl->body->child_count; ++i) {
-    const BlockItem item = decl->body->children[i];
-    switch (item.tag) {
-    case BLOCK_ITEM_STMT: {
-      const Stmt stmt = item.stmt;
-      switch (stmt.type) {
-      case STMT_INVALID: MCC_UNREACHABLE();
-      case STMT_EMPTY: break;
-      case STMT_EXPR: {
-        emit_ir_instructions_from_expr(stmt.expr, &context);
-      } break;
-      case STMT_RETURN: {
-        const IRValue return_value =
-            emit_ir_instructions_from_expr(stmt.ret.expr, &context);
-
-        push_instruction(&context,
-                         ir_single_operand_instr(IR_RETURN, return_value));
-        break;
-      }
-      case STMT_COMPOUND: MCC_UNIMPLEMENTED(); break;
-      }
-    } break;
-    case BLOCK_ITEM_DECL: {
-      const VariableDecl var_decl = item.decl;
-      if (var_decl.initializer != nullptr) {
-        const IRValue value =
-            emit_ir_instructions_from_expr(var_decl.initializer, &context);
-        push_instruction(
-            &context,
-            ir_unary_instr(IR_COPY, ir_variable(var_decl.name), value));
-      }
-    } break;
-    }
+    emit_ir_instructions_from_block_item(&decl->body->children[i], &context);
   }
 
   // return 0 for main if there is no return statement at the end

@@ -113,34 +113,52 @@ static void parse_consume(Parser* parser, TokenType type, const char* error_msg)
  * =============================================================================
  */
 
-// TODO: use hash table
-static struct Locals {
+struct Variables {
   uint32_t length;
   uint32_t capacity;
   StringView* data;
-} locals = {};
+};
 
-static bool has_local(StringView var)
+// TODO: use hash table
+typedef struct VariableMap {
+  uint32_t length;
+  uint32_t capacity;
+  StringView* data;
+  struct VariableMap* parent;
+} VariableMap;
+
+static struct VariableMap* new_variable_map(VariableMap* parent, Arena* arena)
 {
-  for (uint32_t i = 0; i < locals.length; ++i) {
-    if (str_eq(var, locals.data[i])) { return true; }
+  struct VariableMap* map = ARENA_ALLOC_OBJECT(arena, struct VariableMap);
+  *map = (struct VariableMap){
+      .parent = parent,
+  };
+  return map;
+}
+
+static bool lookup_variable(const VariableMap* map, StringView var)
+{
+  for (uint32_t i = 0; i < map->length; ++i) {
+    if (str_eq(var, map->data[i])) { return true; }
   }
-  return false;
+  return map->parent != nullptr && lookup_variable(map->parent, var);
 }
 
 // Return false if a local variable already exist
-static bool add_local(StringView var, Arena* arena)
+static bool add_variable(StringView var, VariableMap* map, Arena* arena)
 {
-  if (has_local(var)) { return false; }
-  DYNARRAY_PUSH_BACK(&locals, StringView, arena, var);
+  if (lookup_variable(map, var)) { return false; }
+  DYNARRAY_PUSH_BACK(map, StringView, arena, var);
   return true;
 }
 
 // =============================================================================
 // Expression parsing
 // =============================================================================
-static Expr* parse_number_literal(Parser* parser)
+static Expr* parse_number_literal(Parser* parser, VariableMap* scope)
 {
+  (void)scope;
+
   const Token token = parser_previous_token(parser);
 
   char* end_ptr;
@@ -157,7 +175,7 @@ static Expr* parse_number_literal(Parser* parser)
   return result;
 }
 
-static Expr* parse_identifier_expr(Parser* parser)
+static Expr* parse_identifier_expr(Parser* parser, VariableMap* scope)
 {
   const Token token = parser_previous_token(parser);
 
@@ -172,7 +190,7 @@ static Expr* parse_identifier_expr(Parser* parser)
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
 
   // If local variable does not exist
-  if (!has_local(identifier)) {
+  if (!lookup_variable(scope, identifier)) {
     const StringView error_msg = allocate_printf(
         parser->permanent_arena, "use of undeclared identifier '%.*s'",
         (int)identifier.size, identifier.start);
@@ -209,16 +227,16 @@ typedef enum Precedence {
   PREC_PRIMARY
 } Precedence;
 
-static Expr* parse_expr(Parser* parser);
-static Expr* parse_group(Parser* parser);
-static Expr* parse_unary_op(Parser* parser);
-static Expr* parse_binop_left(Parser* parser,
-                              Expr* lhs_expr); // left associative
-static Expr* parse_assignment(Parser* parser,
-                              Expr* lhs_expr); // right associative
+static Expr* parse_expr(Parser* parser, struct VariableMap* scope);
+static Expr* parse_group(Parser* parser, struct VariableMap* scope);
+static Expr* parse_unary_op(Parser* parser, struct VariableMap* scope);
+static Expr* parse_binop_left(Parser* parser, Expr* lhs_expr,
+                              struct VariableMap* scope); // left associative
+static Expr* parse_assignment(Parser* parser, Expr* lhs_expr,
+                              struct VariableMap* scope); // right associative
 
-typedef Expr* (*PrefixParseFn)(Parser*);
-typedef Expr* (*InfixParseFn)(Parser*, Expr*);
+typedef Expr* (*PrefixParseFn)(Parser*, struct VariableMap* scope);
+typedef Expr* (*InfixParseFn)(Parser*, Expr*, struct VariableMap* scope);
 
 typedef struct ParseRule {
   PrefixParseFn prefix;
@@ -280,7 +298,8 @@ static ParseRule* get_rule(TokenType operator_type)
   return &rules[operator_type];
 }
 
-static Expr* parse_precedence(Parser* parser, Precedence precedence)
+static Expr* parse_precedence(Parser* parser, Precedence precedence,
+                              struct VariableMap* scope)
 {
   parse_advance(parser);
 
@@ -298,27 +317,27 @@ static Expr* parse_precedence(Parser* parser, Precedence precedence)
     return error_expr;
   }
 
-  Expr* expr = prefix_rule(parser);
+  Expr* expr = prefix_rule(parser, scope);
 
   while (precedence <=
          get_rule(parser_current_token(parser).type)->precedence) {
     parse_advance(parser);
     InfixParseFn infix_rule =
         get_rule(parser_previous_token(parser).type)->infix;
-    expr = infix_rule(parser, expr);
+    expr = infix_rule(parser, expr, scope);
   }
 
   return expr;
 }
 
-static Expr* parse_group(Parser* parser)
+static Expr* parse_group(Parser* parser, struct VariableMap* scope)
 {
-  Expr* result = parse_expr(parser);
+  Expr* result = parse_expr(parser, scope);
   parse_consume(parser, TOKEN_RIGHT_PAREN, "Expect )");
   return result;
 }
 
-static Expr* parse_unary_op(Parser* parser)
+static Expr* parse_unary_op(Parser* parser, VariableMap* scope)
 {
   Token operator_token = parser_previous_token(parser);
 
@@ -331,7 +350,7 @@ static Expr* parse_unary_op(Parser* parser)
   }
 
   // Inner expression
-  Expr* expr = parse_precedence(parser, PREC_UNARY);
+  Expr* expr = parse_precedence(parser, PREC_UNARY, scope);
 
   // build result
   // TODO: better way to handle the case where expr == NULL
@@ -388,15 +407,18 @@ static BinaryOpType binop_type_from_token_type(TokenType token_type)
 enum Associativity { ASSOCIATIVITY_LEFT, ASSOCIATIVITY_RIGHT };
 
 static Expr* parse_binary_op(Parser* parser, Expr* lhs_expr,
-                             enum Associativity associativity)
+                             enum Associativity associativity,
+                             VariableMap* scope)
 {
   Token operator_token = parser_previous_token(parser);
 
   const TokenType operator_type = operator_token.type;
   const ParseRule* rule = get_rule(operator_type);
   Expr* rhs_expr = parse_precedence(
-      parser, (Precedence)(rule->precedence +
-                           ((associativity == ASSOCIATIVITY_LEFT) ? 1 : 0)));
+      parser,
+      (Precedence)(rule->precedence +
+                   ((associativity == ASSOCIATIVITY_LEFT) ? 1 : 0)),
+      scope);
 
   BinaryOpType binary_op_type = binop_type_from_token_type(operator_type);
 
@@ -417,34 +439,36 @@ static Expr* parse_binary_op(Parser* parser, Expr* lhs_expr,
   return result;
 }
 
-static Expr* parse_binop_left(Parser* parser, Expr* lhs_expr)
+static Expr* parse_binop_left(Parser* parser, Expr* lhs_expr,
+                              VariableMap* scope)
 {
-  return parse_binary_op(parser, lhs_expr, ASSOCIATIVITY_LEFT);
+  return parse_binary_op(parser, lhs_expr, ASSOCIATIVITY_LEFT, scope);
 }
 
-static Expr* parse_assignment(Parser* parser, Expr* lhs_expr)
+static Expr* parse_assignment(Parser* parser, Expr* lhs_expr,
+                              VariableMap* scope)
 {
   // Check whether the left hand side is lvalue
   if (lhs_expr->tag != EXPR_VARIABLE) {
     parse_error_at(parser, str("expression is not assignable"),
                    lhs_expr->source_range);
   }
-  return parse_binary_op(parser, lhs_expr, ASSOCIATIVITY_RIGHT);
+  return parse_binary_op(parser, lhs_expr, ASSOCIATIVITY_RIGHT, scope);
 }
 
-static Expr* parse_expr(Parser* parser)
+static Expr* parse_expr(Parser* parser, VariableMap* scope)
 {
-  return parse_precedence(parser, PREC_ASSIGNMENT);
+  return parse_precedence(parser, PREC_ASSIGNMENT, scope);
 }
 
-static ReturnStmt parse_return_stmt(Parser* parser)
+static ReturnStmt parse_return_stmt(Parser* parser, VariableMap* scope)
 {
-  Expr* expr = parse_expr(parser);
+  Expr* expr = parse_expr(parser, scope);
   parse_consume(parser, TOKEN_SEMICOLON, "Expect ;");
   return (ReturnStmt){.expr = expr};
 }
 
-static void parse_stmt(Parser* parser, Stmt* out_stmt);
+static Stmt parse_stmt(Parser* parser, struct VariableMap* scope);
 
 struct BlockItemVec {
   size_t capacity;
@@ -457,14 +481,14 @@ static StringView str_from_token(const char* src, Token token)
   return (StringView){.start = src + token.start, .size = token.size};
 }
 
-static VariableDecl parse_decl(Parser* parser)
+static VariableDecl parse_decl(Parser* parser, struct VariableMap* scope)
 {
   const Token name = parser_current_token(parser);
   // TODO: proper error handling
   MCC_ASSERT(name.type == TOKEN_IDENTIFIER);
 
   const StringView identifier = str_from_token(parser->src, name);
-  if (!add_local(identifier, parser->permanent_arena)) {
+  if (!add_variable(identifier, scope, parser->permanent_arena)) {
     const StringView error_msg =
         allocate_printf(parser->permanent_arena, "redefinition of '%.*s'",
                         (int)identifier.size, identifier.start);
@@ -476,42 +500,43 @@ static VariableDecl parse_decl(Parser* parser)
   const Expr* initializer = nullptr;
   if (parser_current_token(parser).type == TOKEN_EQUAL) {
     parse_advance(parser);
-    initializer = parse_expr(parser);
+    initializer = parse_expr(parser, scope);
   }
   parse_consume(parser, TOKEN_SEMICOLON, "expect ';'");
 
   return (VariableDecl){.name = identifier, .initializer = initializer};
 }
 
-static BlockItem parse_block_item(Parser* parser)
+static BlockItem parse_block_item(Parser* parser, struct VariableMap* scope)
 {
   const Token current_token = parser_current_token(parser);
   if (current_token.type == TOKEN_KEYWORD_INT) {
     parse_advance(parser);
-    return (BlockItem){.tag = BLOCK_ITEM_DECL, .decl = parse_decl(parser)};
+    return (BlockItem){.tag = BLOCK_ITEM_DECL,
+                       .decl = parse_decl(parser, scope)};
   } else {
-    Stmt stmt;
-    parse_stmt(parser, &stmt);
-    return (BlockItem){.tag = BLOCK_ITEM_STMT, .stmt = stmt};
+    return (BlockItem){.tag = BLOCK_ITEM_STMT,
+                       .stmt = parse_stmt(parser, scope)};
   }
 }
 
-static Block parse_block(Parser* parser)
+static Block parse_block(Parser* parser, struct VariableMap* parent_scope)
 {
-  struct BlockItemVec items_vec = {};
+  struct VariableMap* scope =
+      new_variable_map(parent_scope, parser->permanent_arena);
 
-  Arena scratch_arena = parser->scratch_arena;
+  struct BlockItemVec items_vec = {};
 
   bool has_error = false;
 
   while (parser_current_token(parser).type != TOKEN_RIGHT_BRACE &&
          parser_current_token(parser).type != TOKEN_EOF) {
-    BlockItem item = parse_block_item(parser);
+    BlockItem item = parse_block_item(parser, scope);
+    DYNARRAY_PUSH_BACK(&items_vec, BlockItem, &parser->scratch_arena, item);
+
     if (parser->in_panic_mode) {
       has_error = true;
       break;
-    } else {
-      DYNARRAY_PUSH_BACK(&items_vec, BlockItem, &scratch_arena, item);
     }
   }
 
@@ -538,7 +563,7 @@ static Block parse_block(Parser* parser)
   return (Block){.children = block_items, .child_count = items_vec.length};
 }
 
-static void parse_stmt(Parser* parser, Stmt* out_stmt)
+static Stmt parse_stmt(Parser* parser, struct VariableMap* scope)
 {
   const Token start_token = parser_current_token(parser);
 
@@ -546,48 +571,39 @@ static void parse_stmt(Parser* parser, Stmt* out_stmt)
   case TOKEN_SEMICOLON: {
     parse_advance(parser);
 
-    *out_stmt = (Stmt){.type = STMT_EMPTY,
-                       .source_range = token_source_range(start_token)};
-
-    return;
+    return (Stmt){.tag = STMT_EMPTY,
+                  .source_range = token_source_range(start_token)};
   }
 
   case TOKEN_KEYWORD_RETURN: {
     parse_advance(parser);
 
-    ReturnStmt return_stmt = parse_return_stmt(parser);
+    ReturnStmt return_stmt = parse_return_stmt(parser, scope);
 
-    *out_stmt =
-        (Stmt){.type = STMT_RETURN,
-               .source_range = {.begin = start_token.start,
-                                .end = parser_previous_token(parser).start},
-               .ret = return_stmt};
-
-    return;
+    return (Stmt){.tag = STMT_RETURN,
+                  .source_range = {.begin = start_token.start,
+                                   .end = parser_previous_token(parser).start},
+                  .ret = return_stmt};
   }
   case TOKEN_LEFT_BRACE: {
     parse_advance(parser);
 
-    const Block compound = parse_block(parser);
+    const Block compound = parse_block(parser, scope);
 
-    *out_stmt =
-        (Stmt){.type = STMT_COMPOUND,
-               .source_range = {.begin = start_token.start,
-                                .end = parser_previous_token(parser).start},
-               .compound = compound};
-    return;
+    return (Stmt){.tag = STMT_COMPOUND,
+                  .source_range = {.begin = start_token.start,
+                                   .end = parser_previous_token(parser).start},
+                  .compound = compound};
   }
   default: {
-    const Expr* expr = parse_expr(parser);
+    const Expr* expr = parse_expr(parser, scope);
     parse_consume(parser, TOKEN_SEMICOLON, "expect ';'");
 
-    *out_stmt = (Stmt){.type = STMT_EXPR,
-                       .expr = expr,
-                       .source_range = source_range_union(
-                           token_source_range(start_token),
-                           token_source_range(parser_previous_token(parser)))};
-
-    break;
+    return (Stmt){.tag = STMT_EXPR,
+                  .expr = expr,
+                  .source_range = source_range_union(
+                      token_source_range(start_token),
+                      token_source_range(parser_previous_token(parser)))};
   }
   }
 }
@@ -625,7 +641,7 @@ static FunctionDecl* parse_function_decl(Parser* parser)
   if (parser_current_token(parser).type == TOKEN_LEFT_BRACE) { // is definition
     parse_advance(parser);
     body = ARENA_ALLOC_OBJECT(parser->permanent_arena, Block);
-    *body = parse_block(parser);
+    *body = parse_block(parser, nullptr);
   } else {
     parse_consume(parser, TOKEN_SEMICOLON, "Expect ;");
   }

@@ -113,7 +113,7 @@ typedef struct ReturnStmt {
 
 typedef struct Stmt {
   SourceRange source_range;
-  StatementType type;
+  StatementType tag;
   union {
     Block compound;
     ReturnStmt ret;

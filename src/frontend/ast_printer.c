@@ -96,7 +96,7 @@ static void ast_print_block(const Block* block, int indent);
 
 static void ast_print_stmt(const Stmt* stmt, int indent)
 {
-  switch (stmt->type) {
+  switch (stmt->tag) {
   case STMT_INVALID: MCC_UNREACHABLE();
   case STMT_EMPTY: {
     printf("%*sEmptyStmt ", indent, "");
