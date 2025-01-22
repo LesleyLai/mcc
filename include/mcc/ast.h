@@ -97,7 +97,8 @@ typedef enum StatementType {
   STMT_EMPTY,
   STMT_EXPR, // An expression statement
   STMT_COMPOUND,
-  STMT_RETURN
+  STMT_RETURN,
+  STMT_IF
 } StatementType;
 
 typedef struct BlockItem BlockItem;
@@ -111,15 +112,24 @@ typedef struct ReturnStmt {
   Expr* expr;
 } ReturnStmt;
 
-typedef struct Stmt {
+typedef struct Stmt Stmt;
+
+typedef struct IfStmt {
+  const Expr* cond;
+  const Stmt* then;
+  const Stmt* els; // optional, can be nullptr
+} IfStmt;
+
+struct Stmt {
   SourceRange source_range;
   StatementType tag;
   union {
     Block compound;
     ReturnStmt ret;
     const Expr* expr;
+    IfStmt if_then;
   };
-} Stmt;
+};
 
 enum BlockItemTag {
   BLOCK_ITEM_STMT,

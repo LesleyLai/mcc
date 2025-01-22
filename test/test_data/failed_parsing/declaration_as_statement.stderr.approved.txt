@@ -1,0 +1,4 @@
+{{base_dir}}/failed_parsing/declaration_as_statement.c:3:10: Error: Expect valid expression
+3 |   if (5) int i = 0;
+  |          ^~~
+

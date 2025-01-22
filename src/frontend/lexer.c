@@ -161,13 +161,23 @@ static TokenType check_keyword(Lexer* lexer, int start_position,
 static TokenType get_identifier_type(Lexer* lexer)
 {
   switch (lexer->previous[0]) {
+  case 'e': return check_keyword(lexer, 1, str("lse"), TOKEN_KEYWORD_ELSE);
+  case 'i': {
+    if (lexer->current - lexer->previous > 1) {
+      switch (lexer->previous[1]) {
+      case 'f': return check_keyword(lexer, 2, str(""), TOKEN_KEYWORD_IF);
+      case 'n': return check_keyword(lexer, 2, str("t"), TOKEN_KEYWORD_INT);
+      default: break;
+      }
+    }
+  } break;
   case 'v': return check_keyword(lexer, 1, str("oid"), TOKEN_KEYWORD_VOID);
-  case 'i': return check_keyword(lexer, 1, str("nt"), TOKEN_KEYWORD_INT);
   case 'r': return check_keyword(lexer, 1, str("eturn"), TOKEN_KEYWORD_RETURN);
   case 't':
     return check_keyword(lexer, 1, str("ypedef"), TOKEN_KEYWORD_TYPEDEF);
-  default: return TOKEN_IDENTIFIER;
+  default: break;
   }
+  return TOKEN_IDENTIFIER;
 }
 
 static Token scan_identifier(Lexer* lexer)

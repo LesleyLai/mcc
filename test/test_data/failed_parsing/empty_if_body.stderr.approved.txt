@@ -1,0 +1,4 @@
+{{base_dir}}/failed_parsing/empty_if_body.c:3:10: Error: Expect valid expression
+3 |   if (0) else return 0;
+  |          ^~~~
+

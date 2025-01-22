@@ -598,6 +598,35 @@ static Stmt parse_stmt(Parser* parser, struct VariableMap* scope)
                                    .end = parser_previous_token(parser).start},
                   .compound = compound};
   }
+  case TOKEN_KEYWORD_IF: {
+    const uint32_t begin = parser_current_token(parser).start;
+
+    parse_advance(parser);
+    parse_consume(parser, TOKEN_LEFT_PAREN, "expect '('");
+    const Expr* cond = parse_expr(parser, scope);
+    parse_consume(parser, TOKEN_RIGHT_PAREN, "expect ')'");
+
+    Stmt* then = ARENA_ALLOC_OBJECT(parser->permanent_arena, Stmt);
+    *then = parse_stmt(parser, scope);
+
+    Stmt* els = nullptr;
+    if (parser_current_token(parser).type == TOKEN_KEYWORD_ELSE) {
+      parse_advance(parser);
+
+      els = ARENA_ALLOC_OBJECT(parser->permanent_arena, Stmt);
+      *els = parse_stmt(parser, scope);
+    }
+
+    const uint32_t end = parser_current_token(parser).start;
+
+    return (Stmt){.tag = STMT_IF,
+                  .source_range = (SourceRange){.begin = begin, .end = end},
+                  .if_then = (IfStmt){
+                      .cond = cond,
+                      .then = then,
+                      .els = els,
+                  }};
+  }
   default: {
     const Expr* expr = parse_expr(parser, scope);
     parse_consume(parser, TOKEN_SEMICOLON, "expect ';'");

@@ -1,0 +1,8 @@
+{{base_dir}}/failed_parsing/if_assignment.c:4:11: Error: Expect valid expression
+4 |   int a = if (flag) { 2 } else { 3 }
+  |           ^~
+
+{{base_dir}}/failed_parsing/if_assignment.c:4:27: Error: Expect end of the file
+4 |   int a = if (flag) { 2 } else { 3 }
+  |                           ^~~~
+

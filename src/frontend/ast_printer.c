@@ -65,7 +65,7 @@ static void ast_print_expr(const Expr* expr, int indent)
   switch (expr->tag) {
   case EXPR_INVALID: MCC_UNREACHABLE();
   case EXPR_CONST:
-    printf("%*s IntegerLiteral ", indent, "");
+    printf("%*sIntegerLiteral ", indent, "");
     print_source_range(expr->source_range);
     printf(" %i\n", expr->const_expr.val);
     break;
@@ -109,12 +109,28 @@ static void ast_print_stmt(const Stmt* stmt, int indent)
     printf("\n");
     ast_print_expr(stmt->ret.expr, indent + 2);
   } break;
-  case STMT_COMPOUND: ast_print_block(&stmt->compound, indent + 2); break;
+  case STMT_COMPOUND: {
+    printf("%*sCompoundStmt ", indent, "");
+    print_source_range(stmt->source_range);
+    printf("\n");
+    ast_print_block(&stmt->compound, indent + 2);
+    break;
+  }
   case STMT_RETURN: {
     printf("%*sReturnStmt ", indent, "");
     print_source_range(stmt->source_range);
     printf("\n");
     ast_print_expr(stmt->ret.expr, indent + 2);
+  } break;
+  case STMT_IF: {
+    printf("%*sIfStmt ", indent, "");
+    print_source_range(stmt->source_range);
+    printf("\n");
+    ast_print_expr(stmt->if_then.cond, indent + 2);
+    ast_print_stmt(stmt->if_then.then, indent + 2);
+    if (stmt->if_then.els != nullptr) {
+      ast_print_stmt(stmt->if_then.els, indent + 2);
+    }
   } break;
   }
 }

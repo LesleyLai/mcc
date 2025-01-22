@@ -1,0 +1,4 @@
+{{base_dir}}/if/failed/invalid_var_in_if.c:3:7: Error: use of undeclared identifier 'x'
+3 |   if (x) { return 42; }
+  |       ^
+

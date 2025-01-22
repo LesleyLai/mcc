@@ -342,32 +342,16 @@ static IRValue emit_ir_instructions_from_expr(const Expr* expr,
   MCC_UNREACHABLE();
 }
 
+static void emit_ir_instructions_from_stmt(const Stmt* stmt,
+                                           IRGenContext* context);
+
 static void emit_ir_instructions_from_block_item(const BlockItem* item,
                                                  IRGenContext* context)
 {
   switch (item->tag) {
   case BLOCK_ITEM_STMT: {
     const Stmt stmt = item->stmt;
-    switch (stmt.tag) {
-    case STMT_INVALID: MCC_UNREACHABLE();
-    case STMT_EMPTY: break;
-    case STMT_EXPR: {
-      emit_ir_instructions_from_expr(stmt.expr, context);
-    } break;
-    case STMT_RETURN: {
-      const IRValue return_value =
-          emit_ir_instructions_from_expr(stmt.ret.expr, context);
-
-      push_instruction(context,
-                       ir_single_operand_instr(IR_RETURN, return_value));
-    } break;
-    case STMT_COMPOUND: {
-      for (size_t i = 0; i < stmt.compound.child_count; ++i) {
-        emit_ir_instructions_from_block_item(&stmt.compound.children[i],
-                                             context);
-      }
-    } break;
-    }
+    emit_ir_instructions_from_stmt(&stmt, context);
   } break;
   case BLOCK_ITEM_DECL: {
     const VariableDecl var_decl = item->decl;
@@ -377,6 +361,66 @@ static void emit_ir_instructions_from_block_item(const BlockItem* item,
       push_instruction(
           context, ir_unary_instr(IR_COPY, ir_variable(var_decl.name), value));
     }
+  } break;
+  }
+}
+
+static void emit_ir_instructions_from_stmt(const Stmt* stmt,
+                                           IRGenContext* context)
+{
+  switch (stmt->tag) {
+  case STMT_INVALID: MCC_UNREACHABLE();
+  case STMT_EMPTY: break;
+  case STMT_EXPR: {
+    emit_ir_instructions_from_expr(stmt->expr, context);
+  } break;
+  case STMT_RETURN: {
+    const IRValue return_value =
+        emit_ir_instructions_from_expr(stmt->ret.expr, context);
+
+    push_instruction(context, ir_single_operand_instr(IR_RETURN, return_value));
+  } break;
+  case STMT_COMPOUND: {
+    for (size_t i = 0; i < stmt->compound.child_count; ++i) {
+      emit_ir_instructions_from_block_item(&stmt->compound.children[i],
+                                           context);
+    }
+  } break;
+  case STMT_IF: {
+    const StringView if_label = create_fresh_label_name(context, "if");
+    const StringView if_end_label = create_fresh_label_name(context, "if_end");
+
+    const IRValue cond =
+        emit_ir_instructions_from_expr(stmt->if_then.cond, context);
+
+    if (stmt->if_then.els == nullptr) {
+      // br cond .if .if_end
+      push_instruction(context, ir_br(cond, if_label, if_end_label));
+
+      // .if
+      // <then branch>
+      push_instruction(context, ir_label(if_label));
+      emit_ir_instructions_from_stmt(stmt->if_then.then, context);
+    } else {
+      const StringView else_label = create_fresh_label_name(context, "else");
+
+      // br cond .if .else
+      push_instruction(context, ir_br(cond, if_label, else_label));
+
+      // .if
+      // <then branch>
+      // jmp .end
+      push_instruction(context, ir_label(if_label));
+      emit_ir_instructions_from_stmt(stmt->if_then.then, context);
+      push_instruction(context, ir_jmp(if_end_label));
+
+      // <else branch>
+      push_instruction(context, ir_label(else_label));
+      emit_ir_instructions_from_stmt(stmt->if_then.els, context);
+    }
+
+    // .if_end
+    push_instruction(context, ir_label(if_end_label));
   } break;
   }
 }
