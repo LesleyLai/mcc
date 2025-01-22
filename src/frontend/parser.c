@@ -101,11 +101,12 @@ static void parse_consume(Parser* parser, TokenType type, const char* error_msg)
 {
   const Token current = parser_current_token(parser);
 
-  if (current.type != type) {
-    parse_error_at_token(parser, str(error_msg), current);
+  if (current.type == type) {
+    parse_advance(parser);
+    return;
   }
 
-  parse_advance(parser);
+  parse_error_at_token(parser, str(error_msg), current);
 }
 
 /* =============================================================================
@@ -507,17 +508,39 @@ static VariableDecl parse_decl(Parser* parser, struct VariableMap* scope)
   return (VariableDecl){.name = identifier, .initializer = initializer};
 }
 
+// Find the next synchronization token (`}` or `;`)
+static void parser_panic_synchronize(Parser* parser)
+{
+  while (true) {
+    const TokenType current_token_type = parser_current_token(parser).type;
+    if (current_token_type == TOKEN_RIGHT_BRACE ||
+        current_token_type == TOKEN_SEMICOLON ||
+        current_token_type == TOKEN_EOF) {
+      break;
+    }
+    parser->current_token_index++;
+  }
+}
+
 static BlockItem parse_block_item(Parser* parser, struct VariableMap* scope)
 {
   const Token current_token = parser_current_token(parser);
+  BlockItem result;
   if (current_token.type == TOKEN_KEYWORD_INT) {
     parse_advance(parser);
-    return (BlockItem){.tag = BLOCK_ITEM_DECL,
-                       .decl = parse_decl(parser, scope)};
+    result =
+        (BlockItem){.tag = BLOCK_ITEM_DECL, .decl = parse_decl(parser, scope)};
   } else {
-    return (BlockItem){.tag = BLOCK_ITEM_STMT,
-                       .stmt = parse_stmt(parser, scope)};
+    result =
+        (BlockItem){.tag = BLOCK_ITEM_STMT, .stmt = parse_stmt(parser, scope)};
   }
+
+  if (parser->in_panic_mode) {
+    parser->in_panic_mode = false;
+    parser_panic_synchronize(parser);
+  }
+
+  return result;
 }
 
 static Block parse_block(Parser* parser, struct VariableMap* parent_scope)
@@ -527,32 +550,12 @@ static Block parse_block(Parser* parser, struct VariableMap* parent_scope)
 
   struct BlockItemVec items_vec = {};
 
-  bool has_error = false;
-
   while (parser_current_token(parser).type != TOKEN_RIGHT_BRACE &&
          parser_current_token(parser).type != TOKEN_EOF) {
     BlockItem item = parse_block_item(parser, scope);
     DYNARRAY_PUSH_BACK(&items_vec, BlockItem, &parser->scratch_arena, item);
-
-    if (parser->in_panic_mode) {
-      has_error = true;
-      break;
-    }
   }
-
-  if (has_error) {
-    parser->in_panic_mode = false;
-    while (parser_current_token(parser).type != TOKEN_EOF) {
-      const TokenType previous_type = parser_previous_token(parser).type;
-      if (previous_type != TOKEN_RIGHT_BRACE &&
-          previous_type != TOKEN_SEMICOLON) {
-        break;
-      }
-      parse_advance(parser);
-    }
-  } else {
-    parse_consume(parser, TOKEN_RIGHT_BRACE, "Expect `}`");
-  }
+  parse_consume(parser, TOKEN_RIGHT_BRACE, "Expect `}`");
 
   BlockItem* block_items =
       ARENA_ALLOC_ARRAY(parser->permanent_arena, BlockItem, items_vec.length);

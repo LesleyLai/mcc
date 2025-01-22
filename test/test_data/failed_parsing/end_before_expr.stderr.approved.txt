@@ -2,3 +2,7 @@
 2 |     return
   |     ^~~~~~
 
+{{base_dir}}/failed_parsing/end_before_expr.c:2:11: Error: Expect `}`
+2 |     return
+  |           ^
+

@@ -2,7 +2,3 @@
 2 |     returns 0;
   |     ^~~~~~~
 
-{{base_dir}}/failed_parsing/misspelled_keyword.c:2:14: Error: Expect end of the file
-2 |     returns 0;
-  |              ^
-

@@ -2,11 +2,3 @@
 4 |     x = 42;
   |     ^
 
-{{base_dir}}/variables/failed/use_before_decl_2.c:6:7: Error: use of undeclared identifier 'x'
-6 |   int x;
-  |       ^
-
-{{base_dir}}/variables/failed/use_before_decl_2.c:7:10: Error: Expect end of the file
-7 |   return x;
-  |          ^
-
