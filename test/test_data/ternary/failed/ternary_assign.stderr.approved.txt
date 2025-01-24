@@ -1,0 +1,4 @@
+{{base_dir}}/ternary/failed/ternary_assign.c:5:3: Error: expression is not assignable
+5 |   a > b ? a = 1 : a = 0;
+  |   ^~~~~~~~~~~~~~~~~
+

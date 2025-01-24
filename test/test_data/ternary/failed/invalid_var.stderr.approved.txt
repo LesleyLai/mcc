@@ -1,0 +1,4 @@
+{{base_dir}}/ternary/failed/invalid_var.c:3:10: Error: use of undeclared identifier 'x'
+3 |   return x > 0 ? 1 : 2;
+  |          ^
+

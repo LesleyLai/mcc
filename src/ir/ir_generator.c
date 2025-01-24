@@ -231,7 +231,7 @@ static IRValue emit_ir_instructions_from_logical_and(const Expr* expr,
   const StringView false_label = create_fresh_label_name(context, "and_false");
   const StringView end_label = create_fresh_label_name(context, "and_end");
 
-  const IRValue result = ir_variable(str("result"));
+  const IRValue result = ir_variable(create_fresh_variable_name(context));
 
   // br lhs .and_lhs_true .and_false
   push_instruction(context, ir_br(lhs, lhs_true_label, false_label));
@@ -274,7 +274,7 @@ static IRValue emit_ir_instructions_from_logical_or(const Expr* expr,
   const StringView true_label = create_fresh_label_name(context, "or_true");
   const StringView end_label = create_fresh_label_name(context, "or_end");
 
-  const IRValue result = ir_variable(str("result"));
+  const IRValue result = ir_variable(create_fresh_variable_name(context));
 
   // br lhs .or_true .or_lhs_false
   push_instruction(context, ir_br(lhs, true_label, lhs_false_label));
@@ -337,6 +337,42 @@ static IRValue emit_ir_instructions_from_expr(const Expr* expr,
     }
   }
   case EXPR_VARIABLE: return ir_variable(expr->variable);
+  case EXPR_TERNARY: {
+    const StringView true_label =
+        create_fresh_label_name(context, "ternary_true");
+    const StringView false_label =
+        create_fresh_label_name(context, "ternary_false");
+    const StringView end_label =
+        create_fresh_label_name(context, "ternary_end");
+
+    const IRValue result = ir_variable(create_fresh_variable_name(context));
+
+    const IRValue cond =
+        emit_ir_instructions_from_expr(expr->ternary.cond, context);
+
+    // br cond .ternary_true .ternary_false
+    push_instruction(context, ir_br(cond, true_label, false_label));
+
+    // .ternary_true
+    // <true branch>
+    // jmp .ternary_end
+    push_instruction(context, ir_label(true_label));
+    const IRValue true_value =
+        emit_ir_instructions_from_expr(expr->ternary.true_expr, context);
+    push_instruction(context, ir_unary_instr(IR_COPY, result, true_value));
+    push_instruction(context, ir_jmp(end_label));
+
+    // .ternary_false
+    // <false branch>
+    push_instruction(context, ir_label(false_label));
+    const IRValue false_value =
+        emit_ir_instructions_from_expr(expr->ternary.false_expr, context);
+    push_instruction(context, ir_unary_instr(IR_COPY, result, false_value));
+
+    // .ternary_end
+    push_instruction(context, ir_label(end_label));
+    return result;
+  }
   }
 
   MCC_UNREACHABLE();

@@ -89,6 +89,15 @@ static void ast_print_expr(const Expr* expr, int indent)
     print_str(expr->variable);
     printf("\n");
     break;
+  case EXPR_TERNARY:
+    printf("%*sTernaryExpr ", indent, "");
+    print_source_range(expr->source_range);
+    printf("\n");
+    ast_print_expr(expr->ternary.cond, indent + 2);
+    ast_print_expr(expr->ternary.true_expr, indent + 2);
+    ast_print_expr(expr->ternary.false_expr, indent + 2);
+    printf("\n");
+    break;
   }
 }
 

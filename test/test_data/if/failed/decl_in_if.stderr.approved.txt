@@ -1,0 +1,4 @@
+{{base_dir}}/if/failed/decl_in_if.c:3:10: Error: Expect valid expression
+3 |   if (1) int x = 10;
+  |          ^~~
+

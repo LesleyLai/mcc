@@ -213,6 +213,7 @@ static Expr* parse_identifier_expr(Parser* parser, VariableMap* scope)
 typedef enum Precedence {
   PREC_NONE = 0,
   PREC_ASSIGNMENT,  // =
+  PREC_TERNARY,     // ? :
   PREC_OR,          // ||
   PREC_AND,         // &&
   PREC_BITWISE_OR,  // |
@@ -235,6 +236,8 @@ static Expr* parse_binop_left(Parser* parser, Expr* lhs_expr,
                               struct VariableMap* scope); // left associative
 static Expr* parse_assignment(Parser* parser, Expr* lhs_expr,
                               struct VariableMap* scope); // right associative
+static Expr* parse_ternary(Parser* parser, Expr* cond,
+                           struct VariableMap* scope);
 
 typedef Expr* (*PrefixParseFn)(Parser*, struct VariableMap* scope);
 typedef Expr* (*InfixParseFn)(Parser*, Expr*, struct VariableMap* scope);
@@ -281,6 +284,7 @@ static ParseRule rules[TOKEN_TYPES_COUNT] = {
     [TOKEN_GREATER_EQUAL] = {NULL, parse_binop_left, PREC_COMPARISON},
     [TOKEN_GREATER_GREATER] = {NULL, parse_binop_left, PREC_SHIFT},
     [TOKEN_GREATER_GREATER_EQUAL] = {NULL, parse_assignment, PREC_ASSIGNMENT},
+    [TOKEN_QUESTION] = {NULL, parse_ternary, PREC_TERNARY},
     [TOKEN_TILDE] = {parse_unary_op, NULL, PREC_TERM},
     [TOKEN_KEYWORD_VOID] = {NULL, NULL, PREC_NONE},
     [TOKEN_KEYWORD_INT] = {NULL, NULL, PREC_NONE},
@@ -455,6 +459,23 @@ static Expr* parse_assignment(Parser* parser, Expr* lhs_expr,
                    lhs_expr->source_range);
   }
   return parse_binary_op(parser, lhs_expr, ASSOCIATIVITY_RIGHT, scope);
+}
+
+static Expr* parse_ternary(Parser* parser, Expr* cond,
+                           struct VariableMap* scope)
+{
+  Expr* true_expr = parse_expr(parser, scope);
+  parse_consume(parser, TOKEN_COLON, "expect ':'");
+  Expr* false_expr = parse_precedence(parser, PREC_TERNARY, scope);
+
+  Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
+  *result = (Expr){.tag = EXPR_TERNARY,
+                   .source_range = source_range_union(cond->source_range,
+                                                      false_expr->source_range),
+                   .ternary = (struct TernaryExpr){.cond = cond,
+                                                   .true_expr = true_expr,
+                                                   .false_expr = false_expr}};
+  return result;
 }
 
 static Expr* parse_expr(Parser* parser, VariableMap* scope)

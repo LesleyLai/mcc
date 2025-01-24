@@ -11,7 +11,8 @@ typedef enum ExprType {
   EXPR_CONST,
   EXPR_VARIABLE,
   EXPR_UNARY,
-  EXPR_BINARY
+  EXPR_BINARY,
+  EXPR_TERNARY
 } ExprTag;
 
 typedef enum UnaryOpType {
@@ -76,6 +77,12 @@ struct BinaryOpExpr {
   Expr* rhs;
 };
 
+struct TernaryExpr {
+  Expr* cond;
+  Expr* true_expr;
+  Expr* false_expr;
+};
+
 typedef struct Expr {
   SourceRange source_range;
   ExprTag tag;
@@ -84,6 +91,7 @@ typedef struct Expr {
     struct UnaryOpExpr unary_op;
     struct BinaryOpExpr binary_op;
     struct StringView variable;
+    struct TernaryExpr ternary;
   };
 } Expr;
 
