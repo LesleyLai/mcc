@@ -16,5 +16,5 @@ The mcc compiler follows a standard compiler architecture, consisting of the fol
 available is x86-64.
 
 At present, only a small subset of the C language is supported. You can find example programs demonstrating the
-compiler’s capabilities in the [test/test_data](./test/test_data) directory. Additionally, mcc does not yet implement
+compiler’s capabilities in the [tests/test_data](./tests/test_data) directory. Additionally, mcc does not yet implement
 any optimization and currently produces extremely inefficient code with no regard for performance.

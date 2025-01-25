@@ -450,6 +450,7 @@ static void emit_ir_instructions_from_stmt(const Stmt* stmt,
       emit_ir_instructions_from_stmt(stmt->if_then.then, context);
       push_instruction(context, ir_jmp(if_end_label));
 
+      // .else
       // <else branch>
       push_instruction(context, ir_label(else_label));
       emit_ir_instructions_from_stmt(stmt->if_then.els, context);

@@ -1,4 +1,0 @@
-{{base_dir}}/variables/failed/redefinition_after_scope.c:7:7: Error: redefinition of 'x'
-7 |   int x = 2;
-  |       ^
-

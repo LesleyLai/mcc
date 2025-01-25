@@ -1,8 +1,0 @@
-{{base_dir}}/variables/failed/use_before_decl.c:3:3: Error: use of undeclared identifier 'x'
-3 |   x = 42;
-  |   ^
-
-{{base_dir}}/variables/failed/use_before_decl.c:5:10: Error: use of undeclared identifier 'x'
-5 |   return x;
-  |          ^
-

@@ -1,0 +1,4 @@
+{{base_dir}}/failed_name_resolution/redefinition_after_scope.c:7:7: Error: redefinition of 'x'
+7 |   int x = 2;
+  |       ^
+

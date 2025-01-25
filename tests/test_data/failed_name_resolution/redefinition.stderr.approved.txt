@@ -1,0 +1,4 @@
+{{base_dir}}/failed_name_resolution/redefinition.c:4:7: Error: redefinition of 'x'
+4 |   int x = 42;
+  |       ^
+

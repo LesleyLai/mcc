@@ -1,0 +1,4 @@
+{{base_dir}}/failed_name_resolution/use_before_decl_2.c:4:5: Error: use of undeclared identifier 'x'
+4 |     x = 42;
+  |     ^
+

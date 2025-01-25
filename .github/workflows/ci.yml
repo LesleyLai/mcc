@@ -75,10 +75,10 @@ jobs:
       - name: Set Up Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: "./test/test_driver"
+          workspaces: "./tests/test_driver"
 
 
       - name: End-to-End Tests
-        working-directory: ./test/test_driver
+        working-directory: ./tests/test_driver
         run: |
           cargo run --release -q -- --mcc ../../build/bin/mcc --base-folder ../test_data/

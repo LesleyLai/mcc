@@ -1,4 +1,0 @@
-{{base_dir}}/variables/failed/use_before_decl_2.c:4:5: Error: use of undeclared identifier 'x'
-4 |     x = 42;
-  |     ^
-

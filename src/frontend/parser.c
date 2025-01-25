@@ -114,49 +114,79 @@ static void parse_consume(Parser* parser, TokenType type, const char* error_msg)
  * =============================================================================
  */
 
-struct Variables {
-  uint32_t length;
-  uint32_t capacity;
-  StringView* data;
-};
+typedef struct Variable {
+  StringView
+      name; // name in the source. This is the name used for variable lookup
+  StringView rewrote_name; // name after rewrite
+  uint32_t shadow_counter; // increase each time we have shadowing
+} Variable;
 
+// Represents a block scope
 // TODO: use hash table
-typedef struct VariableMap {
+typedef struct Scope {
   uint32_t length;
   uint32_t capacity;
-  StringView* data;
-  struct VariableMap* parent;
-} VariableMap;
+  Variable* data;
+  struct Scope* parent;
+} Scope;
 
-static struct VariableMap* new_variable_map(VariableMap* parent, Arena* arena)
+static struct Scope* new_scope(Scope* parent, Arena* arena)
 {
-  struct VariableMap* map = ARENA_ALLOC_OBJECT(arena, struct VariableMap);
-  *map = (struct VariableMap){
+  struct Scope* map = ARENA_ALLOC_OBJECT(arena, Scope);
+  *map = (struct Scope){
       .parent = parent,
   };
   return map;
 }
 
-static bool lookup_variable(const VariableMap* map, StringView var)
+static Variable* lookup_variable(const Scope* scope, StringView name)
 {
-  for (uint32_t i = 0; i < map->length; ++i) {
-    if (str_eq(var, map->data[i])) { return true; }
+  for (uint32_t i = 0; i < scope->length; ++i) {
+    if (str_eq(name, scope->data[i].name)) { return &scope->data[i]; }
   }
-  return map->parent != nullptr && lookup_variable(map->parent, var);
+
+  if (scope->parent == nullptr) return nullptr;
+
+  return lookup_variable(scope->parent, name);
 }
 
-// Return false if a local variable already exist
-static bool add_variable(StringView var, VariableMap* map, Arena* arena)
+// Return nullptr if a variable already exist in the same scope
+static Variable* add_variable(StringView name, Scope* scope, Arena* arena)
 {
-  if (lookup_variable(map, var)) { return false; }
-  DYNARRAY_PUSH_BACK(map, StringView, arena, var);
-  return true;
+  // check variable in current scope
+  for (uint32_t i = 0; i < scope->length; ++i) {
+    if (str_eq(name, scope->data[i].name)) { return nullptr; }
+  }
+
+  // lookup variable in parent scopes
+  const Variable* parent_variable = nullptr;
+  if (scope->parent) { parent_variable = lookup_variable(scope->parent, name); }
+
+  Variable variable;
+  if (parent_variable == nullptr) {
+    variable = (Variable){
+        .name = name,
+        .rewrote_name = name,
+        .shadow_counter = 0,
+    };
+  } else {
+    uint32_t shadow_counter = parent_variable->shadow_counter + 1;
+    variable = (Variable){
+        .name = name,
+        .rewrote_name = allocate_printf(arena, "%.*s.%i", (int)name.size,
+                                        name.start, shadow_counter),
+        .shadow_counter = shadow_counter + 1,
+    };
+  }
+
+  DYNARRAY_PUSH_BACK(scope, Variable, arena, variable);
+  return &scope->data[scope->length - 1];
 }
 
 // =============================================================================
 // Expression parsing
 // =============================================================================
-static Expr* parse_number_literal(Parser* parser, VariableMap* scope)
+static Expr* parse_number_literal(Parser* parser, Scope* scope)
 {
   (void)scope;
 
@@ -176,7 +206,7 @@ static Expr* parse_number_literal(Parser* parser, VariableMap* scope)
   return result;
 }
 
-static Expr* parse_identifier_expr(Parser* parser, VariableMap* scope)
+static Expr* parse_identifier_expr(Parser* parser, Scope* scope)
 {
   const Token token = parser_previous_token(parser);
 
@@ -191,7 +221,8 @@ static Expr* parse_identifier_expr(Parser* parser, VariableMap* scope)
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
 
   // If local variable does not exist
-  if (!lookup_variable(scope, identifier)) {
+  const Variable* variable = lookup_variable(scope, identifier);
+  if (!variable) {
     const StringView error_msg = allocate_printf(
         parser->permanent_arena, "use of undeclared identifier '%.*s'",
         (int)identifier.size, identifier.start);
@@ -201,7 +232,7 @@ static Expr* parse_identifier_expr(Parser* parser, VariableMap* scope)
   } else {
     *result = (Expr){.tag = EXPR_VARIABLE,
                      .source_range = token_source_range(token),
-                     .variable = identifier};
+                     .variable = variable->rewrote_name};
   }
   return result;
 }
@@ -229,18 +260,17 @@ typedef enum Precedence {
   PREC_PRIMARY
 } Precedence;
 
-static Expr* parse_expr(Parser* parser, struct VariableMap* scope);
-static Expr* parse_group(Parser* parser, struct VariableMap* scope);
-static Expr* parse_unary_op(Parser* parser, struct VariableMap* scope);
+static Expr* parse_expr(Parser* parser, struct Scope* scope);
+static Expr* parse_group(Parser* parser, struct Scope* scope);
+static Expr* parse_unary_op(Parser* parser, struct Scope* scope);
 static Expr* parse_binop_left(Parser* parser, Expr* lhs_expr,
-                              struct VariableMap* scope); // left associative
+                              struct Scope* scope); // left associative
 static Expr* parse_assignment(Parser* parser, Expr* lhs_expr,
-                              struct VariableMap* scope); // right associative
-static Expr* parse_ternary(Parser* parser, Expr* cond,
-                           struct VariableMap* scope);
+                              struct Scope* scope); // right associative
+static Expr* parse_ternary(Parser* parser, Expr* cond, struct Scope* scope);
 
-typedef Expr* (*PrefixParseFn)(Parser*, struct VariableMap* scope);
-typedef Expr* (*InfixParseFn)(Parser*, Expr*, struct VariableMap* scope);
+typedef Expr* (*PrefixParseFn)(Parser*, struct Scope* scope);
+typedef Expr* (*InfixParseFn)(Parser*, Expr*, struct Scope* scope);
 
 typedef struct ParseRule {
   PrefixParseFn prefix;
@@ -304,7 +334,7 @@ static ParseRule* get_rule(TokenType operator_type)
 }
 
 static Expr* parse_precedence(Parser* parser, Precedence precedence,
-                              struct VariableMap* scope)
+                              struct Scope* scope)
 {
   parse_advance(parser);
 
@@ -335,14 +365,14 @@ static Expr* parse_precedence(Parser* parser, Precedence precedence,
   return expr;
 }
 
-static Expr* parse_group(Parser* parser, struct VariableMap* scope)
+static Expr* parse_group(Parser* parser, struct Scope* scope)
 {
   Expr* result = parse_expr(parser, scope);
   parse_consume(parser, TOKEN_RIGHT_PAREN, "Expect )");
   return result;
 }
 
-static Expr* parse_unary_op(Parser* parser, VariableMap* scope)
+static Expr* parse_unary_op(Parser* parser, Scope* scope)
 {
   Token operator_token = parser_previous_token(parser);
 
@@ -412,8 +442,7 @@ static BinaryOpType binop_type_from_token_type(TokenType token_type)
 enum Associativity { ASSOCIATIVITY_LEFT, ASSOCIATIVITY_RIGHT };
 
 static Expr* parse_binary_op(Parser* parser, Expr* lhs_expr,
-                             enum Associativity associativity,
-                             VariableMap* scope)
+                             enum Associativity associativity, Scope* scope)
 {
   Token operator_token = parser_previous_token(parser);
 
@@ -444,14 +473,12 @@ static Expr* parse_binary_op(Parser* parser, Expr* lhs_expr,
   return result;
 }
 
-static Expr* parse_binop_left(Parser* parser, Expr* lhs_expr,
-                              VariableMap* scope)
+static Expr* parse_binop_left(Parser* parser, Expr* lhs_expr, Scope* scope)
 {
   return parse_binary_op(parser, lhs_expr, ASSOCIATIVITY_LEFT, scope);
 }
 
-static Expr* parse_assignment(Parser* parser, Expr* lhs_expr,
-                              VariableMap* scope)
+static Expr* parse_assignment(Parser* parser, Expr* lhs_expr, Scope* scope)
 {
   // Check whether the left hand side is lvalue
   if (lhs_expr->tag != EXPR_VARIABLE) {
@@ -461,8 +488,7 @@ static Expr* parse_assignment(Parser* parser, Expr* lhs_expr,
   return parse_binary_op(parser, lhs_expr, ASSOCIATIVITY_RIGHT, scope);
 }
 
-static Expr* parse_ternary(Parser* parser, Expr* cond,
-                           struct VariableMap* scope)
+static Expr* parse_ternary(Parser* parser, Expr* cond, struct Scope* scope)
 {
   Expr* true_expr = parse_expr(parser, scope);
   parse_consume(parser, TOKEN_COLON, "expect ':'");
@@ -478,19 +504,19 @@ static Expr* parse_ternary(Parser* parser, Expr* cond,
   return result;
 }
 
-static Expr* parse_expr(Parser* parser, VariableMap* scope)
+static Expr* parse_expr(Parser* parser, Scope* scope)
 {
   return parse_precedence(parser, PREC_ASSIGNMENT, scope);
 }
 
-static ReturnStmt parse_return_stmt(Parser* parser, VariableMap* scope)
+static ReturnStmt parse_return_stmt(Parser* parser, Scope* scope)
 {
   Expr* expr = parse_expr(parser, scope);
   parse_consume(parser, TOKEN_SEMICOLON, "Expect ;");
   return (ReturnStmt){.expr = expr};
 }
 
-static Stmt parse_stmt(Parser* parser, struct VariableMap* scope);
+static Stmt parse_stmt(Parser* parser, struct Scope* scope);
 
 struct BlockItemVec {
   size_t capacity;
@@ -503,14 +529,16 @@ static StringView str_from_token(const char* src, Token token)
   return (StringView){.start = src + token.start, .size = token.size};
 }
 
-static VariableDecl parse_decl(Parser* parser, struct VariableMap* scope)
+static VariableDecl parse_decl(Parser* parser, struct Scope* scope)
 {
   const Token name = parser_current_token(parser);
   // TODO: proper error handling
   MCC_ASSERT(name.type == TOKEN_IDENTIFIER);
 
   const StringView identifier = str_from_token(parser->src, name);
-  if (!add_variable(identifier, scope, parser->permanent_arena)) {
+  const Variable* variable =
+      add_variable(identifier, scope, parser->permanent_arena);
+  if (!variable) {
     const StringView error_msg =
         allocate_printf(parser->permanent_arena, "redefinition of '%.*s'",
                         (int)identifier.size, identifier.start);
@@ -526,7 +554,8 @@ static VariableDecl parse_decl(Parser* parser, struct VariableMap* scope)
   }
   parse_consume(parser, TOKEN_SEMICOLON, "expect ';'");
 
-  return (VariableDecl){.name = identifier, .initializer = initializer};
+  return (VariableDecl){.name = variable ? variable->rewrote_name : identifier,
+                        .initializer = initializer};
 }
 
 // Find the next synchronization token (`}` or `;`)
@@ -543,7 +572,7 @@ static void parser_panic_synchronize(Parser* parser)
   }
 }
 
-static BlockItem parse_block_item(Parser* parser, struct VariableMap* scope)
+static BlockItem parse_block_item(Parser* parser, struct Scope* scope)
 {
   const Token current_token = parser_current_token(parser);
   BlockItem result;
@@ -564,10 +593,9 @@ static BlockItem parse_block_item(Parser* parser, struct VariableMap* scope)
   return result;
 }
 
-static Block parse_block(Parser* parser, struct VariableMap* parent_scope)
+static Block parse_block(Parser* parser, struct Scope* parent_scope)
 {
-  struct VariableMap* scope =
-      new_variable_map(parent_scope, parser->permanent_arena);
+  struct Scope* scope = new_scope(parent_scope, parser->permanent_arena);
 
   struct BlockItemVec items_vec = {};
 
@@ -587,7 +615,7 @@ static Block parse_block(Parser* parser, struct VariableMap* parent_scope)
   return (Block){.children = block_items, .child_count = items_vec.length};
 }
 
-static Stmt parse_stmt(Parser* parser, struct VariableMap* scope)
+static Stmt parse_stmt(Parser* parser, struct Scope* scope)
 {
   const Token start_token = parser_current_token(parser);
 
