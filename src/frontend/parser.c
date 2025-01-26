@@ -701,6 +701,57 @@ static Stmt parse_stmt(Parser* parser, Scope* scope)
                     .while_loop = {.cond = cond, .body = body}};
     break;
   }
+  case TOKEN_KEYWORD_FOR: {
+    parse_advance(parser);
+    parse_consume(parser, TOKEN_LEFT_PAREN, "expect '('");
+
+    // init
+    ForInit init = {};
+    switch (parser_current_token(parser).type) {
+    case TOKEN_KEYWORD_INT: {
+      // for loop introduce a new scope
+      scope = new_scope(scope, parser->permanent_arena);
+
+      parse_advance(parser);
+      VariableDecl* decl =
+          ARENA_ALLOC_OBJECT(parser->permanent_arena, VariableDecl);
+      *decl = parse_decl(parser, scope);
+      init = (ForInit){.tag = FOR_INIT_DECL, .decl = decl};
+    } break;
+    case TOKEN_SEMICOLON: {
+      init = (ForInit){.tag = FOR_INIT_EXPR, .expr = nullptr};
+      parse_consume(parser, TOKEN_SEMICOLON, "expect ';'");
+    } break;
+    default: {
+      init = (ForInit){.tag = FOR_INIT_EXPR, .expr = parse_expr(parser, scope)};
+      parse_consume(parser, TOKEN_SEMICOLON, "expect ';'");
+    } break;
+    }
+
+    // cond
+    Expr* cond = parser_current_token(parser).type == TOKEN_SEMICOLON
+                     ? nullptr
+                     : parse_expr(parser, scope);
+    parse_consume(parser, TOKEN_SEMICOLON, "expect ';'");
+
+    // post
+    Expr* post = parser_current_token(parser).type == TOKEN_RIGHT_PAREN
+                     ? nullptr
+                     : parse_expr(parser, scope);
+    parse_consume(parser, TOKEN_RIGHT_PAREN, "expect ')'");
+
+    Stmt* body = ARENA_ALLOC_OBJECT(parser->permanent_arena, Stmt);
+    *body = parse_stmt(parser, scope);
+    result = (Stmt){.tag = STMT_FOR,
+                    .for_loop = {
+                        .init = init,
+                        .cond = cond,
+                        .post = post,
+                        .body = body,
+                    }};
+
+    break;
+  }
   default: {
     const Expr* expr = parse_expr(parser, scope);
     parse_consume(parser, TOKEN_SEMICOLON, "expect ';'");

@@ -121,6 +121,24 @@ static const char* string_from_stmt_tag(StmtTag stmt_tag)
   MCC_UNREACHABLE();
 }
 
+static void ast_print_decl(const VariableDecl* decl, int indent)
+{
+  printf("%*sVariableDecl ", indent, "");
+  printf("int ");
+  print_str(decl->name);
+  printf("\n");
+  if (decl->initializer) { ast_print_expr(decl->initializer, indent + 2); }
+}
+
+static void ast_print_nullable_expr(const Expr* expr, int indent)
+{
+  if (expr != nullptr) {
+    ast_print_expr(expr, indent);
+  } else {
+    printf("%*s<<null>>\n", indent, "");
+  }
+}
+
 static void ast_print_stmt(const Stmt* stmt, int indent)
 {
   printf("%*s%s ", indent, "", string_from_stmt_tag(stmt->tag));
@@ -148,7 +166,21 @@ static void ast_print_stmt(const Stmt* stmt, int indent)
     ast_print_stmt(stmt->while_loop.body, indent + 2);
     ast_print_expr(stmt->while_loop.cond, indent + 2);
     break;
-  case STMT_FOR: MCC_UNIMPLEMENTED(); break;
+  case STMT_FOR:
+    switch (stmt->for_loop.init.tag) {
+    case FOR_INIT_INVALID: MCC_UNREACHABLE();
+    case FOR_INIT_DECL:
+      ast_print_decl(stmt->for_loop.init.decl, indent + 2);
+      break;
+    case FOR_INIT_EXPR: {
+      ast_print_nullable_expr(stmt->for_loop.init.expr, indent + 2);
+    } break;
+    }
+
+    ast_print_nullable_expr(stmt->for_loop.cond, indent + 2);
+    ast_print_nullable_expr(stmt->for_loop.post, indent + 2);
+    ast_print_stmt(stmt->for_loop.body, indent + 2);
+    break;
   case STMT_BREAK: MCC_UNIMPLEMENTED(); break;
   case STMT_CONTINUE: MCC_UNIMPLEMENTED(); break;
   }
@@ -157,16 +189,7 @@ static void ast_print_stmt(const Stmt* stmt, int indent)
 static void ast_print_block_item(const BlockItem* item, int indent)
 {
   switch (item->tag) {
-  case BLOCK_ITEM_DECL: {
-    printf("%*sVariableDecl ", indent, "");
-    printf("int ");
-    print_str(item->decl.name);
-    printf("\n");
-    if (item->decl.initializer) {
-      ast_print_expr(item->decl.initializer, indent + 2);
-    }
-  }
-    return;
+  case BLOCK_ITEM_DECL: ast_print_decl(&item->decl, indent); return;
   case BLOCK_ITEM_STMT: ast_print_stmt(&item->stmt, indent); return;
   }
   MCC_UNREACHABLE();

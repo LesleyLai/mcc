@@ -381,6 +381,17 @@ static IRValue emit_ir_instructions_from_expr(const Expr* expr,
 static void emit_ir_instructions_from_stmt(const Stmt* stmt,
                                            IRGenContext* context);
 
+static void emit_ir_instructions_from_decl(const VariableDecl* decl,
+                                           IRGenContext* context)
+{
+  if (decl->initializer != nullptr) {
+    const IRValue value =
+        emit_ir_instructions_from_expr(decl->initializer, context);
+    push_instruction(context,
+                     ir_unary_instr(IR_COPY, ir_variable(decl->name), value));
+  }
+}
+
 static void emit_ir_instructions_from_block_item(const BlockItem* item,
                                                  IRGenContext* context)
 {
@@ -389,15 +400,9 @@ static void emit_ir_instructions_from_block_item(const BlockItem* item,
     const Stmt stmt = item->stmt;
     emit_ir_instructions_from_stmt(&stmt, context);
   } break;
-  case BLOCK_ITEM_DECL: {
-    const VariableDecl var_decl = item->decl;
-    if (var_decl.initializer != nullptr) {
-      const IRValue value =
-          emit_ir_instructions_from_expr(var_decl.initializer, context);
-      push_instruction(
-          context, ir_unary_instr(IR_COPY, ir_variable(var_decl.name), value));
-    }
-  } break;
+  case BLOCK_ITEM_DECL:
+    emit_ir_instructions_from_decl(&item->decl, context);
+    break;
   }
 }
 
@@ -508,7 +513,53 @@ static void emit_ir_instructions_from_stmt(const Stmt* stmt,
     // .end
     push_instruction(context, ir_label(end_label));
   } break;
-  case STMT_FOR: MCC_UNIMPLEMENTED(); break;
+  case STMT_FOR: {
+    const StringView start_label =
+        create_fresh_label_name(context, "for_start");
+    const StringView body_label = create_fresh_label_name(context, "for_body");
+    const StringView end_label = create_fresh_label_name(context, "for_end");
+
+    switch (stmt->for_loop.init.tag) {
+    case FOR_INIT_INVALID: MCC_UNREACHABLE();
+    case FOR_INIT_DECL:
+      emit_ir_instructions_from_decl(stmt->for_loop.init.decl, context);
+      break;
+    case FOR_INIT_EXPR:
+      if (stmt->for_loop.init.expr) {
+        emit_ir_instructions_from_expr(stmt->for_loop.init.expr, context);
+      }
+      break;
+    }
+
+    // .start
+    push_instruction(context, ir_label(start_label));
+
+    if (stmt->for_loop.cond) {
+      // cond = {{ evaluate condition }}
+      const IRValue cond =
+          emit_ir_instructions_from_expr(stmt->for_loop.cond, context);
+
+      // br cond .body .end
+      push_instruction(context, ir_br(cond, body_label, end_label));
+    }
+
+    // .body
+    // {{ execute body }}
+    push_instruction(context, ir_label(body_label));
+    emit_ir_instructions_from_stmt(stmt->for_loop.body, context);
+
+    if (stmt->for_loop.post) {
+      // {{ execute post expression }}
+      emit_ir_instructions_from_expr(stmt->for_loop.post, context);
+    }
+
+    // jmp .start
+    push_instruction(context, ir_jmp(start_label));
+
+    // .end
+    push_instruction(context, ir_label(end_label));
+
+  } break;
   case STMT_BREAK: MCC_UNIMPLEMENTED(); break;
   case STMT_CONTINUE: MCC_UNIMPLEMENTED(); break;
   }

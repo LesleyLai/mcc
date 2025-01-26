@@ -123,6 +123,16 @@ typedef struct Block {
 
 typedef struct Stmt Stmt;
 
+enum ForInitTag { FOR_INIT_INVALID, FOR_INIT_DECL, FOR_INIT_EXPR };
+
+typedef struct ForInit {
+  enum ForInitTag tag;
+  union {
+    VariableDecl* decl;
+    Expr* expr; // optional, can be nullptr
+  };
+} ForInit;
+
 struct Stmt {
   SourceRange source_range;
   StmtTag tag;
@@ -143,6 +153,13 @@ struct Stmt {
       const Expr* cond;
       const Stmt* body;
     } while_loop;
+
+    struct For {
+      ForInit init;
+      const Expr* cond; // optional, can be nullptr
+      const Expr* post; // optional, can be nullptr
+      const Stmt* body;
+    } for_loop;
   };
 };
 
