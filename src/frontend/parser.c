@@ -686,6 +686,21 @@ static Stmt parse_stmt(Parser* parser, Scope* scope)
         (Stmt){.tag = STMT_WHILE, .while_loop = {.cond = cond, .body = body}};
     break;
   }
+  case TOKEN_KEYWORD_DO: {
+    parse_advance(parser);
+    Stmt* body = ARENA_ALLOC_OBJECT(parser->permanent_arena, Stmt);
+    *body = parse_stmt(parser, scope);
+    parse_consume(parser, TOKEN_KEYWORD_WHILE, "expect \"while\"");
+
+    parse_consume(parser, TOKEN_LEFT_PAREN, "expect '('");
+    const Expr* cond = parse_expr(parser, scope);
+    parse_consume(parser, TOKEN_RIGHT_PAREN, "expect ')'");
+    parse_consume(parser, TOKEN_SEMICOLON,
+                  "expect ';' after do/while statement");
+    result = (Stmt){.tag = STMT_DO_WHILE,
+                    .while_loop = {.cond = cond, .body = body}};
+    break;
+  }
   default: {
     const Expr* expr = parse_expr(parser, scope);
     parse_consume(parser, TOKEN_SEMICOLON, "expect ';'");

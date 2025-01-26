@@ -103,52 +103,51 @@ static void ast_print_expr(const Expr* expr, int indent)
 
 static void ast_print_block(const Block* block, int indent);
 
+static const char* string_from_stmt_tag(StmtTag stmt_tag)
+{
+  switch (stmt_tag) {
+  case STMT_INVALID: MCC_UNREACHABLE();
+  case STMT_EMPTY: return "EmptyStmt";
+  case STMT_EXPR: return "ExprStmt";
+  case STMT_COMPOUND: return "CompoundStmt";
+  case STMT_RETURN: return "ReturnStmt";
+  case STMT_IF: return "IfStmt";
+  case STMT_WHILE: return "WhileStmt";
+  case STMT_DO_WHILE: return "DoWhileStmt";
+  case STMT_FOR: return "ForStmt";
+  case STMT_BREAK: return "BreakStmt";
+  case STMT_CONTINUE: return "ContinueStmt";
+  }
+  MCC_UNREACHABLE();
+}
+
 static void ast_print_stmt(const Stmt* stmt, int indent)
 {
+  printf("%*s%s ", indent, "", string_from_stmt_tag(stmt->tag));
+  print_source_range(stmt->source_range);
+  printf("\n");
+
   switch (stmt->tag) {
   case STMT_INVALID: MCC_UNREACHABLE();
-  case STMT_EMPTY: {
-    printf("%*sEmptyStmt ", indent, "");
-    print_source_range(stmt->source_range);
-    printf("\n");
-  } break;
-  case STMT_EXPR: {
-    printf("%*sExprStmt ", indent, "");
-    print_source_range(stmt->source_range);
-    printf("\n");
-    ast_print_expr(stmt->ret.expr, indent + 2);
-  } break;
-  case STMT_COMPOUND: {
-    printf("%*sCompoundStmt ", indent, "");
-    print_source_range(stmt->source_range);
-    printf("\n");
-    ast_print_block(&stmt->compound, indent + 2);
-    break;
-  }
-  case STMT_RETURN: {
-    printf("%*sReturnStmt ", indent, "");
-    print_source_range(stmt->source_range);
-    printf("\n");
-    ast_print_expr(stmt->ret.expr, indent + 2);
-  } break;
-  case STMT_IF: {
-    printf("%*sIfStmt ", indent, "");
-    print_source_range(stmt->source_range);
-    printf("\n");
+  case STMT_EMPTY: break;
+  case STMT_EXPR: ast_print_expr(stmt->ret.expr, indent + 2); break;
+  case STMT_COMPOUND: ast_print_block(&stmt->compound, indent + 2); break;
+  case STMT_RETURN: ast_print_expr(stmt->ret.expr, indent + 2); break;
+  case STMT_IF:
     ast_print_expr(stmt->if_then.cond, indent + 2);
     ast_print_stmt(stmt->if_then.then, indent + 2);
     if (stmt->if_then.els != nullptr) {
       ast_print_stmt(stmt->if_then.els, indent + 2);
     }
-  } break;
-  case STMT_WHILE: {
-    printf("%*sWhileStmt ", indent, "");
-    print_source_range(stmt->source_range);
-    printf("\n");
+    break;
+  case STMT_WHILE:
     ast_print_expr(stmt->while_loop.cond, indent + 2);
     ast_print_stmt(stmt->while_loop.body, indent + 2);
-  } break;
-  case STMT_DO_WHILE: MCC_UNIMPLEMENTED(); break;
+    break;
+  case STMT_DO_WHILE:
+    ast_print_stmt(stmt->while_loop.body, indent + 2);
+    ast_print_expr(stmt->while_loop.cond, indent + 2);
+    break;
   case STMT_FOR: MCC_UNIMPLEMENTED(); break;
   case STMT_BREAK: MCC_UNIMPLEMENTED(); break;
   case STMT_CONTINUE: MCC_UNIMPLEMENTED(); break;

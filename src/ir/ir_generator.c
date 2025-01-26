@@ -354,7 +354,7 @@ static IRValue emit_ir_instructions_from_expr(const Expr* expr,
     push_instruction(context, ir_br(cond, true_label, false_label));
 
     // .ternary_true
-    // <true branch>
+    // result = {{ true branch }}
     // jmp .ternary_end
     push_instruction(context, ir_label(true_label));
     const IRValue true_value =
@@ -363,7 +363,7 @@ static IRValue emit_ir_instructions_from_expr(const Expr* expr,
     push_instruction(context, ir_jmp(end_label));
 
     // .ternary_false
-    // <false branch>
+    // result = {{ false branch }}
     push_instruction(context, ir_label(false_label));
     const IRValue false_value =
         emit_ir_instructions_from_expr(expr->ternary.false_expr, context);
@@ -434,7 +434,7 @@ static void emit_ir_instructions_from_stmt(const Stmt* stmt,
       push_instruction(context, ir_br(cond, if_label, if_end_label));
 
       // .if
-      // <then branch>
+      // {{ then branch }}
       push_instruction(context, ir_label(if_label));
       emit_ir_instructions_from_stmt(stmt->if_then.then, context);
     } else {
@@ -444,14 +444,14 @@ static void emit_ir_instructions_from_stmt(const Stmt* stmt,
       push_instruction(context, ir_br(cond, if_label, else_label));
 
       // .if
-      // <then branch>
+      // {{ then branch }}
       // jmp .end
       push_instruction(context, ir_label(if_label));
       emit_ir_instructions_from_stmt(stmt->if_then.then, context);
       push_instruction(context, ir_jmp(if_end_label));
 
       // .else
-      // <else branch>
+      // {{ else branch }}
       push_instruction(context, ir_label(else_label));
       emit_ir_instructions_from_stmt(stmt->if_then.els, context);
     }
@@ -488,7 +488,26 @@ static void emit_ir_instructions_from_stmt(const Stmt* stmt,
     push_instruction(context, ir_label(end_label));
 
   } break;
-  case STMT_DO_WHILE: MCC_UNIMPLEMENTED(); break;
+  case STMT_DO_WHILE: {
+    const StringView start_label = create_fresh_label_name(context, "do_start");
+    const StringView end_label = create_fresh_label_name(context, "do_end");
+
+    // .start
+    push_instruction(context, ir_label(start_label));
+
+    // {{ execute body }}
+    emit_ir_instructions_from_stmt(stmt->while_loop.body, context);
+
+    // cond = {{ evaluate condition }}
+    const IRValue cond =
+        emit_ir_instructions_from_expr(stmt->while_loop.cond, context);
+
+    // br cond .start .end
+    push_instruction(context, ir_br(cond, start_label, end_label));
+
+    // .end
+    push_instruction(context, ir_label(end_label));
+  } break;
   case STMT_FOR: MCC_UNIMPLEMENTED(); break;
   case STMT_BREAK: MCC_UNIMPLEMENTED(); break;
   case STMT_CONTINUE: MCC_UNIMPLEMENTED(); break;

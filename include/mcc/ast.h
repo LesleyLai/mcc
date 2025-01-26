@@ -100,7 +100,7 @@ typedef struct VariableDecl {
   const Expr* initializer; // An optional initializer
 } VariableDecl;
 
-typedef enum StatementType {
+typedef enum StmtTag {
   STMT_INVALID = 0,
   STMT_EMPTY,
   STMT_EXPR, // An expression statement
@@ -112,7 +112,7 @@ typedef enum StatementType {
   STMT_FOR,
   STMT_BREAK,
   STMT_CONTINUE,
-} StatementType;
+} StmtTag;
 
 typedef struct BlockItem BlockItem;
 
@@ -125,7 +125,7 @@ typedef struct Stmt Stmt;
 
 struct Stmt {
   SourceRange source_range;
-  StatementType tag;
+  StmtTag tag;
   union {
     Block compound;
     struct ReturnStmt {
@@ -137,6 +137,8 @@ struct Stmt {
       const Stmt* then;
       const Stmt* els; // optional, can be nullptr
     } if_then;
+
+    // while or do while loop
     struct While {
       const Expr* cond;
       const Stmt* body;
