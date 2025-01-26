@@ -1,4 +1,4 @@
-{{base_dir}}/failed_parsing/do_missing_semicolon.c:5:3: Error: expect ';' after do/while statement
+{{filename}}:5:3: Error: expect ';' after do/while statement
 5 |   return 0;
   |   ^~~~~~
 

@@ -1,4 +1,4 @@
-{{base_dir}}/failed_parsing/if_no_parens.c:3:6: Error: expect '('
+{{filename}}:3:6: Error: expect '('
 3 |   if 1 { return 1; }
   |      ^
 

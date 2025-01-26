@@ -1,4 +1,4 @@
-{{base_dir}}/failed_parsing/keyword_wrong_case.c:2:5: Error: use of undeclared identifier 'RETURN'
+{{filename}}:2:5: Error: use of undeclared identifier 'RETURN'
 2 |     RETURN 0;
   |     ^~~~~~
 

@@ -1,8 +1,8 @@
-{{base_dir}}/failed_parsing/end_before_expr.c:2:5: Error: Expect valid expression
+{{filename}}:2:5: Error: Expect valid expression
 2 |     return
   |     ^~~~~~
 
-{{base_dir}}/failed_parsing/end_before_expr.c:2:11: Error: Expect `}`
+{{filename}}:2:11: Error: Expect `}`
 2 |     return
   |           ^
 

@@ -1,8 +1,8 @@
-{{base_dir}}/failed_parsing/multiple_else.c:7:5: Error: Expect valid expression
+{{filename}}:7:5: Error: Expect valid expression
 7 |   } else {
   |     ^~~~
 
-{{base_dir}}/failed_parsing/multiple_else.c:10:1: Error: Expect end of the file
+{{filename}}:10:1: Error: Expect end of the file
 10 | }
   | ^
 

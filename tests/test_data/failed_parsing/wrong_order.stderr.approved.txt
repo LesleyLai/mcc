@@ -1,4 +1,4 @@
-{{base_dir}}/failed_parsing/wrong_order.c:2:14: Error: Expect valid expression
+{{filename}}:2:14: Error: Expect valid expression
 2 |     return 4-;
   |              ^
 

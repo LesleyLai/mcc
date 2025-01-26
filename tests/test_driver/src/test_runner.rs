@@ -1,4 +1,3 @@
-use crate::global_configuration::global_config;
 use crate::snapshot_testing::{snapshot_match, SnapshotError};
 use crate::test_configuration::TestConfig;
 use crate::test_database::TestDatabase;
@@ -68,8 +67,9 @@ async fn run_test(database: &TestDatabase, config: &TestConfig) -> Result<(), Te
     let actual_code = output.status.code();
 
     let actual_stderr = String::from_utf8_lossy(&output.stderr);
+    // TODO: better way to replace file name
     let actual_stderr =
-        actual_stderr.replace(global_config().base_dir.to_str().unwrap(), "{{base_dir}}");
+        actual_stderr.replace(path.to_str().unwrap(), "{{filename}}");
     let actual_stderr: Arc<str> = Arc::from(actual_stderr);
 
     let mut stderr_snapshot_result = Ok(());

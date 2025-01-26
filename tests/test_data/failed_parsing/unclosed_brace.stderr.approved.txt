@@ -1,4 +1,4 @@
-{{base_dir}}/failed_parsing/unclosed_brace.c:2:14: Error: Expect `}`
+{{filename}}:2:14: Error: Expect `}`
 2 |     return 0;
   |              ^
 

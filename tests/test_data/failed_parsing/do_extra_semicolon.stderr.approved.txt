@@ -1,4 +1,4 @@
-{{base_dir}}/failed_parsing/do_extra_semicolon.c:4:4: Error: expect "while"
+{{filename}}:4:4: Error: expect "while"
 4 |   }; while(1);
   |    ^
 

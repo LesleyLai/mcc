@@ -1,4 +1,4 @@
-{{base_dir}}/failed_parsing/space_in_keyword.c:2:5: Error: use of undeclared identifier 'retur'
+{{filename}}:2:5: Error: use of undeclared identifier 'retur'
 2 |     retur n 0;
   |     ^~~~~
 

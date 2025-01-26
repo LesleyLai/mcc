@@ -1,4 +1,4 @@
-{{base_dir}}/failed_parsing/extra_junk.c:5:1: Error: Expect end of the file
+{{filename}}:5:1: Error: Expect end of the file
 5 | foo
   | ^~~
 

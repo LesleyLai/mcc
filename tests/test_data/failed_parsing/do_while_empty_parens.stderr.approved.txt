@@ -1,4 +1,4 @@
-{{base_dir}}/failed_parsing/do_while_empty_parens.c:2:16: Error: Expect valid expression
+{{filename}}:2:16: Error: Expect valid expression
 2 |   do 1; while ();
   |                ^
 

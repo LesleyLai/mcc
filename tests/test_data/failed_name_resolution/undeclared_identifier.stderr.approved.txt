@@ -1,4 +1,4 @@
-{{base_dir}}/failed_name_resolution/undeclared_identifier.c:3:10: Error: use of undeclared identifier 'x'
+{{filename}}:3:10: Error: use of undeclared identifier 'x'
 3 |   return x;
   |          ^
 

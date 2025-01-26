@@ -1,4 +1,4 @@
-{{base_dir}}/failed_parsing/decl_in_while.c:2:13: Error: Expect valid expression
+{{filename}}:2:13: Error: Expect valid expression
 2 |   while (1) int x = 0;
   |             ^~~
 

@@ -1,4 +1,4 @@
-{{base_dir}}/failed_parsing/unclosed_paren.c:1:11: Error: Expect keyword void
+{{filename}}:1:11: Error: Expect keyword void
 1 | int main( {
   |           ^
 

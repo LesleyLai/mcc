@@ -1,4 +1,4 @@
-{{base_dir}}/basics/assignment/failed/assign_to_rvalue.c:3:3: Error: expression is not assignable
+{{filename}}:3:3: Error: expression is not assignable
 3 |   10 = 42;
   |   ^~
 
