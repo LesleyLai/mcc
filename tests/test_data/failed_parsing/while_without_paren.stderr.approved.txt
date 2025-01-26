@@ -1,0 +1,4 @@
+{{base_dir}}/failed_parsing/while_without_paren.c:2:9: Error: expect '('
+2 |   while 1 {
+  |         ^
+

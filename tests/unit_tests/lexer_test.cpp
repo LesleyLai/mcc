@@ -72,11 +72,24 @@ TEST_CASE("Lexer lex keywords", "[lexer]")
   Arena& permanent_arena = get_permanent_arena();
   const Arena scratch_arena = get_scratch_arena();
 
-  static constexpr const char* input = R"(int void return typedef let)";
+  static constexpr const char* input = R"(int void return typedef
+ if else
+ do while for break continue
+ let)";
 
-  static constexpr TokenType expected[] = {
-      TOKEN_KEYWORD_INT,     TOKEN_KEYWORD_VOID, TOKEN_KEYWORD_RETURN,
-      TOKEN_KEYWORD_TYPEDEF, TOKEN_IDENTIFIER,   TOKEN_EOF};
+  static constexpr TokenType expected[] = {TOKEN_KEYWORD_INT,
+                                           TOKEN_KEYWORD_VOID,
+                                           TOKEN_KEYWORD_RETURN,
+                                           TOKEN_KEYWORD_TYPEDEF,
+                                           TOKEN_KEYWORD_IF,
+                                           TOKEN_KEYWORD_ELSE,
+                                           TOKEN_KEYWORD_DO,
+                                           TOKEN_KEYWORD_WHILE,
+                                           TOKEN_KEYWORD_FOR,
+                                           TOKEN_KEYWORD_BREAK,
+                                           TOKEN_KEYWORD_CONTINUE,
+                                           TOKEN_IDENTIFIER,
+                                           TOKEN_EOF};
 
   const auto tokens = lex(input, &permanent_arena, scratch_arena);
   const std::span<const TokenType> token_types(tokens.token_types,

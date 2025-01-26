@@ -1,4 +1,3 @@
-
 get_filename_component(include_dir ${CMAKE_CURRENT_SOURCE_DIR}/../include/mcc ABSOLUTE)
 add_library(mcc_lib
         ${include_dir}/str.h

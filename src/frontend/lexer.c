@@ -1,7 +1,6 @@
+#include <limits.h>
 #include <stdbool.h>
 #include <string.h>
-
-#include <limits.h>
 
 #include <mcc/dynarray.h>
 #include <mcc/frontend.h>
@@ -161,7 +160,12 @@ static TokenType check_keyword(Lexer* lexer, int start_position,
 static TokenType get_identifier_type(Lexer* lexer)
 {
   switch (lexer->previous[0]) {
+  case 'b': return check_keyword(lexer, 1, str("reak"), TOKEN_KEYWORD_BREAK);
+  case 'c':
+    return check_keyword(lexer, 1, str("ontinue"), TOKEN_KEYWORD_CONTINUE);
+  case 'd': return check_keyword(lexer, 1, str("o"), TOKEN_KEYWORD_DO);
   case 'e': return check_keyword(lexer, 1, str("lse"), TOKEN_KEYWORD_ELSE);
+  case 'f': return check_keyword(lexer, 1, str("or"), TOKEN_KEYWORD_FOR);
   case 'i': {
     if (lexer->current - lexer->previous > 1) {
       switch (lexer->previous[1]) {
@@ -175,6 +179,7 @@ static TokenType get_identifier_type(Lexer* lexer)
   case 'r': return check_keyword(lexer, 1, str("eturn"), TOKEN_KEYWORD_RETURN);
   case 't':
     return check_keyword(lexer, 1, str("ypedef"), TOKEN_KEYWORD_TYPEDEF);
+  case 'w': return check_keyword(lexer, 1, str("hile"), TOKEN_KEYWORD_WHILE);
   default: break;
   }
   return TOKEN_IDENTIFIER;
@@ -188,19 +193,9 @@ static Token scan_identifier(Lexer* lexer)
   return make_token(lexer, get_identifier_type(lexer));
 }
 
-static Token scan_token(Lexer* lexer)
+static Token scan_symbol(Lexer* lexer)
 {
-  skip_whitespace(lexer);
-
-  lexer->previous = lexer->current;
-
-  if (lexer_is_at_end(lexer)) return make_token(lexer, TOKEN_EOF);
-
-  const char c = advance(lexer);
-  if (is_digit(c)) return scan_number(lexer);
-  if (can_start_identifier(c)) return scan_identifier(lexer);
-
-  switch (c) {
+  switch (lexer->previous[0]) {
   case '(': return make_token(lexer, TOKEN_LEFT_PAREN);
   case ')': return make_token(lexer, TOKEN_RIGHT_PAREN);
   case '{': return make_token(lexer, TOKEN_LEFT_BRACE);
@@ -280,6 +275,20 @@ static Token scan_token(Lexer* lexer)
   }
 
   return make_token(lexer, TOKEN_ERROR);
+}
+
+static Token scan_token(Lexer* lexer)
+{
+  skip_whitespace(lexer);
+
+  lexer->previous = lexer->current;
+
+  if (lexer_is_at_end(lexer)) return make_token(lexer, TOKEN_EOF);
+
+  const char c = advance(lexer);
+  if (is_digit(c)) return scan_number(lexer);
+  if (can_start_identifier(c)) return scan_identifier(lexer);
+  return scan_symbol(lexer);
 }
 
 struct TokenTypeDynArray {

@@ -509,14 +509,14 @@ static Expr* parse_expr(Parser* parser, Scope* scope)
   return parse_precedence(parser, PREC_ASSIGNMENT, scope);
 }
 
-static ReturnStmt parse_return_stmt(Parser* parser, Scope* scope)
+static Stmt parse_stmt(Parser* parser, struct Scope* scope);
+
+static struct ReturnStmt parse_return_stmt(Parser* parser, Scope* scope)
 {
   Expr* expr = parse_expr(parser, scope);
   parse_consume(parser, TOKEN_SEMICOLON, "Expect ;");
-  return (ReturnStmt){.expr = expr};
+  return (struct ReturnStmt){.expr = expr};
 }
-
-static Stmt parse_stmt(Parser* parser, struct Scope* scope);
 
 struct BlockItemVec {
   size_t capacity;
@@ -572,7 +572,7 @@ static void parser_panic_synchronize(Parser* parser)
   }
 }
 
-static BlockItem parse_block_item(Parser* parser, struct Scope* scope)
+static BlockItem parse_block_item(Parser* parser, Scope* scope)
 {
   const Token current_token = parser_current_token(parser);
   BlockItem result;
@@ -593,7 +593,7 @@ static BlockItem parse_block_item(Parser* parser, struct Scope* scope)
   return result;
 }
 
-static Block parse_block(Parser* parser, struct Scope* parent_scope)
+static Block parse_block(Parser* parser, Scope* parent_scope)
 {
   struct Scope* scope = new_scope(parent_scope, parser->permanent_arena);
 
@@ -615,78 +615,89 @@ static Block parse_block(Parser* parser, struct Scope* parent_scope)
   return (Block){.children = block_items, .child_count = items_vec.length};
 }
 
-static Stmt parse_stmt(Parser* parser, struct Scope* scope)
+struct IfStmt parse_if_stmt(Parser* parser, Scope* scope)
+{
+  parse_consume(parser, TOKEN_LEFT_PAREN, "expect '('");
+  const Expr* cond = parse_expr(parser, scope);
+  parse_consume(parser, TOKEN_RIGHT_PAREN, "expect ')'");
+
+  Stmt* then = ARENA_ALLOC_OBJECT(parser->permanent_arena, Stmt);
+  *then = parse_stmt(parser, scope);
+
+  Stmt* els = nullptr;
+  if (parser_current_token(parser).type == TOKEN_KEYWORD_ELSE) {
+    parse_advance(parser);
+
+    els = ARENA_ALLOC_OBJECT(parser->permanent_arena, Stmt);
+    *els = parse_stmt(parser, scope);
+  }
+
+  return (struct IfStmt){
+      .cond = cond,
+      .then = then,
+      .els = els,
+  };
+}
+
+static Stmt parse_stmt(Parser* parser, Scope* scope)
 {
   const Token start_token = parser_current_token(parser);
+
+  Stmt result;
 
   switch (start_token.type) {
   case TOKEN_SEMICOLON: {
     parse_advance(parser);
 
-    return (Stmt){.tag = STMT_EMPTY,
-                  .source_range = token_source_range(start_token)};
+    result = (Stmt){.tag = STMT_EMPTY};
+    break;
   }
 
   case TOKEN_KEYWORD_RETURN: {
     parse_advance(parser);
 
-    ReturnStmt return_stmt = parse_return_stmt(parser, scope);
-
-    return (Stmt){.tag = STMT_RETURN,
-                  .source_range = {.begin = start_token.start,
-                                   .end = parser_previous_token(parser).start},
-                  .ret = return_stmt};
+    struct ReturnStmt return_stmt = parse_return_stmt(parser, scope);
+    result = (Stmt){.tag = STMT_RETURN, .ret = return_stmt};
+    break;
   }
   case TOKEN_LEFT_BRACE: {
     parse_advance(parser);
 
     const Block compound = parse_block(parser, scope);
-
-    return (Stmt){.tag = STMT_COMPOUND,
-                  .source_range = {.begin = start_token.start,
-                                   .end = parser_previous_token(parser).start},
-                  .compound = compound};
+    result = (Stmt){.tag = STMT_COMPOUND, .compound = compound};
+    break;
   }
   case TOKEN_KEYWORD_IF: {
-    const uint32_t begin = parser_current_token(parser).start;
+    parse_advance(parser);
+    const struct IfStmt if_then = parse_if_stmt(parser, scope);
 
+    result = (Stmt){.tag = STMT_IF, .if_then = if_then};
+    break;
+  }
+  case TOKEN_KEYWORD_WHILE: {
     parse_advance(parser);
     parse_consume(parser, TOKEN_LEFT_PAREN, "expect '('");
     const Expr* cond = parse_expr(parser, scope);
     parse_consume(parser, TOKEN_RIGHT_PAREN, "expect ')'");
 
-    Stmt* then = ARENA_ALLOC_OBJECT(parser->permanent_arena, Stmt);
-    *then = parse_stmt(parser, scope);
-
-    Stmt* els = nullptr;
-    if (parser_current_token(parser).type == TOKEN_KEYWORD_ELSE) {
-      parse_advance(parser);
-
-      els = ARENA_ALLOC_OBJECT(parser->permanent_arena, Stmt);
-      *els = parse_stmt(parser, scope);
-    }
-
-    const uint32_t end = parser_current_token(parser).start;
-
-    return (Stmt){.tag = STMT_IF,
-                  .source_range = (SourceRange){.begin = begin, .end = end},
-                  .if_then = (IfStmt){
-                      .cond = cond,
-                      .then = then,
-                      .els = els,
-                  }};
+    Stmt* body = ARENA_ALLOC_OBJECT(parser->permanent_arena, Stmt);
+    *body = parse_stmt(parser, scope);
+    result =
+        (Stmt){.tag = STMT_WHILE, .while_loop = {.cond = cond, .body = body}};
+    break;
   }
   default: {
     const Expr* expr = parse_expr(parser, scope);
     parse_consume(parser, TOKEN_SEMICOLON, "expect ';'");
+    result = (Stmt){.tag = STMT_EXPR, .expr = expr};
+    break;
+  }
+  }
 
-    return (Stmt){.tag = STMT_EXPR,
-                  .expr = expr,
-                  .source_range = source_range_union(
-                      token_source_range(start_token),
-                      token_source_range(parser_previous_token(parser)))};
-  }
-  }
+  result.source_range =
+      source_range_union(token_source_range(start_token),
+                         token_source_range(parser_previous_token(parser)));
+  return result;
 }
 
 static void parse_parameter_list(Parser* parser)

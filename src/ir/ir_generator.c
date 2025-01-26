@@ -459,6 +459,39 @@ static void emit_ir_instructions_from_stmt(const Stmt* stmt,
     // .if_end
     push_instruction(context, ir_label(if_end_label));
   } break;
+  case STMT_WHILE: {
+    const StringView start_label =
+        create_fresh_label_name(context, "while_start");
+    const StringView body_label =
+        create_fresh_label_name(context, "while_body");
+    const StringView end_label = create_fresh_label_name(context, "while_end");
+
+    // .start
+    push_instruction(context, ir_label(start_label));
+
+    // cond = {{ evaluate condition }}
+    const IRValue cond =
+        emit_ir_instructions_from_expr(stmt->while_loop.cond, context);
+
+    // br cond .body .end
+    push_instruction(context, ir_br(cond, body_label, end_label));
+
+    // .body
+    // {{ execute body }}
+    push_instruction(context, ir_label(body_label));
+    emit_ir_instructions_from_stmt(stmt->while_loop.body, context);
+
+    // jmp .start
+    push_instruction(context, ir_jmp(start_label));
+
+    // .end
+    push_instruction(context, ir_label(end_label));
+
+  } break;
+  case STMT_DO_WHILE: MCC_UNIMPLEMENTED(); break;
+  case STMT_FOR: MCC_UNIMPLEMENTED(); break;
+  case STMT_BREAK: MCC_UNIMPLEMENTED(); break;
+  case STMT_CONTINUE: MCC_UNIMPLEMENTED(); break;
   }
 }
 

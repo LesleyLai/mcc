@@ -106,7 +106,12 @@ typedef enum StatementType {
   STMT_EXPR, // An expression statement
   STMT_COMPOUND,
   STMT_RETURN,
-  STMT_IF
+  STMT_IF,
+  STMT_WHILE,
+  STMT_DO_WHILE,
+  STMT_FOR,
+  STMT_BREAK,
+  STMT_CONTINUE,
 } StatementType;
 
 typedef struct BlockItem BlockItem;
@@ -116,26 +121,26 @@ typedef struct Block {
   BlockItem* children;
 } Block;
 
-typedef struct ReturnStmt {
-  Expr* expr;
-} ReturnStmt;
-
 typedef struct Stmt Stmt;
-
-typedef struct IfStmt {
-  const Expr* cond;
-  const Stmt* then;
-  const Stmt* els; // optional, can be nullptr
-} IfStmt;
 
 struct Stmt {
   SourceRange source_range;
   StatementType tag;
   union {
     Block compound;
-    ReturnStmt ret;
+    struct ReturnStmt {
+      Expr* expr;
+    } ret;
     const Expr* expr;
-    IfStmt if_then;
+    struct IfStmt {
+      const Expr* cond;
+      const Stmt* then;
+      const Stmt* els; // optional, can be nullptr
+    } if_then;
+    struct While {
+      const Expr* cond;
+      const Stmt* body;
+    } while_loop;
   };
 };
 

@@ -141,6 +141,17 @@ static void ast_print_stmt(const Stmt* stmt, int indent)
       ast_print_stmt(stmt->if_then.els, indent + 2);
     }
   } break;
+  case STMT_WHILE: {
+    printf("%*sWhileStmt ", indent, "");
+    print_source_range(stmt->source_range);
+    printf("\n");
+    ast_print_expr(stmt->while_loop.cond, indent + 2);
+    ast_print_stmt(stmt->while_loop.body, indent + 2);
+  } break;
+  case STMT_DO_WHILE: MCC_UNIMPLEMENTED(); break;
+  case STMT_FOR: MCC_UNIMPLEMENTED(); break;
+  case STMT_BREAK: MCC_UNIMPLEMENTED(); break;
+  case STMT_CONTINUE: MCC_UNIMPLEMENTED(); break;
   }
 }
 

@@ -1,6 +1,6 @@
-#include "mcc/prelude.h"
 #include "x86_passes.h"
 #include <mcc/ir.h>
+#include <mcc/prelude.h>
 
 static X86Operand x86_operand_from_ir(IRValue ir_operand)
 {

@@ -58,6 +58,11 @@ static const char* token_type_string(TokenType type)
   case TOKEN_KEYWORD_TYPEDEF: return "typedef";
   case TOKEN_KEYWORD_IF: return "if";
   case TOKEN_KEYWORD_ELSE: return "else";
+  case TOKEN_KEYWORD_WHILE: return "while";
+  case TOKEN_KEYWORD_DO: return "do";
+  case TOKEN_KEYWORD_FOR: return "for";
+  case TOKEN_KEYWORD_BREAK: return "break";
+  case TOKEN_KEYWORD_CONTINUE: return "continue";
   case TOKEN_IDENTIFIER: return "identifier";
   case TOKEN_INTEGER: return "integer";
   case TOKEN_ERROR: return "error";
