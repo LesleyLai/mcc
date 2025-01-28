@@ -2,14 +2,21 @@
 #define MCC_IR_H
 
 #include "arena.h"
+#include "diagnostic.h"
 #include "str.h"
 
 // A three-address code intermediate representation
 
-struct TranslationUnit;
+struct IRProgram;
 
-struct IRProgram* ir_generate(struct TranslationUnit* ast,
-                              Arena* permanent_arena, Arena scratch_arena);
+typedef struct IRGenerationResult {
+  struct IRProgram* program;
+  ErrorsView errors;
+} IRGenerationResult;
+
+struct TranslationUnit;
+IRGenerationResult ir_generate(struct TranslationUnit* ast,
+                               Arena* permanent_arena, Arena scratch_arena);
 void print_ir(const struct IRProgram* ir);
 
 typedef struct IRProgram {

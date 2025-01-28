@@ -25,8 +25,7 @@ DiagnosticsContext create_diagnostic_context(const char* filename,
                                              Arena* permanent_arena,
                                              Arena scratch_arena);
 
-void print_parse_diagnostics(ErrorsView errors,
-                             const DiagnosticsContext* context);
+void print_diagnostics(ErrorsView errors, const DiagnosticsContext* context);
 
 void write_diagnostics(StringBuffer* output, const Error* error,
                        const DiagnosticsContext* context);

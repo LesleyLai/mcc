@@ -164,7 +164,7 @@ int main(int argc, char* argv[])
       parse(src_start, tokens, &permanent_arena, scratch_arena);
   const DiagnosticsContext diagnostics_context = create_diagnostic_context(
       src_filename, source_str, &permanent_arena, scratch_arena);
-  print_parse_diagnostics(parse_result.errors, &diagnostics_context);
+  print_diagnostics(parse_result.errors, &diagnostics_context);
 
   if (parse_result.ast == NULL) {
     // Failed to parse program
@@ -176,8 +176,16 @@ int main(int argc, char* argv[])
     return 0;
   }
 
-  IRProgram* ir =
+  IRGenerationResult ir_gen_result =
       ir_generate(parse_result.ast, &permanent_arena, scratch_arena);
+
+  if (ir_gen_result.program == NULL) {
+    // Failed to generate IR
+    print_diagnostics(ir_gen_result.errors, &diagnostics_context);
+    return 1;
+  }
+
+  IRProgram* ir = ir_gen_result.program;
 
   if (args.gen_ir_only) {
     print_ir(ir);

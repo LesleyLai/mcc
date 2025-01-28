@@ -181,8 +181,8 @@ static void ast_print_stmt(const Stmt* stmt, int indent)
     ast_print_nullable_expr(stmt->for_loop.post, indent + 2);
     ast_print_stmt(stmt->for_loop.body, indent + 2);
     break;
-  case STMT_BREAK: MCC_UNIMPLEMENTED(); break;
-  case STMT_CONTINUE: MCC_UNIMPLEMENTED(); break;
+  case STMT_BREAK:
+  case STMT_CONTINUE: break;
   }
 }
 

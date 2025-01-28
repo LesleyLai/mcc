@@ -1,0 +1,3 @@
+command = "{mcc} {filename}"
+return_code = 1
+snapshot_test_stderr = true

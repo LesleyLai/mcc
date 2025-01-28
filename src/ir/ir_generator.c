@@ -110,39 +110,56 @@ typedef struct IRInstructions {
   uint32_t capacity;
 } IRInstructions;
 
-typedef struct IRGenContext {
+struct ErrorVec {
+  size_t length;
+  size_t capacity;
+  Error* data;
+};
+
+// Context for the whole translation unit
+typedef struct IRGenTUContext {
   Arena* permanent_arena;
   Arena* scratch_arena;
+
+  struct ErrorVec errors;
+} IRGenTUContext;
+
+// context only for the a single function
+typedef struct IRGenProceduralContext {
+  IRGenTUContext* tu_context;
   IRInstructions instructions;
   int fresh_variable_counter;
   int fresh_label_counter;
-} IRGenContext;
+} IRGenProceduralContext;
 
-static void push_instruction(IRGenContext* context, IRInstruction instruction)
+static void push_instruction(IRGenProceduralContext* context,
+                             IRInstruction instruction)
 {
   DYNARRAY_PUSH_BACK(&context->instructions, IRInstruction,
-                     context->scratch_arena, instruction);
+                     context->tu_context->scratch_arena, instruction);
 }
 
-static StringView create_fresh_variable_name(IRGenContext* context)
+static StringView create_fresh_variable_name(IRGenProceduralContext* context)
 {
-  const StringView variable_name_buffer = allocate_printf(
-      context->permanent_arena, "$%d", context->fresh_variable_counter);
+  const StringView variable_name_buffer =
+      allocate_printf(context->tu_context->permanent_arena, "$%d",
+                      context->fresh_variable_counter);
   ++context->fresh_variable_counter;
   return variable_name_buffer;
 }
 
-static StringView create_fresh_label_name(IRGenContext* context,
+static StringView create_fresh_label_name(IRGenProceduralContext* context,
                                           const char* name)
 {
-  const StringView variable_name_buffer = allocate_printf(
-      context->permanent_arena, "%s_%d", name, context->fresh_label_counter);
+  const StringView variable_name_buffer =
+      allocate_printf(context->tu_context->permanent_arena, "%s_%d", name,
+                      context->fresh_label_counter);
   ++context->fresh_label_counter;
   return variable_name_buffer;
 }
 
 static IRValue emit_ir_instructions_from_expr(const Expr* expr,
-                                              IRGenContext* context);
+                                              IRGenProceduralContext* context);
 
 static bool is_assignment(BinaryOpType typ)
 {
@@ -153,8 +170,9 @@ static bool is_assignment(BinaryOpType typ)
   }
 }
 
-static IRValue emit_ir_instructions_from_binary_expr(const Expr* expr,
-                                                     IRGenContext* context)
+static IRValue
+emit_ir_instructions_from_binary_expr(const Expr* expr,
+                                      IRGenProceduralContext* context)
 {
   if (is_assignment(expr->binary_op.binary_op_type)) {
     IRInstructionType compound_op_type = IR_INVALID;
@@ -219,8 +237,9 @@ static IRValue emit_ir_instructions_from_binary_expr(const Expr* expr,
   return dst;
 }
 
-static IRValue emit_ir_instructions_from_logical_and(const Expr* expr,
-                                                     IRGenContext* context)
+static IRValue
+emit_ir_instructions_from_logical_and(const Expr* expr,
+                                      IRGenProceduralContext* context)
 {
   const IRValue lhs =
       emit_ir_instructions_from_expr(expr->binary_op.lhs, context);
@@ -262,8 +281,9 @@ static IRValue emit_ir_instructions_from_logical_and(const Expr* expr,
   return result;
 }
 
-static IRValue emit_ir_instructions_from_logical_or(const Expr* expr,
-                                                    IRGenContext* context)
+static IRValue
+emit_ir_instructions_from_logical_or(const Expr* expr,
+                                     IRGenProceduralContext* context)
 {
   const IRValue lhs =
       emit_ir_instructions_from_expr(expr->binary_op.lhs, context);
@@ -306,7 +326,7 @@ static IRValue emit_ir_instructions_from_logical_or(const Expr* expr,
 }
 
 static IRValue emit_ir_instructions_from_expr(const Expr* expr,
-                                              IRGenContext* context)
+                                              IRGenProceduralContext* context)
 {
   switch (expr->tag) {
   case EXPR_INVALID: MCC_UNREACHABLE();
@@ -378,11 +398,17 @@ static IRValue emit_ir_instructions_from_expr(const Expr* expr,
   MCC_UNREACHABLE();
 }
 
+typedef struct BreakContinueInfo {
+  StringView break_label;
+  StringView continue_label;
+} BreakContinueInfo;
+
 static void emit_ir_instructions_from_stmt(const Stmt* stmt,
-                                           IRGenContext* context);
+                                           IRGenProceduralContext* context,
+                                           BreakContinueInfo* break_info);
 
 static void emit_ir_instructions_from_decl(const VariableDecl* decl,
-                                           IRGenContext* context)
+                                           IRGenProceduralContext* context)
 {
   if (decl->initializer != nullptr) {
     const IRValue value =
@@ -392,13 +418,15 @@ static void emit_ir_instructions_from_decl(const VariableDecl* decl,
   }
 }
 
-static void emit_ir_instructions_from_block_item(const BlockItem* item,
-                                                 IRGenContext* context)
+static void
+emit_ir_instructions_from_block_item(const BlockItem* item,
+                                     IRGenProceduralContext* context,
+                                     BreakContinueInfo* break_info)
 {
   switch (item->tag) {
   case BLOCK_ITEM_STMT: {
     const Stmt stmt = item->stmt;
-    emit_ir_instructions_from_stmt(&stmt, context);
+    emit_ir_instructions_from_stmt(&stmt, context, break_info);
   } break;
   case BLOCK_ITEM_DECL:
     emit_ir_instructions_from_decl(&item->decl, context);
@@ -406,8 +434,21 @@ static void emit_ir_instructions_from_block_item(const BlockItem* item,
   }
 }
 
+static void emit_ir_instructions_from_for_init(ForInit init,
+                                               IRGenProceduralContext* context)
+{
+  switch (init.tag) {
+  case FOR_INIT_INVALID: MCC_UNREACHABLE();
+  case FOR_INIT_DECL: emit_ir_instructions_from_decl(init.decl, context); break;
+  case FOR_INIT_EXPR:
+    if (init.expr) { emit_ir_instructions_from_expr(init.expr, context); }
+    break;
+  }
+}
+
 static void emit_ir_instructions_from_stmt(const Stmt* stmt,
-                                           IRGenContext* context)
+                                           IRGenProceduralContext* context,
+                                           BreakContinueInfo* break_info)
 {
   switch (stmt->tag) {
   case STMT_INVALID: MCC_UNREACHABLE();
@@ -423,8 +464,8 @@ static void emit_ir_instructions_from_stmt(const Stmt* stmt,
   } break;
   case STMT_COMPOUND: {
     for (size_t i = 0; i < stmt->compound.child_count; ++i) {
-      emit_ir_instructions_from_block_item(&stmt->compound.children[i],
-                                           context);
+      emit_ir_instructions_from_block_item(&stmt->compound.children[i], context,
+                                           break_info);
     }
   } break;
   case STMT_IF: {
@@ -441,7 +482,7 @@ static void emit_ir_instructions_from_stmt(const Stmt* stmt,
       // .if
       // {{ then branch }}
       push_instruction(context, ir_label(if_label));
-      emit_ir_instructions_from_stmt(stmt->if_then.then, context);
+      emit_ir_instructions_from_stmt(stmt->if_then.then, context, break_info);
     } else {
       const StringView else_label = create_fresh_label_name(context, "else");
 
@@ -452,13 +493,13 @@ static void emit_ir_instructions_from_stmt(const Stmt* stmt,
       // {{ then branch }}
       // jmp .end
       push_instruction(context, ir_label(if_label));
-      emit_ir_instructions_from_stmt(stmt->if_then.then, context);
+      emit_ir_instructions_from_stmt(stmt->if_then.then, context, break_info);
       push_instruction(context, ir_jmp(if_end_label));
 
       // .else
       // {{ else branch }}
       push_instruction(context, ir_label(else_label));
-      emit_ir_instructions_from_stmt(stmt->if_then.els, context);
+      emit_ir_instructions_from_stmt(stmt->if_then.els, context, break_info);
     }
 
     // .if_end
@@ -484,7 +525,11 @@ static void emit_ir_instructions_from_stmt(const Stmt* stmt,
     // .body
     // {{ execute body }}
     push_instruction(context, ir_label(body_label));
-    emit_ir_instructions_from_stmt(stmt->while_loop.body, context);
+    struct BreakContinueInfo loop_info = (BreakContinueInfo){
+        .break_label = end_label,
+        .continue_label = start_label,
+    };
+    emit_ir_instructions_from_stmt(stmt->while_loop.body, context, &loop_info);
 
     // jmp .start
     push_instruction(context, ir_jmp(start_label));
@@ -495,15 +540,23 @@ static void emit_ir_instructions_from_stmt(const Stmt* stmt,
   } break;
   case STMT_DO_WHILE: {
     const StringView start_label = create_fresh_label_name(context, "do_start");
+    const StringView continue_label =
+        create_fresh_label_name(context, "do_continue");
     const StringView end_label = create_fresh_label_name(context, "do_end");
 
     // .start
     push_instruction(context, ir_label(start_label));
 
     // {{ execute body }}
-    emit_ir_instructions_from_stmt(stmt->while_loop.body, context);
+    struct BreakContinueInfo loop_info = (BreakContinueInfo){
+        .break_label = end_label,
+        .continue_label = continue_label,
+    };
+    emit_ir_instructions_from_stmt(stmt->while_loop.body, context, &loop_info);
 
+    // .continue
     // cond = {{ evaluate condition }}
+    push_instruction(context, ir_label(continue_label));
     const IRValue cond =
         emit_ir_instructions_from_expr(stmt->while_loop.cond, context);
 
@@ -517,24 +570,18 @@ static void emit_ir_instructions_from_stmt(const Stmt* stmt,
     const StringView start_label =
         create_fresh_label_name(context, "for_start");
     const StringView body_label = create_fresh_label_name(context, "for_body");
+    const StringView continue_label =
+        create_fresh_label_name(context, "for_continue");
     const StringView end_label = create_fresh_label_name(context, "for_end");
 
-    switch (stmt->for_loop.init.tag) {
-    case FOR_INIT_INVALID: MCC_UNREACHABLE();
-    case FOR_INIT_DECL:
-      emit_ir_instructions_from_decl(stmt->for_loop.init.decl, context);
-      break;
-    case FOR_INIT_EXPR:
-      if (stmt->for_loop.init.expr) {
-        emit_ir_instructions_from_expr(stmt->for_loop.init.expr, context);
-      }
-      break;
-    }
+    // {{ for init }}
+    emit_ir_instructions_from_for_init(stmt->for_loop.init, context);
 
     // .start
     push_instruction(context, ir_label(start_label));
 
     if (stmt->for_loop.cond) {
+
       // cond = {{ evaluate condition }}
       const IRValue cond =
           emit_ir_instructions_from_expr(stmt->for_loop.cond, context);
@@ -546,7 +593,14 @@ static void emit_ir_instructions_from_stmt(const Stmt* stmt,
     // .body
     // {{ execute body }}
     push_instruction(context, ir_label(body_label));
-    emit_ir_instructions_from_stmt(stmt->for_loop.body, context);
+    struct BreakContinueInfo loop_info = (BreakContinueInfo){
+        .break_label = end_label,
+        .continue_label = continue_label,
+    };
+    emit_ir_instructions_from_stmt(stmt->for_loop.body, context, &loop_info);
+
+    // .continue
+    push_instruction(context, ir_label(continue_label));
 
     if (stmt->for_loop.post) {
       // {{ execute post expression }}
@@ -560,23 +614,44 @@ static void emit_ir_instructions_from_stmt(const Stmt* stmt,
     push_instruction(context, ir_label(end_label));
 
   } break;
-  case STMT_BREAK: MCC_UNIMPLEMENTED(); break;
-  case STMT_CONTINUE: MCC_UNIMPLEMENTED(); break;
+  case STMT_BREAK:
+    if (break_info != nullptr) {
+      push_instruction(context, ir_jmp(break_info->break_label));
+    } else {
+      Error error = (Error){
+          .msg = str("'break' statement not in loop or switch statement"),
+          .range = stmt->source_range};
+      DYNARRAY_PUSH_BACK(&context->tu_context->errors, Error,
+                         context->tu_context->permanent_arena, error);
+    }
+
+    break;
+  case STMT_CONTINUE:
+    if (break_info != nullptr) {
+      push_instruction(context, ir_jmp(break_info->continue_label));
+    } else {
+      Error error = (Error){
+          .msg = str("'continue' statement not in loop or switch statement"),
+          .range = stmt->source_range};
+      DYNARRAY_PUSH_BACK(&context->tu_context->errors, Error,
+                         context->tu_context->permanent_arena, error);
+    }
+    break;
   }
 }
 
 static IRFunctionDef generate_ir_function_def(const FunctionDecl* decl,
-                                              Arena* permanent_arena,
-                                              Arena scratch_arena)
+                                              IRGenTUContext* tu_context)
 
 {
-  IRGenContext context = (IRGenContext){.permanent_arena = permanent_arena,
-                                        .scratch_arena = &scratch_arena,
-                                        .instructions = {},
-                                        .fresh_variable_counter = 0};
+  IRGenProceduralContext context =
+      (IRGenProceduralContext){.tu_context = tu_context,
+                               .instructions = {},
+                               .fresh_variable_counter = 0};
 
   for (size_t i = 0; i < decl->body->child_count; ++i) {
-    emit_ir_instructions_from_block_item(&decl->body->children[i], &context);
+    emit_ir_instructions_from_block_item(&decl->body->children[i], &context,
+                                         nullptr);
   }
 
   // return 0 for main if there is no return statement at the end
@@ -591,7 +666,7 @@ static IRFunctionDef generate_ir_function_def(const FunctionDecl* decl,
   // allocate and copy instructions to permanent arena
   IRInstruction* instructions = nullptr;
   if (context.instructions.data != nullptr) {
-    instructions = ARENA_ALLOC_ARRAY(permanent_arena, IRInstruction,
+    instructions = ARENA_ALLOC_ARRAY(tu_context->permanent_arena, IRInstruction,
                                      context.instructions.length);
     memcpy(instructions, context.instructions.data,
            context.instructions.length * sizeof(IRInstruction));
@@ -602,22 +677,34 @@ static IRFunctionDef generate_ir_function_def(const FunctionDecl* decl,
                          .instructions = instructions};
 }
 
-IRProgram* ir_generate(TranslationUnit* ast, Arena* permanent_arena,
-                       Arena scratch_arena)
+IRGenerationResult ir_generate(TranslationUnit* ast, Arena* permanent_arena,
+                               Arena scratch_arena)
 {
   const size_t ir_function_count = ast->decl_count;
   IRFunctionDef* ir_functions =
       ARENA_ALLOC_ARRAY(permanent_arena, IRFunctionDef, ir_function_count);
+
+  IRGenTUContext context = (IRGenTUContext){.permanent_arena = permanent_arena,
+                                            .scratch_arena = &scratch_arena,
+                                            .errors = (struct ErrorVec){}};
+
   for (size_t i = 0; i < ir_function_count; i++) {
-    ir_functions[i] = generate_ir_function_def(&ast->decls[i], permanent_arena,
-                                               scratch_arena);
+    ir_functions[i] = generate_ir_function_def(&ast->decls[i], &context);
   }
 
-  IRProgram* program = ARENA_ALLOC_OBJECT(permanent_arena, IRProgram);
-  *program = (IRProgram){
-      .function_count = ir_function_count,
-      .functions = ir_functions,
-  };
+  IRProgram* program = nullptr;
+  if (context.errors.length == 0) {
+    program = ARENA_ALLOC_OBJECT(permanent_arena, IRProgram);
+    *program = (IRProgram){
+        .function_count = ir_function_count,
+        .functions = ir_functions,
+    };
+  }
 
-  return program;
+  return (IRGenerationResult){.errors =
+                                  (ErrorsView){
+                                      .length = context.errors.length,
+                                      .data = context.errors.data,
+                                  },
+                              .program = program};
 }

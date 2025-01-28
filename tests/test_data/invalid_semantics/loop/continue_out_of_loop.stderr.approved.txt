@@ -1,0 +1,4 @@
+{{filename}}:3:10: Error: 'continue' statement not in loop or switch statement
+3 |   if (1) continue;
+  |          ^~~~~~~~~
+

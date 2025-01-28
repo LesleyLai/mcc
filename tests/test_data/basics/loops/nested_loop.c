@@ -7,10 +7,8 @@ int main(void)
     int x = 1;
     while (x <= 10) {
       acc += x * y;
-
       x += 1;
     }
-
     y += 1;
   }
 

@@ -80,8 +80,7 @@ static void write_diagnostic_position_indicator(StringBuffer* output,
   string_buffer_printf(output, "\n");
 }
 
-void print_parse_diagnostics(ErrorsView errors,
-                             const DiagnosticsContext* context)
+void print_diagnostics(ErrorsView errors, const DiagnosticsContext* context)
 {
   enum { diagnostics_arena_size = 40000 }; // 40 Mb
   uint8_t diagnostics_buffer[diagnostics_arena_size];

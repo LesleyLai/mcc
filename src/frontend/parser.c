@@ -660,6 +660,20 @@ static Stmt parse_stmt(Parser* parser, Scope* scope)
     result = (Stmt){.tag = STMT_RETURN, .ret = return_stmt};
     break;
   }
+  case TOKEN_KEYWORD_BREAK: {
+    parse_advance(parser);
+    parse_consume(parser, TOKEN_SEMICOLON, "expect ';'");
+
+    result = (Stmt){.tag = STMT_BREAK};
+    break;
+  }
+  case TOKEN_KEYWORD_CONTINUE: {
+    parse_advance(parser);
+    parse_consume(parser, TOKEN_SEMICOLON, "expect ';'");
+
+    result = (Stmt){.tag = STMT_CONTINUE};
+    break;
+  }
   case TOKEN_LEFT_BRACE: {
     parse_advance(parser);
 
