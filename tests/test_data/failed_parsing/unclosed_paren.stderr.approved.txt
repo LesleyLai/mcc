@@ -1,4 +1,4 @@
-{{filename}}:1:11: Error: Expect keyword void
+{{filename}}:1:11: Error: Expect parameter declarator
 1 | int main( {
   |           ^
 

@@ -1,4 +1,4 @@
-{{filename}}:5:1: Error: Expect end of the file
+{{filename}}:5:1: Error: Expect keyword int
 5 | foo
   | ^~~
 

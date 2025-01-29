@@ -1,4 +1,0 @@
-{{filename}}:1:10: Error: Expect keyword void
-1 | int main() {
-  |          ^
-

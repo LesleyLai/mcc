@@ -1,4 +1,0 @@
-{{filename}}:2:14: Error: Expect ;
-2 |     return 2 (- 3);
-  |              ^
-

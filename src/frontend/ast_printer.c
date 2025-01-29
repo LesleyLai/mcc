@@ -98,6 +98,15 @@ static void ast_print_expr(const Expr* expr, int indent)
     ast_print_expr(expr->ternary.false_expr, indent + 2);
     printf("\n");
     break;
+  case EXPR_CALL:
+    printf("%*sCallExpr ", indent, "");
+    print_source_range(expr->source_range);
+    printf("\n");
+    ast_print_expr(expr->call.function, indent + 2);
+    for (uint32_t i = 0; i < expr->call.arg_count; ++i) {
+      ast_print_expr(expr->call.args[i], indent + 2);
+    }
+    break;
   }
 }
 
@@ -202,20 +211,39 @@ static void ast_print_block(const Block* block, int indent)
   }
 }
 
+static void ast_print_parameters(Parameters parameters)
+{
+  if (parameters.length == 0) {
+    printf("(void)\"\n");
+  } else {
+    printf("(");
+    for (uint32_t i = 0; i < parameters.length; ++i) {
+      if (i > 0) { printf(", "); }
+      const Parameter param = parameters.data[i];
+      printf("int");
+      if (param.name.size != 0) {
+        printf(" %.*s", (int)param.name.size, param.name.start);
+      }
+    }
+    printf(")\"\n");
+  }
+}
+
 static void ast_print_function_decl(const FunctionDecl* decl, int indent)
 {
   printf("%*sFunctionDecl ", indent, "");
   print_source_range(decl->source_range);
   printf(" \"int ");
   print_str(decl->name);
-  printf("(void)\"\n");
-  ast_print_block(decl->body, indent + 2);
+  ast_print_parameters(decl->params);
+
+  if (decl->body) { ast_print_block(decl->body, indent + 2); }
 }
 
 void ast_print_translation_unit(const TranslationUnit* tu)
 {
   printf("TranslationUnit\n");
   for (size_t i = 0; i < tu->decl_count; ++i) {
-    ast_print_function_decl(&tu->decls[i], 2);
+    ast_print_function_decl(tu->decls[i], 2);
   }
 }

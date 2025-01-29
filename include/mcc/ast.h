@@ -12,7 +12,8 @@ typedef enum ExprType {
   EXPR_VARIABLE,
   EXPR_UNARY,
   EXPR_BINARY,
-  EXPR_TERNARY
+  EXPR_TERNARY,
+  EXPR_CALL,
 } ExprTag;
 
 typedef enum UnaryOpType {
@@ -83,6 +84,12 @@ struct TernaryExpr {
   Expr* false_expr;
 };
 
+struct CallExpr {
+  Expr* function;
+  Expr** args;
+  uint32_t arg_count;
+};
+
 typedef struct Expr {
   SourceRange source_range;
   ExprTag tag;
@@ -92,6 +99,7 @@ typedef struct Expr {
     struct BinaryOpExpr binary_op;
     struct StringView variable;
     struct TernaryExpr ternary;
+    struct CallExpr call;
   };
 } Expr;
 
@@ -176,15 +184,25 @@ typedef struct BlockItem {
   };
 } BlockItem;
 
+typedef struct Parameter {
+  StringView name;
+} Parameter;
+
+typedef struct Parameters {
+  uint32_t length;
+  Parameter* data;
+} Parameters;
+
 typedef struct FunctionDecl {
   SourceRange source_range;
   StringView name;
-  Block* body;
+  Parameters params;
+  Block* body; // Optional
 } FunctionDecl;
 
 typedef struct TranslationUnit {
-  size_t decl_count;
-  FunctionDecl* decls;
+  uint32_t decl_count;
+  FunctionDecl** decls;
 } TranslationUnit;
 
 void ast_print_translation_unit(const TranslationUnit* tu);

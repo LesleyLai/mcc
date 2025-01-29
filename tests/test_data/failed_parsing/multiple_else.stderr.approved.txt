@@ -2,7 +2,7 @@
 7 |   } else {
   |     ^~~~
 
-{{filename}}:10:1: Error: Expect end of the file
+{{filename}}:10:1: Error: Expect keyword int
 10 | }
   | ^
 

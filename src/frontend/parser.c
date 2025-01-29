@@ -27,8 +27,11 @@ typedef struct Parser {
   bool in_panic_mode;
 
   struct ParseErrorVec errors;
+
+  struct Scope* global_scope;
 } Parser;
 
+#pragma region source range operations
 static SourceRange token_source_range(Token token)
 {
   const uint32_t begin =
@@ -42,8 +45,22 @@ static SourceRange source_range_union(SourceRange lhs, SourceRange rhs)
   return (SourceRange){.begin = (lhs.begin < rhs.begin) ? lhs.begin : rhs.begin,
                        .end = (lhs.end > rhs.end) ? lhs.end : rhs.end};
 }
+#pragma endregion
 
+#pragma region source error handling
+// A version of error that does not cause parser to enter panic mode
 static void parse_error_at(Parser* parser, StringView error_msg,
+                           SourceRange range)
+{
+  if (parser->in_panic_mode) return;
+
+  Error error = (Error){.msg = error_msg, .range = range};
+  DYNARRAY_PUSH_BACK(&parser->errors, Error, parser->permanent_arena, error);
+
+  parser->has_error = true;
+}
+
+static void parse_panic_at(Parser* parser, StringView error_msg,
                            SourceRange range)
 {
   if (parser->in_panic_mode) return;
@@ -55,14 +72,23 @@ static void parse_error_at(Parser* parser, StringView error_msg,
   parser->has_error = true;
 }
 
-static void parse_error_at_token(Parser* parser, StringView error_msg,
+static void parse_panic_at_token(Parser* parser, StringView error_msg,
                                  Token token)
 {
-  parse_error_at(parser, error_msg, token_source_range(token));
+  parse_panic_at(parser, error_msg, token_source_range(token));
+}
+
+#pragma endregion
+
+#pragma region parser helpers
+
+static StringView str_from_token(const char* src, Token token)
+{
+  return (StringView){.start = src + token.start, .size = token.size};
 }
 
 // gets the current token
-static Token parser_current_token(Parser* parser)
+static Token parser_current_token(const Parser* parser)
 {
   return get_token(&parser->tokens, parser->current_token_index);
 }
@@ -75,23 +101,23 @@ static Token parser_previous_token(Parser* parser)
   return get_token(&parser->tokens, previous_token_index);
 }
 
-// whether we are at the end
-static bool is_at_end(Parser* parser)
+static bool token_match_or_eof(const Parser* parser, TokenType typ)
 {
-  return parser_current_token(parser).type == TOKEN_EOF;
+  const Token current_token = parser_current_token(parser);
+  return current_token.type == typ || current_token.type == TOKEN_EOF;
 }
 
 // Advance tokens by one
 // Also skip any error tokens
 static void parse_advance(Parser* parser)
 {
-  if (is_at_end(parser)) { return; }
+  if (parser_current_token(parser).type == TOKEN_EOF) { return; }
 
   for (;;) {
     parser->current_token_index++;
     Token current = parser_current_token(parser);
     if (current.type != TOKEN_ERROR) break;
-    parse_error_at_token(parser, str("unexpected character"), current);
+    parse_panic_at_token(parser, str("unexpected character"), current);
   }
 }
 
@@ -106,27 +132,24 @@ static void parse_consume(Parser* parser, TokenType type, const char* error_msg)
     return;
   }
 
-  parse_error_at_token(parser, str(error_msg), current);
+  parse_panic_at_token(parser, str(error_msg), current);
 }
+#pragma endregion
 
-/* =============================================================================
- * Local Variables are accumulated here
- * =============================================================================
- */
-
-typedef struct Variable {
+#pragma region Scope and name resolution
+typedef struct Name {
   StringView
       name; // name in the source. This is the name used for variable lookup
-  StringView rewrote_name; // name after rewrite
+  StringView rewrote_name; // name after alpha renaming
   uint32_t shadow_counter; // increase each time we have shadowing
-} Variable;
+} Name;
 
 // Represents a block scope
 // TODO: use hash table
 typedef struct Scope {
   uint32_t length;
   uint32_t capacity;
-  Variable* data;
+  Name* data;
   struct Scope* parent;
 } Scope;
 
@@ -139,7 +162,7 @@ static struct Scope* new_scope(Scope* parent, Arena* arena)
   return map;
 }
 
-static Variable* lookup_variable(const Scope* scope, StringView name)
+static Name* lookup_name(const Scope* scope, StringView name)
 {
   for (uint32_t i = 0; i < scope->length; ++i) {
     if (str_eq(name, scope->data[i].name)) { return &scope->data[i]; }
@@ -147,11 +170,11 @@ static Variable* lookup_variable(const Scope* scope, StringView name)
 
   if (scope->parent == nullptr) return nullptr;
 
-  return lookup_variable(scope->parent, name);
+  return lookup_name(scope->parent, name);
 }
 
 // Return nullptr if a variable already exist in the same scope
-static Variable* add_variable(StringView name, Scope* scope, Arena* arena)
+static Name* add_name(StringView name, Scope* scope, Arena* arena)
 {
   // check variable in current scope
   for (uint32_t i = 0; i < scope->length; ++i) {
@@ -159,19 +182,19 @@ static Variable* add_variable(StringView name, Scope* scope, Arena* arena)
   }
 
   // lookup variable in parent scopes
-  const Variable* parent_variable = nullptr;
-  if (scope->parent) { parent_variable = lookup_variable(scope->parent, name); }
+  const Name* parent_variable = nullptr;
+  if (scope->parent) { parent_variable = lookup_name(scope->parent, name); }
 
-  Variable variable;
+  Name variable;
   if (parent_variable == nullptr) {
-    variable = (Variable){
+    variable = (Name){
         .name = name,
         .rewrote_name = name,
         .shadow_counter = 0,
     };
   } else {
     uint32_t shadow_counter = parent_variable->shadow_counter + 1;
-    variable = (Variable){
+    variable = (Name){
         .name = name,
         .rewrote_name = allocate_printf(arena, "%.*s.%i", (int)name.size,
                                         name.start, shadow_counter),
@@ -179,13 +202,12 @@ static Variable* add_variable(StringView name, Scope* scope, Arena* arena)
     };
   }
 
-  DYNARRAY_PUSH_BACK(scope, Variable, arena, variable);
+  DYNARRAY_PUSH_BACK(scope, Name, arena, variable);
   return &scope->data[scope->length - 1];
 }
+#pragma endregion
 
-// =============================================================================
-// Expression parsing
-// =============================================================================
+#pragma region Expression parsing
 static Expr* parse_number_literal(Parser* parser, Scope* scope)
 {
   (void)scope;
@@ -212,23 +234,21 @@ static Expr* parse_identifier_expr(Parser* parser, Scope* scope)
 
   MCC_ASSERT(token.type == TOKEN_IDENTIFIER);
 
-  const StringView identifier = (struct StringView){
-      .start = parser->src + token.start,
-      .size = token.size,
-  };
+  const StringView identifier = str_from_token(parser->src, token);
 
   // TODO: handle typedef
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
 
   // If local variable does not exist
-  const Variable* variable = lookup_variable(scope, identifier);
+  const Name* variable = lookup_name(scope, identifier);
   if (!variable) {
     const StringView error_msg = allocate_printf(
         parser->permanent_arena, "use of undeclared identifier '%.*s'",
         (int)identifier.size, identifier.start);
-    parse_error_at_token(parser, error_msg, token);
-    *result =
-        (Expr){.tag = EXPR_INVALID, .source_range = token_source_range(token)};
+    parse_error_at(parser, error_msg, token_source_range(token));
+    *result = (Expr){.tag = EXPR_VARIABLE,
+                     .source_range = token_source_range(token),
+                     .variable = identifier};
   } else {
     *result = (Expr){.tag = EXPR_VARIABLE,
                      .source_range = token_source_range(token),
@@ -237,10 +257,6 @@ static Expr* parse_identifier_expr(Parser* parser, Scope* scope)
   return result;
 }
 
-/* =============================================================================
- * Pratt Parsing for expressions
- * =============================================================================
- */
 typedef enum Precedence {
   PREC_NONE = 0,
   PREC_ASSIGNMENT,  // =
@@ -268,6 +284,8 @@ static Expr* parse_binop_left(Parser* parser, Expr* lhs_expr,
 static Expr* parse_assignment(Parser* parser, Expr* lhs_expr,
                               struct Scope* scope); // right associative
 static Expr* parse_ternary(Parser* parser, Expr* cond, struct Scope* scope);
+static Expr* parse_function_call(Parser* parser, Expr* function,
+                                 struct Scope* scope);
 
 typedef Expr* (*PrefixParseFn)(Parser*, struct Scope* scope);
 typedef Expr* (*InfixParseFn)(Parser*, Expr*, struct Scope* scope);
@@ -279,7 +297,7 @@ typedef struct ParseRule {
 } ParseRule;
 
 static ParseRule rules[TOKEN_TYPES_COUNT] = {
-    [TOKEN_LEFT_PAREN] = {parse_group, NULL, PREC_NONE},
+    [TOKEN_LEFT_PAREN] = {parse_group, parse_function_call, PREC_CALL},
     [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
     [TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE},
     [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
@@ -342,7 +360,7 @@ static Expr* parse_precedence(Parser* parser, Precedence precedence,
 
   const PrefixParseFn prefix_rule = get_rule(previous_token.type)->prefix;
   if (prefix_rule == NULL) {
-    parse_error_at_token(parser, str("Expect valid expression"),
+    parse_panic_at_token(parser, str("Expect valid expression"),
                          previous_token);
     Expr* error_expr = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
     *error_expr = (Expr){
@@ -504,10 +522,55 @@ static Expr* parse_ternary(Parser* parser, Expr* cond, struct Scope* scope)
   return result;
 }
 
+struct ExprVec {
+  size_t length;
+  size_t capacity;
+  Expr** data;
+};
+
+static Expr* parse_function_call(Parser* parser, Expr* function,
+                                 struct Scope* scope)
+{
+  struct ExprVec args_vec = {};
+
+  while (!token_match_or_eof(parser, TOKEN_RIGHT_PAREN)) {
+    Expr* expr = parse_expr(parser, scope);
+    DYNARRAY_PUSH_BACK(&args_vec, Expr*, &parser->scratch_arena, expr);
+    if (token_match_or_eof(parser, TOKEN_RIGHT_PAREN)) break;
+    parse_consume(parser, TOKEN_COMMA, "expect ','");
+  }
+
+  parse_consume(parser, TOKEN_RIGHT_PAREN,
+                "expect ')' at the end of a function call");
+
+  Expr* expr = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
+
+  const uint32_t arg_count = u32_from_usize(args_vec.length);
+  Expr** args = ARENA_ALLOC_ARRAY(parser->permanent_arena, Expr*, arg_count);
+  if (args_vec.length != 0) {
+    memcpy(args, args_vec.data, args_vec.length * sizeof(Expr*));
+  }
+
+  *expr = (Expr){.tag = EXPR_CALL,
+                 .source_range = source_range_union(
+                     function->source_range,
+                     token_source_range(parser_previous_token(parser))),
+                 .call = {
+                     .function = function,
+                     .arg_count = arg_count,
+                     .args = args,
+                 }};
+
+  return expr;
+}
+
 static Expr* parse_expr(Parser* parser, Scope* scope)
 {
   return parse_precedence(parser, PREC_ASSIGNMENT, scope);
 }
+#pragma endregion
+
+#pragma region Statement/declaration parsing
 
 static Stmt parse_stmt(Parser* parser, struct Scope* scope);
 
@@ -524,11 +587,6 @@ struct BlockItemVec {
   BlockItem* data;
 };
 
-static StringView str_from_token(const char* src, Token token)
-{
-  return (StringView){.start = src + token.start, .size = token.size};
-}
-
 static VariableDecl parse_decl(Parser* parser, struct Scope* scope)
 {
   const Token name = parser_current_token(parser);
@@ -536,13 +594,12 @@ static VariableDecl parse_decl(Parser* parser, struct Scope* scope)
   MCC_ASSERT(name.type == TOKEN_IDENTIFIER);
 
   const StringView identifier = str_from_token(parser->src, name);
-  const Variable* variable =
-      add_variable(identifier, scope, parser->permanent_arena);
+  const Name* variable = add_name(identifier, scope, parser->permanent_arena);
   if (!variable) {
     const StringView error_msg =
         allocate_printf(parser->permanent_arena, "redefinition of '%.*s'",
                         (int)identifier.size, identifier.start);
-    parse_error_at_token(parser, error_msg, name);
+    parse_error_at(parser, error_msg, token_source_range(name));
   }
 
   parse_advance(parser);
@@ -599,8 +656,7 @@ static Block parse_block(Parser* parser, Scope* parent_scope)
 
   struct BlockItemVec items_vec = {};
 
-  while (parser_current_token(parser).type != TOKEN_RIGHT_BRACE &&
-         parser_current_token(parser).type != TOKEN_EOF) {
+  while (!token_match_or_eof(parser, TOKEN_RIGHT_BRACE)) {
     BlockItem item = parse_block_item(parser, scope);
     DYNARRAY_PUSH_BACK(&items_vec, BlockItem, &parser->scratch_arena, item);
   }
@@ -780,11 +836,84 @@ static Stmt parse_stmt(Parser* parser, Scope* scope)
   return result;
 }
 
-static void parse_parameter_list(Parser* parser)
+struct ParameterVec {
+  uint32_t length;
+  uint32_t capacity;
+  Parameter* data;
+};
+
+static Parameters parse_parameter_list(Parser* parser)
 {
   parse_consume(parser, TOKEN_LEFT_PAREN, "Expect (");
-  parse_consume(parser, TOKEN_KEYWORD_VOID, "Expect keyword void");
+
+  if (parser_current_token(parser).type == TOKEN_KEYWORD_VOID) {
+    parse_advance(parser);
+    parse_consume(parser, TOKEN_RIGHT_PAREN, "Expect )");
+
+    return (Parameters){
+        .length = 0,
+        .data = nullptr,
+    };
+  }
+
+  struct ParameterVec parameters_vec = {};
+
+  while (!token_match_or_eof(parser, TOKEN_RIGHT_PAREN)) {
+    const Token current_token = parser_current_token(parser);
+
+    switch (current_token.type) {
+    case TOKEN_KEYWORD_VOID: {
+      parse_error_at(
+          parser,
+          str("'void' must be the first and only parameter if specified"),
+          token_source_range(current_token));
+      parse_advance(parser);
+      break;
+    }
+    case TOKEN_KEYWORD_INT: {
+      parse_advance(parser);
+
+      const Token identifier_token = parser_current_token(parser);
+      StringView identifier = {};
+      if (identifier_token.type == TOKEN_IDENTIFIER) {
+        identifier = str_from_token(parser->src, identifier_token);
+        parse_advance(parser);
+      }
+
+      if (!token_match_or_eof(parser, TOKEN_RIGHT_PAREN)) {
+        parse_consume(parser, TOKEN_COMMA, "Expect ','");
+      }
+
+      const Parameter parameter = {
+          .name = identifier,
+      };
+      DYNARRAY_PUSH_BACK(&parameters_vec, Parameter, &parser->scratch_arena,
+                         parameter);
+
+    } break;
+    default:
+      parse_panic_at_token(parser, str("Expect parameter declarator"),
+                           current_token);
+      parse_advance(parser);
+    }
+    break;
+  }
+
   parse_consume(parser, TOKEN_RIGHT_PAREN, "Expect )");
+
+  Parameter* params = ARENA_ALLOC_ARRAY(parser->permanent_arena, Parameter,
+                                        parameters_vec.length);
+  if (parameters_vec.length != 0) {
+    memcpy(params, parameters_vec.data,
+           parameters_vec.length * sizeof(Parameter));
+  }
+
+  // TODO: warn when the parameter list is empty in pre-C23 mode
+
+  return (Parameters){
+      .length = parameters_vec.length,
+      .data = params,
+  };
 }
 
 static StringView parse_identifier(Parser* parser)
@@ -792,11 +921,10 @@ static StringView parse_identifier(Parser* parser)
   const Token current_token = parser_current_token(parser);
 
   if (current_token.type != TOKEN_IDENTIFIER) {
-    parse_error_at_token(parser, str("Expect Identifier"), current_token);
+    parse_panic_at_token(parser, str("Expect Identifier"), current_token);
   }
   parse_advance(parser);
-  return (StringView){.start = parser->src + current_token.start,
-                      .size = current_token.size};
+  return str_from_token(parser->src, current_token);
 }
 
 static FunctionDecl* parse_function_decl(Parser* parser)
@@ -805,15 +933,16 @@ static FunctionDecl* parse_function_decl(Parser* parser)
 
   parse_consume(parser, TOKEN_KEYWORD_INT, "Expect keyword int");
   StringView function_name = parse_identifier(parser);
+  add_name(function_name, parser->global_scope, parser->permanent_arena);
 
-  parse_parameter_list(parser);
+  const Parameters parameters = parse_parameter_list(parser);
 
   Block* body = NULL;
 
   if (parser_current_token(parser).type == TOKEN_LEFT_BRACE) { // is definition
     parse_advance(parser);
     body = ARENA_ALLOC_OBJECT(parser->permanent_arena, Block);
-    *body = parse_block(parser, nullptr);
+    *body = parse_block(parser, parser->global_scope);
   } else {
     parse_consume(parser, TOKEN_SEMICOLON, "Expect ;");
   }
@@ -824,20 +953,42 @@ static FunctionDecl* parse_function_decl(Parser* parser)
       .source_range = {.begin = start_offset,
                        .end = parser_current_token(parser).start},
       .name = function_name,
+      .params = parameters,
       .body = body,
   };
   return decl;
 }
+#pragma endregion
+
+struct FunctionDeclVec {
+  uint32_t length;
+  uint32_t capacity;
+  FunctionDecl** data;
+};
 
 static TranslationUnit* parse_translation_unit(Parser* parser)
 {
-  FunctionDecl* decl = parse_function_decl(parser);
+  struct FunctionDeclVec function_decl_vec = {};
+
+  while (parser_current_token(parser).type != TOKEN_EOF) {
+    FunctionDecl* decl = parse_function_decl(parser);
+    DYNARRAY_PUSH_BACK(&function_decl_vec, FunctionDecl*,
+                       &parser->scratch_arena, decl);
+  }
+
+  const uint32_t decl_count = function_decl_vec.length;
+  FunctionDecl** decls =
+      ARENA_ALLOC_ARRAY(parser->permanent_arena, FunctionDecl*, decl_count);
+  if (function_decl_vec.length != 0) {
+    memcpy(decls, function_decl_vec.data,
+           function_decl_vec.length * sizeof(FunctionDecl*));
+  }
 
   TranslationUnit* tu =
       ARENA_ALLOC_OBJECT(parser->permanent_arena, TranslationUnit);
   *tu = (TranslationUnit){
-      .decl_count = 1,
-      .decls = decl,
+      .decl_count = decl_count,
+      .decls = decls,
   };
   parse_consume(parser, TOKEN_EOF, "Expect end of the file");
 
@@ -847,10 +998,13 @@ static TranslationUnit* parse_translation_unit(Parser* parser)
 ParseResult parse(const char* src, Tokens tokens, Arena* permanent_arena,
                   Arena scratch_arena)
 {
+  Scope* global_scope = new_scope(nullptr, permanent_arena);
+
   Parser parser = {.src = src,
                    .tokens = tokens,
                    .permanent_arena = permanent_arena,
-                   .scratch_arena = scratch_arena};
+                   .scratch_arena = scratch_arena,
+                   .global_scope = global_scope};
 
   TranslationUnit* tu = parse_translation_unit(&parser);
 

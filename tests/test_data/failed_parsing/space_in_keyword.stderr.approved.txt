@@ -2,3 +2,7 @@
 2 |     retur n 0;
   |     ^~~~~
 
+{{filename}}:2:11: Error: expect ';'
+2 |     retur n 0;
+  |           ^
+

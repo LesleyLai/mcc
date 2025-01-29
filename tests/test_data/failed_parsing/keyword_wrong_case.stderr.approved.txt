@@ -2,3 +2,7 @@
 2 |     RETURN 0;
   |     ^~~~~~
 
+{{filename}}:2:12: Error: expect ';'
+2 |     RETURN 0;
+  |            ^
+

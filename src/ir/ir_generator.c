@@ -393,6 +393,7 @@ static IRValue emit_ir_instructions_from_expr(const Expr* expr,
     push_instruction(context, ir_label(end_label));
     return result;
   }
+  case EXPR_CALL: MCC_UNIMPLEMENTED();
   }
 
   MCC_UNREACHABLE();
@@ -644,6 +645,7 @@ static IRFunctionDef generate_ir_function_def(const FunctionDecl* decl,
                                               IRGenTUContext* tu_context)
 
 {
+
   IRGenProceduralContext context =
       (IRGenProceduralContext){.tu_context = tu_context,
                                .instructions = {},
@@ -677,26 +679,40 @@ static IRFunctionDef generate_ir_function_def(const FunctionDecl* decl,
                          .instructions = instructions};
 }
 
+typedef struct IRFunctionVec {
+  IRFunctionDef* data;
+  uint32_t length;
+  uint32_t capacity;
+} IRFunctionVec;
+
 IRGenerationResult ir_generate(TranslationUnit* ast, Arena* permanent_arena,
                                Arena scratch_arena)
 {
-  const size_t ir_function_count = ast->decl_count;
-  IRFunctionDef* ir_functions =
-      ARENA_ALLOC_ARRAY(permanent_arena, IRFunctionDef, ir_function_count);
+  IRFunctionVec ir_function_vec = {};
 
   IRGenTUContext context = (IRGenTUContext){.permanent_arena = permanent_arena,
                                             .scratch_arena = &scratch_arena,
                                             .errors = (struct ErrorVec){}};
 
-  for (size_t i = 0; i < ir_function_count; i++) {
-    ir_functions[i] = generate_ir_function_def(&ast->decls[i], &context);
+  for (size_t i = 0; i < ast->decl_count; i++) {
+    if (ast->decls[i]->body != nullptr) {
+      IRFunctionDef function_def =
+          generate_ir_function_def(ast->decls[i], &context);
+      DYNARRAY_PUSH_BACK(&ir_function_vec, IRFunctionDef, &scratch_arena,
+                         function_def);
+    }
   }
+
+  IRFunctionDef* ir_functions =
+      ARENA_ALLOC_ARRAY(permanent_arena, IRFunctionDef, ir_function_vec.length);
+  memcpy(ir_functions, ir_function_vec.data,
+         ir_function_vec.length * sizeof(IRFunctionDef));
 
   IRProgram* program = nullptr;
   if (context.errors.length == 0) {
     program = ARENA_ALLOC_OBJECT(permanent_arena, IRProgram);
     *program = (IRProgram){
-        .function_count = ir_function_count,
+        .function_count = ir_function_vec.length,
         .functions = ir_functions,
     };
   }

@@ -2,7 +2,3 @@
 3 |   x = 42;
   |   ^
 
-{{filename}}:5:10: Error: use of undeclared identifier 'x'
-5 |   return x;
-  |          ^
-

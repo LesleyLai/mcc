@@ -2,7 +2,7 @@
 4 |   int a = if (flag) { 2 } else { 3 }
   |           ^~
 
-{{filename}}:4:27: Error: Expect end of the file
+{{filename}}:4:27: Error: Expect keyword int
 4 |   int a = if (flag) { 2 } else { 3 }
   |                           ^~~~
 
