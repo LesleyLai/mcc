@@ -1,0 +1,4 @@
+{{filename}}:7:16: Error: passing 'int(int, int)' to parameter of type 'int'
+7 |   return f(42, f);
+  |                ^
+

@@ -8,7 +8,9 @@
 #include <mcc/frontend.h>
 #include <mcc/ir.h>
 #include <mcc/prelude.h>
+#include <mcc/sema.h>
 #include <mcc/str.h>
+#include <mcc/type.h>
 #include <mcc/x86.h>
 
 #include <stdarg.h>
@@ -170,14 +172,21 @@ int main(int argc, char* argv[])
     // Failed to parse program
     return 1;
   }
-
+  TranslationUnit* tu = parse_result.ast;
   if (args.stop_after_parser) {
-    ast_print_translation_unit(parse_result.ast);
+    ast_print_translation_unit(tu);
     return 0;
   }
 
+  ErrorsView type_errors = type_check(tu, &permanent_arena);
+  if (type_errors.length != 0) {
+    print_diagnostics(type_errors, &diagnostics_context);
+    return 1;
+  }
+  if (args.stop_after_semantic_analysis) { return 0; }
+
   IRGenerationResult ir_gen_result =
-      ir_generate(parse_result.ast, &permanent_arena, scratch_arena);
+      ir_generate(tu, &permanent_arena, scratch_arena);
 
   if (ir_gen_result.program == NULL) {
     // Failed to generate IR

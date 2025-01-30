@@ -3,6 +3,7 @@
 
 #include "source_location.h"
 #include "str.h"
+#include "type.h"
 
 #include <stdlib.h>
 
@@ -62,6 +63,7 @@ typedef enum BinaryOpType {
 } BinaryOpType;
 
 typedef struct Expr Expr;
+typedef struct Variable Variable; // identifier
 
 struct ConstExpr {
   int32_t val;
@@ -93,19 +95,20 @@ struct CallExpr {
 typedef struct Expr {
   SourceRange source_range;
   ExprTag tag;
+  const Type* type; // C type (e.g. void, int, int*)
   union {
     struct ConstExpr const_expr;
     struct UnaryOpExpr unary_op;
     struct BinaryOpExpr binary_op;
-    struct StringView variable;
+    const Variable* variable;
     struct TernaryExpr ternary;
     struct CallExpr call;
   };
 } Expr;
 
 typedef struct VariableDecl {
-  StringView name;
-  const Expr* initializer; // An optional initializer
+  Variable* name;
+  Expr* initializer; // An optional initializer
 } VariableDecl;
 
 typedef enum StmtTag {
@@ -149,24 +152,24 @@ struct Stmt {
     struct ReturnStmt {
       Expr* expr;
     } ret;
-    const Expr* expr;
+    Expr* expr;
     struct IfStmt {
-      const Expr* cond;
-      const Stmt* then;
-      const Stmt* els; // optional, can be nullptr
+      Expr* cond;
+      Stmt* then;
+      Stmt* els; // optional, can be nullptr
     } if_then;
 
     // while or do while loop
     struct While {
-      const Expr* cond;
-      const Stmt* body;
+      Expr* cond;
+      Stmt* body;
     } while_loop;
 
     struct For {
       ForInit init;
-      const Expr* cond; // optional, can be nullptr
-      const Expr* post; // optional, can be nullptr
-      const Stmt* body;
+      Expr* cond; // optional, can be nullptr
+      Expr* post; // optional, can be nullptr
+      Stmt* body;
     } for_loop;
   };
 };
@@ -184,13 +187,9 @@ typedef struct BlockItem {
   };
 } BlockItem;
 
-typedef struct Parameter {
-  StringView name;
-} Parameter;
-
 typedef struct Parameters {
   uint32_t length;
-  Parameter* data;
+  Variable** data;
 } Parameters;
 
 typedef struct FunctionDecl {

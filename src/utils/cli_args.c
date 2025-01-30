@@ -16,6 +16,8 @@ static const Option options[] = {
     {"--help, -h", "prints this help message"},
     {"--lex", "lexing only and then dump the result tokens"},
     {"--parse", "lex and parse, and then dump the result AST"},
+    {"--validate",
+     "lex, parse, perform the semantic analysis on result AST, and then stop"},
     {"--ir", "generate the IR, and then dump the result AST"},
     {"--codegen", "generate the assembly, and then dump the result rather than "
                   "saving to a file"},
@@ -50,6 +52,8 @@ CliArgs parse_cli_args(int argc, char** argv)
       result.stop_after_lexer = true;
     } else if (str_eq(arg, str("--parse"))) {
       result.stop_after_parser = true;
+    } else if (str_eq(arg, str("--validate"))) {
+      result.stop_after_semantic_analysis = true;
     } else if (str_eq(arg, str("-S"))) {
       result.compile_only = true;
     } else if (str_eq(arg, str("-c"))) {
@@ -64,6 +68,7 @@ CliArgs parse_cli_args(int argc, char** argv)
           stderr,
           "mcc: fatal error: unrecognized command-line option: '%.*s'\n",
           (int)arg.size, arg.start);
+      exit(1);
     } else {
       // TODO: support more than one source file
       result.source_filename = argv[i];

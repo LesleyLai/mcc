@@ -15,7 +15,7 @@ typedef struct IRGenerationResult {
 } IRGenerationResult;
 
 struct TranslationUnit;
-IRGenerationResult ir_generate(struct TranslationUnit* ast,
+IRGenerationResult ir_generate(const struct TranslationUnit* ast,
                                Arena* permanent_arena, Arena scratch_arena);
 void print_ir(const struct IRProgram* ir);
 

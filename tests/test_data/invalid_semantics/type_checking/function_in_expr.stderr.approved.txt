@@ -1,0 +1,8 @@
+{{filename}}:4:4: Error: invalid argument type 'int(void)' to unary expression
+4 |   -f;
+  |    ^
+
+{{filename}}:5:3: Error: invalid operands to binary expression ('int' and 'int(void)')
+5 |   1 + f;
+  |   ^~~~~
+

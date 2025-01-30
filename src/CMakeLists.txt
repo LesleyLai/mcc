@@ -13,6 +13,8 @@ add_library(mcc_lib
         ${include_dir}/ir.h
         ${include_dir}/x86.h
         ${include_dir}/dynarray.h
+        ${include_dir}/type.h
+        ${include_dir}/sema.h
 
         utils/format.c
         utils/str.c
@@ -26,6 +28,10 @@ add_library(mcc_lib
         frontend/ast_printer.c
         frontend/parser.c
         frontend/token.c
+        frontend/type.c
+        frontend/type_check.c
+        frontend/symbol_table.h
+        frontend/symbol_table.c
 
         ir/ir_generator.c
         ir/ir_printer.c

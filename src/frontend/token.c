@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 
-static const char* token_type_string(TokenType type)
+static const char* token_type_string(TokenTag type)
 {
   switch (type) {
   case TOKEN_INVALID: MCC_UNREACHABLE();
@@ -86,7 +86,7 @@ void print_tokens(const char* src, const Tokens* tokens,
     if (src_padding_size < 0) src_padding_size = 0;
 
     printf("%-10s src=\"%.*s\"%*s line=%-2i column=%-2i offset=%u\n",
-           token_type_string(token.type), (int)token.size, src + token.start,
+           token_type_string(token.tag), (int)token.size, src + token.start,
            src_padding_size, "", line_column.line, line_column.column,
            token.start);
   }

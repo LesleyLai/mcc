@@ -4,7 +4,7 @@
 #include "source_location.h"
 #include "str.h"
 
-typedef enum TokenType : char {
+typedef enum TokenTag : char {
   TOKEN_INVALID = 0,
 
   TOKEN_LEFT_PAREN,    // (
@@ -75,17 +75,17 @@ typedef enum TokenType : char {
   TOKEN_EOF,
 
   TOKEN_TYPES_COUNT,
-} TokenType;
+} TokenTag;
 
 typedef struct Token {
-  TokenType type;
+  TokenTag tag;
   uint32_t start; // The offset of the starting character in a token
   uint32_t size;
 } Token;
 
 /// @brief An SOA view of tokens
 typedef struct Tokens {
-  TokenType* token_types;
+  TokenTag* token_types;
   uint32_t* token_starts;
   uint32_t* token_sizes;
   uint32_t token_count;
@@ -94,7 +94,7 @@ typedef struct Tokens {
 inline static Token get_token(const Tokens* tokens, uint32_t i)
 {
   MCC_ASSERT(i < tokens->token_count);
-  return MCC_COMPOUND_LITERAL(Token){.type = tokens->token_types[i],
+  return MCC_COMPOUND_LITERAL(Token){.tag = tokens->token_types[i],
                                      .start = tokens->token_starts[i],
                                      .size = tokens->token_sizes[i]};
 }

@@ -5,6 +5,8 @@
 #include <mcc/dynarray.h>
 #include <mcc/format.h>
 
+#include "../frontend/symbol_table.h"
+
 #define ASSIGNMENTS                                                            \
   case BINARY_OP_ASSIGNMENT:                                                   \
   case BINARY_OP_PLUS_EQUAL:                                                   \
@@ -356,7 +358,7 @@ static IRValue emit_ir_instructions_from_expr(const Expr* expr,
     default: return emit_ir_instructions_from_binary_expr(expr, context);
     }
   }
-  case EXPR_VARIABLE: return ir_variable(expr->variable);
+  case EXPR_VARIABLE: return ir_variable(expr->variable->rewrote_name);
   case EXPR_TERNARY: {
     const StringView true_label =
         create_fresh_label_name(context, "ternary_true");
@@ -414,8 +416,9 @@ static void emit_ir_instructions_from_decl(const VariableDecl* decl,
   if (decl->initializer != nullptr) {
     const IRValue value =
         emit_ir_instructions_from_expr(decl->initializer, context);
-    push_instruction(context,
-                     ir_unary_instr(IR_COPY, ir_variable(decl->name), value));
+    push_instruction(
+        context,
+        ir_unary_instr(IR_COPY, ir_variable(decl->name->rewrote_name), value));
   }
 }
 
@@ -685,8 +688,8 @@ typedef struct IRFunctionVec {
   uint32_t capacity;
 } IRFunctionVec;
 
-IRGenerationResult ir_generate(TranslationUnit* ast, Arena* permanent_arena,
-                               Arena scratch_arena)
+IRGenerationResult ir_generate(const TranslationUnit* ast,
+                               Arena* permanent_arena, Arena scratch_arena)
 {
   IRFunctionVec ir_function_vec = {};
 

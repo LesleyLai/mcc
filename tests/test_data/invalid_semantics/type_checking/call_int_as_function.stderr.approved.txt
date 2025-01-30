@@ -1,0 +1,4 @@
+{{filename}}:3:10: Error: called object with type 'int', which is not callable
+3 |   return 1(2);
+  |          ^
+

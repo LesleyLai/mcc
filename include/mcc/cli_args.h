@@ -6,6 +6,7 @@ typedef struct CliArgs {
   const char* source_filename; // Filename of the source file (with extension)
   bool stop_after_lexer;
   bool stop_after_parser;
+  bool stop_after_semantic_analysis;
 
   bool gen_ir_only;        // Stop after generating the IR
   bool codegen_only;       // generate assembly; but does not save to a file

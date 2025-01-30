@@ -1,6 +1,8 @@
 #include <mcc/ast.h>
 #include <mcc/prelude.h>
 
+#include "symbol_table.h"
+
 static void print_str(StringView str)
 {
   printf("%.*s", (int)str.size, str.start);
@@ -86,7 +88,7 @@ static void ast_print_expr(const Expr* expr, int indent)
     printf("%*sVariableExpr ", indent, "");
     print_source_range(expr->source_range);
     printf(" ");
-    print_str(expr->variable);
+    print_str(expr->variable->name);
     printf("\n");
     break;
   case EXPR_TERNARY:
@@ -134,7 +136,7 @@ static void ast_print_decl(const VariableDecl* decl, int indent)
 {
   printf("%*sVariableDecl ", indent, "");
   printf("int ");
-  print_str(decl->name);
+  print_str(decl->name->name);
   printf("\n");
   if (decl->initializer) { ast_print_expr(decl->initializer, indent + 2); }
 }
@@ -219,10 +221,10 @@ static void ast_print_parameters(Parameters parameters)
     printf("(");
     for (uint32_t i = 0; i < parameters.length; ++i) {
       if (i > 0) { printf(", "); }
-      const Parameter param = parameters.data[i];
+      const Variable* param = parameters.data[i];
       printf("int");
-      if (param.name.size != 0) {
-        printf(" %.*s", (int)param.name.size, param.name.start);
+      if (param->name.size != 0) {
+        printf(" %.*s", (int)param->name.size, param->name.start);
       }
     }
     printf(")\"\n");

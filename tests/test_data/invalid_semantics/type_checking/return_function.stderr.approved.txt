@@ -1,0 +1,4 @@
+{{filename}}:4:10: Error: returning 'int(void)' from a function with incompatible result type 'int'
+4 |   return f;
+  |          ^
+

@@ -8,7 +8,9 @@
 #include <stdio.h>
 #include <string.h>
 
-struct ParseErrorVec {
+#include "symbol_table.h"
+
+struct ErrorVec {
   size_t length;
   size_t capacity;
   Error* data;
@@ -26,7 +28,7 @@ typedef struct Parser {
   bool has_error;
   bool in_panic_mode;
 
-  struct ParseErrorVec errors;
+  struct ErrorVec errors;
 
   struct Scope* global_scope;
 } Parser;
@@ -35,7 +37,7 @@ typedef struct Parser {
 static SourceRange token_source_range(Token token)
 {
   const uint32_t begin =
-      (token.type == TOKEN_EOF) ? token.start - 1 : token.start;
+      (token.tag == TOKEN_EOF) ? token.start - 1 : token.start;
 
   return (SourceRange){.begin = begin, .end = token.start + token.size};
 }
@@ -101,109 +103,38 @@ static Token parser_previous_token(Parser* parser)
   return get_token(&parser->tokens, previous_token_index);
 }
 
-static bool token_match_or_eof(const Parser* parser, TokenType typ)
+static bool token_match_or_eof(const Parser* parser, TokenTag typ)
 {
   const Token current_token = parser_current_token(parser);
-  return current_token.type == typ || current_token.type == TOKEN_EOF;
+  return current_token.tag == typ || current_token.tag == TOKEN_EOF;
 }
 
 // Advance tokens by one
 // Also skip any error tokens
 static void parse_advance(Parser* parser)
 {
-  if (parser_current_token(parser).type == TOKEN_EOF) { return; }
+  if (parser_current_token(parser).tag == TOKEN_EOF) { return; }
 
   for (;;) {
     parser->current_token_index++;
     Token current = parser_current_token(parser);
-    if (current.type != TOKEN_ERROR) break;
+    if (current.tag != TOKEN_ERROR) break;
     parse_panic_at_token(parser, str("unexpected character"), current);
   }
 }
 
 // Consume the current token. If the token doesn't have specified type, generate
 // an error.
-static void parse_consume(Parser* parser, TokenType type, const char* error_msg)
+static void parse_consume(Parser* parser, TokenTag type, const char* error_msg)
 {
   const Token current = parser_current_token(parser);
 
-  if (current.type == type) {
+  if (current.tag == type) {
     parse_advance(parser);
     return;
   }
 
   parse_panic_at_token(parser, str(error_msg), current);
-}
-#pragma endregion
-
-#pragma region Scope and name resolution
-typedef struct Name {
-  StringView
-      name; // name in the source. This is the name used for variable lookup
-  StringView rewrote_name; // name after alpha renaming
-  uint32_t shadow_counter; // increase each time we have shadowing
-} Name;
-
-// Represents a block scope
-// TODO: use hash table
-typedef struct Scope {
-  uint32_t length;
-  uint32_t capacity;
-  Name* data;
-  struct Scope* parent;
-} Scope;
-
-static struct Scope* new_scope(Scope* parent, Arena* arena)
-{
-  struct Scope* map = ARENA_ALLOC_OBJECT(arena, Scope);
-  *map = (struct Scope){
-      .parent = parent,
-  };
-  return map;
-}
-
-static Name* lookup_name(const Scope* scope, StringView name)
-{
-  for (uint32_t i = 0; i < scope->length; ++i) {
-    if (str_eq(name, scope->data[i].name)) { return &scope->data[i]; }
-  }
-
-  if (scope->parent == nullptr) return nullptr;
-
-  return lookup_name(scope->parent, name);
-}
-
-// Return nullptr if a variable already exist in the same scope
-static Name* add_name(StringView name, Scope* scope, Arena* arena)
-{
-  // check variable in current scope
-  for (uint32_t i = 0; i < scope->length; ++i) {
-    if (str_eq(name, scope->data[i].name)) { return nullptr; }
-  }
-
-  // lookup variable in parent scopes
-  const Name* parent_variable = nullptr;
-  if (scope->parent) { parent_variable = lookup_name(scope->parent, name); }
-
-  Name variable;
-  if (parent_variable == nullptr) {
-    variable = (Name){
-        .name = name,
-        .rewrote_name = name,
-        .shadow_counter = 0,
-    };
-  } else {
-    uint32_t shadow_counter = parent_variable->shadow_counter + 1;
-    variable = (Name){
-        .name = name,
-        .rewrote_name = allocate_printf(arena, "%.*s.%i", (int)name.size,
-                                        name.start, shadow_counter),
-        .shadow_counter = shadow_counter + 1,
-    };
-  }
-
-  DYNARRAY_PUSH_BACK(scope, Name, arena, variable);
-  return &scope->data[scope->length - 1];
 }
 #pragma endregion
 
@@ -223,6 +154,7 @@ static Expr* parse_number_literal(Parser* parser, Scope* scope)
 
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
   *result = (Expr){.tag = EXPR_CONST,
+                   .type = typ_invalid,
                    .source_range = token_source_range(token),
                    .const_expr = (struct ConstExpr){.val = val}};
   return result;
@@ -232,7 +164,7 @@ static Expr* parse_identifier_expr(Parser* parser, Scope* scope)
 {
   const Token token = parser_previous_token(parser);
 
-  MCC_ASSERT(token.type == TOKEN_IDENTIFIER);
+  MCC_ASSERT(token.tag == TOKEN_IDENTIFIER);
 
   const StringView identifier = str_from_token(parser->src, token);
 
@@ -240,20 +172,19 @@ static Expr* parse_identifier_expr(Parser* parser, Scope* scope)
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
 
   // If local variable does not exist
-  const Name* variable = lookup_name(scope, identifier);
+  const Variable* variable = lookup_variable(scope, identifier);
   if (!variable) {
     const StringView error_msg = allocate_printf(
         parser->permanent_arena, "use of undeclared identifier '%.*s'",
         (int)identifier.size, identifier.start);
     parse_error_at(parser, error_msg, token_source_range(token));
-    *result = (Expr){.tag = EXPR_VARIABLE,
-                     .source_range = token_source_range(token),
-                     .variable = identifier};
-  } else {
-    *result = (Expr){.tag = EXPR_VARIABLE,
-                     .source_range = token_source_range(token),
-                     .variable = variable->rewrote_name};
   }
+
+  // TODO: handle the case wher variable == nullptr
+  *result = (Expr){.tag = EXPR_VARIABLE,
+                   .type = typ_invalid,
+                   .source_range = token_source_range(token),
+                   .variable = variable};
   return result;
 }
 
@@ -346,7 +277,7 @@ static ParseRule rules[TOKEN_TYPES_COUNT] = {
 _Static_assert(sizeof(rules) / sizeof(ParseRule) == TOKEN_TYPES_COUNT,
                "Parse rule table should contain all token types");
 
-static ParseRule* get_rule(TokenType operator_type)
+static ParseRule* get_rule(TokenTag operator_type)
 {
   return &rules[operator_type];
 }
@@ -358,13 +289,14 @@ static Expr* parse_precedence(Parser* parser, Precedence precedence,
 
   const Token previous_token = parser_previous_token(parser);
 
-  const PrefixParseFn prefix_rule = get_rule(previous_token.type)->prefix;
+  const PrefixParseFn prefix_rule = get_rule(previous_token.tag)->prefix;
   if (prefix_rule == NULL) {
     parse_panic_at_token(parser, str("Expect valid expression"),
                          previous_token);
     Expr* error_expr = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
     *error_expr = (Expr){
         .tag = EXPR_INVALID,
+        .type = typ_invalid,
         .source_range = token_source_range(previous_token),
     };
     return error_expr;
@@ -372,11 +304,10 @@ static Expr* parse_precedence(Parser* parser, Precedence precedence,
 
   Expr* expr = prefix_rule(parser, scope);
 
-  while (precedence <=
-         get_rule(parser_current_token(parser).type)->precedence) {
+  while (precedence <= get_rule(parser_current_token(parser).tag)->precedence) {
     parse_advance(parser);
     InfixParseFn infix_rule =
-        get_rule(parser_previous_token(parser).type)->infix;
+        get_rule(parser_previous_token(parser).tag)->infix;
     expr = infix_rule(parser, expr, scope);
   }
 
@@ -395,7 +326,7 @@ static Expr* parse_unary_op(Parser* parser, Scope* scope)
   Token operator_token = parser_previous_token(parser);
 
   UnaryOpType operator_type;
-  switch (operator_token.type) {
+  switch (operator_token.tag) {
   case TOKEN_MINUS: operator_type = UNARY_OP_NEGATION; break;
   case TOKEN_TILDE: operator_type = UNARY_OP_BITWISE_TYPE_COMPLEMENT; break;
   case TOKEN_NOT: operator_type = UNARY_OP_NOT; break;
@@ -404,6 +335,8 @@ static Expr* parse_unary_op(Parser* parser, Scope* scope)
 
   // Inner expression
   Expr* expr = parse_precedence(parser, PREC_UNARY, scope);
+
+  // TODO: type check
 
   // build result
   // TODO: better way to handle the case where expr == NULL
@@ -414,6 +347,7 @@ static Expr* parse_unary_op(Parser* parser, Scope* scope)
 
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
   *result = (Expr){.tag = EXPR_UNARY,
+                   .type = typ_invalid,
                    .source_range = result_source_range,
                    .unary_op = (struct UnaryOpExpr){
                        .unary_op_type = operator_type, .inner_expr = expr}};
@@ -421,7 +355,7 @@ static Expr* parse_unary_op(Parser* parser, Scope* scope)
   return result;
 }
 
-static BinaryOpType binop_type_from_token_type(TokenType token_type)
+static BinaryOpType binop_type_from_token_type(TokenTag token_type)
 {
   switch (token_type) {
   case TOKEN_PLUS: return BINARY_OP_PLUS;
@@ -464,7 +398,7 @@ static Expr* parse_binary_op(Parser* parser, Expr* lhs_expr,
 {
   Token operator_token = parser_previous_token(parser);
 
-  const TokenType operator_type = operator_token.type;
+  const TokenTag operator_type = operator_token.tag;
   const ParseRule* rule = get_rule(operator_type);
   Expr* rhs_expr = parse_precedence(
       parser,
@@ -474,6 +408,8 @@ static Expr* parse_binary_op(Parser* parser, Expr* lhs_expr,
 
   BinaryOpType binary_op_type = binop_type_from_token_type(operator_type);
 
+  // TODO: type check
+
   // build result
   const SourceRange result_source_range =
       source_range_union(source_range_union(token_source_range(operator_token),
@@ -482,6 +418,7 @@ static Expr* parse_binary_op(Parser* parser, Expr* lhs_expr,
 
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
   *result = (Expr){.tag = EXPR_BINARY,
+                   .type = typ_invalid,
                    .source_range = result_source_range,
                    .binary_op = (struct BinaryOpExpr){
                        .binary_op_type = binary_op_type,
@@ -512,8 +449,11 @@ static Expr* parse_ternary(Parser* parser, Expr* cond, struct Scope* scope)
   parse_consume(parser, TOKEN_COLON, "expect ':'");
   Expr* false_expr = parse_precedence(parser, PREC_TERNARY, scope);
 
+  // TODO: type check
+
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
   *result = (Expr){.tag = EXPR_TERNARY,
+                   .type = typ_invalid,
                    .source_range = source_range_union(cond->source_range,
                                                       false_expr->source_range),
                    .ternary = (struct TernaryExpr){.cond = cond,
@@ -534,8 +474,8 @@ static Expr* parse_function_call(Parser* parser, Expr* function,
   struct ExprVec args_vec = {};
 
   while (!token_match_or_eof(parser, TOKEN_RIGHT_PAREN)) {
-    Expr* expr = parse_expr(parser, scope);
-    DYNARRAY_PUSH_BACK(&args_vec, Expr*, &parser->scratch_arena, expr);
+    Expr* arg = parse_expr(parser, scope);
+    DYNARRAY_PUSH_BACK(&args_vec, Expr*, &parser->scratch_arena, arg);
     if (token_match_or_eof(parser, TOKEN_RIGHT_PAREN)) break;
     parse_consume(parser, TOKEN_COMMA, "expect ','");
   }
@@ -543,15 +483,16 @@ static Expr* parse_function_call(Parser* parser, Expr* function,
   parse_consume(parser, TOKEN_RIGHT_PAREN,
                 "expect ')' at the end of a function call");
 
-  Expr* expr = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
-
   const uint32_t arg_count = u32_from_usize(args_vec.length);
+
   Expr** args = ARENA_ALLOC_ARRAY(parser->permanent_arena, Expr*, arg_count);
   if (args_vec.length != 0) {
     memcpy(args, args_vec.data, args_vec.length * sizeof(Expr*));
   }
 
+  Expr* expr = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
   *expr = (Expr){.tag = EXPR_CALL,
+                 .type = typ_invalid,
                  .source_range = source_range_union(
                      function->source_range,
                      token_source_range(parser_previous_token(parser))),
@@ -560,7 +501,6 @@ static Expr* parse_function_call(Parser* parser, Expr* function,
                      .arg_count = arg_count,
                      .args = args,
                  }};
-
   return expr;
 }
 
@@ -591,10 +531,10 @@ static VariableDecl parse_decl(Parser* parser, struct Scope* scope)
 {
   const Token name = parser_current_token(parser);
   // TODO: proper error handling
-  MCC_ASSERT(name.type == TOKEN_IDENTIFIER);
+  MCC_ASSERT(name.tag == TOKEN_IDENTIFIER);
 
   const StringView identifier = str_from_token(parser->src, name);
-  const Name* variable = add_name(identifier, scope, parser->permanent_arena);
+  Variable* variable = add_variable(identifier, scope, parser->permanent_arena);
   if (!variable) {
     const StringView error_msg =
         allocate_printf(parser->permanent_arena, "redefinition of '%.*s'",
@@ -604,22 +544,22 @@ static VariableDecl parse_decl(Parser* parser, struct Scope* scope)
 
   parse_advance(parser);
 
-  const Expr* initializer = nullptr;
-  if (parser_current_token(parser).type == TOKEN_EQUAL) {
+  Expr* initializer = nullptr;
+  if (parser_current_token(parser).tag == TOKEN_EQUAL) {
     parse_advance(parser);
     initializer = parse_expr(parser, scope);
   }
   parse_consume(parser, TOKEN_SEMICOLON, "expect ';'");
 
-  return (VariableDecl){.name = variable ? variable->rewrote_name : identifier,
-                        .initializer = initializer};
+  // TODO: handle the case where variable == nullptr
+  return (VariableDecl){.name = variable, .initializer = initializer};
 }
 
 // Find the next synchronization token (`}` or `;`)
 static void parser_panic_synchronize(Parser* parser)
 {
   while (true) {
-    const TokenType current_token_type = parser_current_token(parser).type;
+    const TokenTag current_token_type = parser_current_token(parser).tag;
     if (current_token_type == TOKEN_RIGHT_BRACE ||
         current_token_type == TOKEN_SEMICOLON ||
         current_token_type == TOKEN_EOF) {
@@ -633,7 +573,7 @@ static BlockItem parse_block_item(Parser* parser, Scope* scope)
 {
   const Token current_token = parser_current_token(parser);
   BlockItem result;
-  if (current_token.type == TOKEN_KEYWORD_INT) {
+  if (current_token.tag == TOKEN_KEYWORD_INT) {
     parse_advance(parser);
     result =
         (BlockItem){.tag = BLOCK_ITEM_DECL, .decl = parse_decl(parser, scope)};
@@ -674,14 +614,14 @@ static Block parse_block(Parser* parser, Scope* parent_scope)
 struct IfStmt parse_if_stmt(Parser* parser, Scope* scope)
 {
   parse_consume(parser, TOKEN_LEFT_PAREN, "expect '('");
-  const Expr* cond = parse_expr(parser, scope);
+  Expr* cond = parse_expr(parser, scope);
   parse_consume(parser, TOKEN_RIGHT_PAREN, "expect ')'");
 
   Stmt* then = ARENA_ALLOC_OBJECT(parser->permanent_arena, Stmt);
   *then = parse_stmt(parser, scope);
 
   Stmt* els = nullptr;
-  if (parser_current_token(parser).type == TOKEN_KEYWORD_ELSE) {
+  if (parser_current_token(parser).tag == TOKEN_KEYWORD_ELSE) {
     parse_advance(parser);
 
     els = ARENA_ALLOC_OBJECT(parser->permanent_arena, Stmt);
@@ -701,7 +641,7 @@ static Stmt parse_stmt(Parser* parser, Scope* scope)
 
   Stmt result;
 
-  switch (start_token.type) {
+  switch (start_token.tag) {
   case TOKEN_SEMICOLON: {
     parse_advance(parser);
 
@@ -747,7 +687,7 @@ static Stmt parse_stmt(Parser* parser, Scope* scope)
   case TOKEN_KEYWORD_WHILE: {
     parse_advance(parser);
     parse_consume(parser, TOKEN_LEFT_PAREN, "expect '('");
-    const Expr* cond = parse_expr(parser, scope);
+    Expr* cond = parse_expr(parser, scope);
     parse_consume(parser, TOKEN_RIGHT_PAREN, "expect ')'");
 
     Stmt* body = ARENA_ALLOC_OBJECT(parser->permanent_arena, Stmt);
@@ -763,7 +703,7 @@ static Stmt parse_stmt(Parser* parser, Scope* scope)
     parse_consume(parser, TOKEN_KEYWORD_WHILE, "expect \"while\"");
 
     parse_consume(parser, TOKEN_LEFT_PAREN, "expect '('");
-    const Expr* cond = parse_expr(parser, scope);
+    Expr* cond = parse_expr(parser, scope);
     parse_consume(parser, TOKEN_RIGHT_PAREN, "expect ')'");
     parse_consume(parser, TOKEN_SEMICOLON,
                   "expect ';' after do/while statement");
@@ -777,7 +717,7 @@ static Stmt parse_stmt(Parser* parser, Scope* scope)
 
     // init
     ForInit init = {};
-    switch (parser_current_token(parser).type) {
+    switch (parser_current_token(parser).tag) {
     case TOKEN_KEYWORD_INT: {
       // for loop introduce a new scope
       scope = new_scope(scope, parser->permanent_arena);
@@ -799,13 +739,13 @@ static Stmt parse_stmt(Parser* parser, Scope* scope)
     }
 
     // cond
-    Expr* cond = parser_current_token(parser).type == TOKEN_SEMICOLON
+    Expr* cond = parser_current_token(parser).tag == TOKEN_SEMICOLON
                      ? nullptr
                      : parse_expr(parser, scope);
     parse_consume(parser, TOKEN_SEMICOLON, "expect ';'");
 
     // post
-    Expr* post = parser_current_token(parser).type == TOKEN_RIGHT_PAREN
+    Expr* post = parser_current_token(parser).tag == TOKEN_RIGHT_PAREN
                      ? nullptr
                      : parse_expr(parser, scope);
     parse_consume(parser, TOKEN_RIGHT_PAREN, "expect ')'");
@@ -823,7 +763,7 @@ static Stmt parse_stmt(Parser* parser, Scope* scope)
     break;
   }
   default: {
-    const Expr* expr = parse_expr(parser, scope);
+    Expr* expr = parse_expr(parser, scope);
     parse_consume(parser, TOKEN_SEMICOLON, "expect ';'");
     result = (Stmt){.tag = STMT_EXPR, .expr = expr};
     break;
@@ -839,14 +779,14 @@ static Stmt parse_stmt(Parser* parser, Scope* scope)
 struct ParameterVec {
   uint32_t length;
   uint32_t capacity;
-  Parameter* data;
+  Variable** data;
 };
 
-static Parameters parse_parameter_list(Parser* parser)
+static Parameters parse_parameter_list(Parser* parser, Scope* scope)
 {
   parse_consume(parser, TOKEN_LEFT_PAREN, "Expect (");
 
-  if (parser_current_token(parser).type == TOKEN_KEYWORD_VOID) {
+  if (parser_current_token(parser).tag == TOKEN_KEYWORD_VOID) {
     parse_advance(parser);
     parse_consume(parser, TOKEN_RIGHT_PAREN, "Expect )");
 
@@ -861,21 +801,20 @@ static Parameters parse_parameter_list(Parser* parser)
   while (!token_match_or_eof(parser, TOKEN_RIGHT_PAREN)) {
     const Token current_token = parser_current_token(parser);
 
-    switch (current_token.type) {
+    switch (current_token.tag) {
     case TOKEN_KEYWORD_VOID: {
       parse_error_at(
           parser,
           str("'void' must be the first and only parameter if specified"),
           token_source_range(current_token));
       parse_advance(parser);
-      break;
-    }
+    } break;
     case TOKEN_KEYWORD_INT: {
       parse_advance(parser);
 
       const Token identifier_token = parser_current_token(parser);
       StringView identifier = {};
-      if (identifier_token.type == TOKEN_IDENTIFIER) {
+      if (identifier_token.tag == TOKEN_IDENTIFIER) {
         identifier = str_from_token(parser->src, identifier_token);
         parse_advance(parser);
       }
@@ -884,28 +823,29 @@ static Parameters parse_parameter_list(Parser* parser)
         parse_consume(parser, TOKEN_COMMA, "Expect ','");
       }
 
-      const Parameter parameter = {
-          .name = identifier,
-      };
-      DYNARRAY_PUSH_BACK(&parameters_vec, Parameter, &parser->scratch_arena,
-                         parameter);
+      Variable* name = add_variable(identifier, scope, parser->permanent_arena);
+      // TODO: error handling
+      MCC_ASSERT(name != nullptr);
+
+      DYNARRAY_PUSH_BACK(&parameters_vec, Variable*, &parser->scratch_arena,
+                         name);
 
     } break;
     default:
       parse_panic_at_token(parser, str("Expect parameter declarator"),
                            current_token);
       parse_advance(parser);
+      break;
     }
-    break;
   }
 
   parse_consume(parser, TOKEN_RIGHT_PAREN, "Expect )");
 
-  Parameter* params = ARENA_ALLOC_ARRAY(parser->permanent_arena, Parameter,
+  Variable** params = ARENA_ALLOC_ARRAY(parser->permanent_arena, Variable*,
                                         parameters_vec.length);
   if (parameters_vec.length != 0) {
     memcpy(params, parameters_vec.data,
-           parameters_vec.length * sizeof(Parameter));
+           parameters_vec.length * sizeof(Variable*));
   }
 
   // TODO: warn when the parameter list is empty in pre-C23 mode
@@ -920,7 +860,7 @@ static StringView parse_identifier(Parser* parser)
 {
   const Token current_token = parser_current_token(parser);
 
-  if (current_token.type != TOKEN_IDENTIFIER) {
+  if (current_token.tag != TOKEN_IDENTIFIER) {
     parse_panic_at_token(parser, str("Expect Identifier"), current_token);
   }
   parse_advance(parser);
@@ -933,19 +873,26 @@ static FunctionDecl* parse_function_decl(Parser* parser)
 
   parse_consume(parser, TOKEN_KEYWORD_INT, "Expect keyword int");
   StringView function_name = parse_identifier(parser);
-  add_name(function_name, parser->global_scope, parser->permanent_arena);
+  Variable* name = add_variable(function_name, parser->global_scope,
+                                parser->permanent_arena);
+  // TODO: support multiple function decl
+  MCC_ASSERT(name != nullptr);
 
-  const Parameters parameters = parse_parameter_list(parser);
+  Scope* function_scope =
+      new_scope(parser->global_scope, parser->permanent_arena);
+  const Parameters parameters = parse_parameter_list(parser, function_scope);
 
   Block* body = NULL;
 
-  if (parser_current_token(parser).type == TOKEN_LEFT_BRACE) { // is definition
+  if (parser_current_token(parser).tag == TOKEN_LEFT_BRACE) { // is definition
     parse_advance(parser);
     body = ARENA_ALLOC_OBJECT(parser->permanent_arena, Block);
-    *body = parse_block(parser, parser->global_scope);
+    *body = parse_block(parser, function_scope);
   } else {
     parse_consume(parser, TOKEN_SEMICOLON, "Expect ;");
   }
+
+  name->type = func_type(typ_int, parameters.length, parser->permanent_arena);
 
   FunctionDecl* decl =
       ARENA_ALLOC_OBJECT(parser->permanent_arena, FunctionDecl);
@@ -970,7 +917,7 @@ static TranslationUnit* parse_translation_unit(Parser* parser)
 {
   struct FunctionDeclVec function_decl_vec = {};
 
-  while (parser_current_token(parser).type != TOKEN_EOF) {
+  while (parser_current_token(parser).tag != TOKEN_EOF) {
     FunctionDecl* decl = parse_function_decl(parser);
     DYNARRAY_PUSH_BACK(&function_decl_vec, FunctionDecl*,
                        &parser->scratch_arena, decl);

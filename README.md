@@ -47,3 +47,11 @@ The mcc compiler follows a standard compiler architecture, consisting of the fol
 - **IR Generation**: Converts the AST into
   a [three-address code intermediate representation](https://en.wikipedia.org/wiki/Three-address_code).
 - **Assembly Generation**: Translates the intermediate representation into assembly code.
+
+## Resources
+
+Here are some useful resources consulted by me when writing this compiler
+
+- [Writing a C Compiler](https://norasandler.com/book/) book
+- Other small C compiler
+  implementations: [9cc](https://github.com/rui314/9cc) [chibicc](https://github.com/rui314/chibicc), [lacc](https://github.com/larmel/lacc), [cproc](https://github.com/michaelforney/cproc)

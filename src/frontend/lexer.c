@@ -31,10 +31,10 @@ static bool lexer_is_at_end(const Lexer* lexer)
   return *lexer->current == '\0';
 }
 
-static Token make_token(const Lexer* lexer, TokenType type)
+static Token make_token(const Lexer* lexer, TokenTag type)
 {
   return (Token){
-      .type = type,
+      .tag = type,
       .start = u32_from_isize(lexer->previous - lexer->start),
       .size = u32_from_isize(lexer->current - lexer->previous),
   };
@@ -146,8 +146,8 @@ static bool eat_char_if_match(Lexer* lexer, const char expected)
   return true;
 }
 
-static TokenType check_keyword(Lexer* lexer, int start_position,
-                               StringView rest, TokenType type)
+static TokenTag check_keyword(Lexer* lexer, int start_position, StringView rest,
+                              TokenTag type)
 {
   if (lexer->current - lexer->previous == start_position + (int)rest.size &&
       memcmp(lexer->previous + start_position, rest.start, rest.size) == 0) {
@@ -157,7 +157,7 @@ static TokenType check_keyword(Lexer* lexer, int start_position,
   return TOKEN_IDENTIFIER;
 }
 
-static TokenType get_identifier_type(Lexer* lexer)
+static TokenTag get_identifier_type(Lexer* lexer)
 {
   switch (lexer->previous[0]) {
   case 'b': return check_keyword(lexer, 1, str("reak"), TOKEN_KEYWORD_BREAK);
@@ -202,14 +202,14 @@ static Token scan_symbol(Lexer* lexer)
   case '}': return make_token(lexer, TOKEN_RIGHT_BRACE);
   case ';': return make_token(lexer, TOKEN_SEMICOLON);
   case '+': {
-    const TokenType token_type = eat_char_if_match(lexer, '+') ? TOKEN_PLUS_PLUS
-                                 : eat_char_if_match(lexer, '=')
-                                     ? TOKEN_PLUS_EQUAL
-                                     : TOKEN_PLUS;
+    const TokenTag token_type = eat_char_if_match(lexer, '+') ? TOKEN_PLUS_PLUS
+                                : eat_char_if_match(lexer, '=')
+                                    ? TOKEN_PLUS_EQUAL
+                                    : TOKEN_PLUS;
     return make_token(lexer, token_type);
   }
   case '-': {
-    const TokenType token_type =
+    const TokenTag token_type =
         eat_char_if_match(lexer, '-')   ? TOKEN_MINUS_MINUS
         : eat_char_if_match(lexer, '=') ? TOKEN_MINUS_EQUAL
         : eat_char_if_match(lexer, '>') ? TOKEN_MINUS_GREATER
@@ -227,17 +227,17 @@ static Token scan_symbol(Lexer* lexer)
                                                            : TOKEN_PERCENT);
   case '~': return make_token(lexer, TOKEN_TILDE);
   case '&': {
-    const TokenType token_type =
+    const TokenTag token_type =
         eat_char_if_match(lexer, '&')   ? TOKEN_AMPERSAND_AMPERSAND
         : eat_char_if_match(lexer, '=') ? TOKEN_AMPERSAND_EQUAL
                                         : TOKEN_AMPERSAND;
     return make_token(lexer, token_type);
   }
   case '|': {
-    const TokenType token_type = eat_char_if_match(lexer, '|') ? TOKEN_BAR_BAR
-                                 : eat_char_if_match(lexer, '=')
-                                     ? TOKEN_BAR_EQUAL
-                                     : TOKEN_BAR;
+    const TokenTag token_type = eat_char_if_match(lexer, '|') ? TOKEN_BAR_BAR
+                                : eat_char_if_match(lexer, '=')
+                                    ? TOKEN_BAR_EQUAL
+                                    : TOKEN_BAR;
     return make_token(lexer, token_type);
   }
   case '^':
@@ -250,7 +250,7 @@ static Token scan_symbol(Lexer* lexer)
     return make_token(lexer, eat_char_if_match(lexer, '=') ? TOKEN_NOT_EQUAL
                                                            : TOKEN_NOT);
   case '<': {
-    const TokenType token_type =
+    const TokenTag token_type =
         eat_char_if_match(lexer, '<')
             ? (eat_char_if_match(lexer, '=') ? TOKEN_LESS_LESS_EQUAL
                                              : TOKEN_LESS_LESS)
@@ -259,7 +259,7 @@ static Token scan_symbol(Lexer* lexer)
     return make_token(lexer, token_type);
   }
   case '>': {
-    const TokenType token_type =
+    const TokenTag token_type =
         eat_char_if_match(lexer, '>')
             ? (eat_char_if_match(lexer, '=') ? TOKEN_GREATER_GREATER_EQUAL
                                              : TOKEN_GREATER_GREATER)
@@ -294,7 +294,7 @@ static Token scan_token(Lexer* lexer)
 struct TokenTypeDynArray {
   size_t length;
   size_t capacity;
-  TokenType* data;
+  TokenTag* data;
 };
 
 struct U32DynArray {
@@ -313,23 +313,23 @@ Tokens lex(const char* source, Arena* permanent_arena, Arena scratch_arena)
 
   while (true) {
     const Token token = scan_token(&lexer);
-    DYNARRAY_PUSH_BACK(&token_types_dyn_array, TokenType, &scratch_arena,
-                       token.type);
+    DYNARRAY_PUSH_BACK(&token_types_dyn_array, TokenTag, &scratch_arena,
+                       token.tag);
     DYNARRAY_PUSH_BACK(&token_starts_dyn_array, uint32_t, &scratch_arena,
                        token.start);
     DYNARRAY_PUSH_BACK(&token_sizes_dyn_array, uint32_t, &scratch_arena,
                        token.size);
-    if (token.type == TOKEN_EOF) { break; }
+    if (token.tag == TOKEN_EOF) { break; }
   }
 
   const uint32_t token_count = u32_from_usize(token_types_dyn_array.length);
   MCC_ASSERT(token_starts_dyn_array.length == token_count);
   MCC_ASSERT(token_sizes_dyn_array.length == token_count);
 
-  TokenType* token_types =
-      ARENA_ALLOC_ARRAY(permanent_arena, TokenType, token_count);
+  TokenTag* token_types =
+      ARENA_ALLOC_ARRAY(permanent_arena, TokenTag, token_count);
   memcpy(token_types, token_types_dyn_array.data,
-         token_count * sizeof(TokenType));
+         token_count * sizeof(TokenTag));
 
   uint32_t* token_starts =
       ARENA_ALLOC_ARRAY(permanent_arena, uint32_t, token_count);

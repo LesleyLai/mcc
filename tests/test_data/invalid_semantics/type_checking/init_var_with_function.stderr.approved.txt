@@ -1,0 +1,4 @@
+{{filename}}:4:11: Error: initialization of 'int' from 'int(void)'
+4 |   int x = f;
+  |           ^
+

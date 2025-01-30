@@ -1,0 +1,4 @@
+{{filename}}:7:10: Error: too many arguments to function call, expected 1, have 2
+7 |   return f(1, 2);
+  |          ^
+
