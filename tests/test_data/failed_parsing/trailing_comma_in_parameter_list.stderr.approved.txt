@@ -1,0 +1,4 @@
+{{filename}}:1:29: Error: Expect parameter declarator
+1 | int foo(int a, int b, int c,) {
+  |                             ^
+

@@ -468,20 +468,29 @@ struct ExprVec {
   Expr** data;
 };
 
-static Expr* parse_function_call(Parser* parser, Expr* function,
-                                 struct Scope* scope)
+static struct ExprVec parse_arg_list(Parser* parser, Scope* scope)
 {
   struct ExprVec args_vec = {};
+  if (!token_match_or_eof(parser, TOKEN_RIGHT_PAREN)) {
+    // first arg
+    DYNARRAY_PUSH_BACK(&args_vec, Expr*, &parser->scratch_arena,
+                       parse_expr(parser, scope));
 
-  while (!token_match_or_eof(parser, TOKEN_RIGHT_PAREN)) {
-    Expr* arg = parse_expr(parser, scope);
-    DYNARRAY_PUSH_BACK(&args_vec, Expr*, &parser->scratch_arena, arg);
-    if (token_match_or_eof(parser, TOKEN_RIGHT_PAREN)) break;
-    parse_consume(parser, TOKEN_COMMA, "expect ','");
+    while (!token_match_or_eof(parser, TOKEN_RIGHT_PAREN)) {
+      parse_consume(parser, TOKEN_COMMA, "expect ','");
+      DYNARRAY_PUSH_BACK(&args_vec, Expr*, &parser->scratch_arena,
+                         parse_expr(parser, scope));
+    }
   }
 
   parse_consume(parser, TOKEN_RIGHT_PAREN,
                 "expect ')' at the end of a function call");
+  return args_vec;
+}
+
+static Expr* parse_function_call(Parser* parser, Expr* function, Scope* scope)
+{
+  struct ExprVec args_vec = parse_arg_list(parser, scope);
 
   const uint32_t arg_count = u32_from_usize(args_vec.length);
 
@@ -782,6 +791,42 @@ struct ParameterVec {
   Variable** data;
 };
 
+static Variable* parse_parameter(Parser* parser, Scope* scope)
+{
+  const Token current_token = parser_current_token(parser);
+
+  switch (current_token.tag) {
+  case TOKEN_KEYWORD_VOID: {
+    parse_error_at(
+        parser, str("'void' must be the first and only parameter if specified"),
+        token_source_range(current_token));
+    parse_advance(parser);
+  } break;
+  case TOKEN_KEYWORD_INT: {
+    parse_advance(parser);
+
+    const Token identifier_token = parser_current_token(parser);
+    StringView identifier = {};
+    if (identifier_token.tag == TOKEN_IDENTIFIER) {
+      identifier = str_from_token(parser->src, identifier_token);
+      parse_advance(parser);
+    }
+
+    Variable* name = add_variable(identifier, scope, parser->permanent_arena);
+    // TODO: error handling
+    MCC_ASSERT(name != nullptr);
+    return name;
+  } break;
+  default:
+    parse_panic_at_token(parser, str("Expect parameter declarator"),
+                         current_token);
+    parse_advance(parser);
+    break;
+  }
+  // TODO: error handling
+  return nullptr;
+}
+
 static Parameters parse_parameter_list(Parser* parser, Scope* scope)
 {
   parse_consume(parser, TOKEN_LEFT_PAREN, "Expect (");
@@ -790,53 +835,29 @@ static Parameters parse_parameter_list(Parser* parser, Scope* scope)
     parse_advance(parser);
     parse_consume(parser, TOKEN_RIGHT_PAREN, "Expect )");
 
-    return (Parameters){
-        .length = 0,
-        .data = nullptr,
-    };
+    return (Parameters){};
+  }
+
+  if (token_match_or_eof(parser, TOKEN_RIGHT_PAREN)) {
+    parse_advance(parser);
+
+    // TODO: warn when the parameter list is empty in pre-C23 mode
+    return (Parameters){};
   }
 
   struct ParameterVec parameters_vec = {};
 
+  {
+    // first parameter
+    Variable* name = parse_parameter(parser, scope);
+    DYNARRAY_PUSH_BACK(&parameters_vec, Variable*, &parser->scratch_arena,
+                       name);
+  }
   while (!token_match_or_eof(parser, TOKEN_RIGHT_PAREN)) {
-    const Token current_token = parser_current_token(parser);
-
-    switch (current_token.tag) {
-    case TOKEN_KEYWORD_VOID: {
-      parse_error_at(
-          parser,
-          str("'void' must be the first and only parameter if specified"),
-          token_source_range(current_token));
-      parse_advance(parser);
-    } break;
-    case TOKEN_KEYWORD_INT: {
-      parse_advance(parser);
-
-      const Token identifier_token = parser_current_token(parser);
-      StringView identifier = {};
-      if (identifier_token.tag == TOKEN_IDENTIFIER) {
-        identifier = str_from_token(parser->src, identifier_token);
-        parse_advance(parser);
-      }
-
-      if (!token_match_or_eof(parser, TOKEN_RIGHT_PAREN)) {
-        parse_consume(parser, TOKEN_COMMA, "Expect ','");
-      }
-
-      Variable* name = add_variable(identifier, scope, parser->permanent_arena);
-      // TODO: error handling
-      MCC_ASSERT(name != nullptr);
-
-      DYNARRAY_PUSH_BACK(&parameters_vec, Variable*, &parser->scratch_arena,
-                         name);
-
-    } break;
-    default:
-      parse_panic_at_token(parser, str("Expect parameter declarator"),
-                           current_token);
-      parse_advance(parser);
-      break;
-    }
+    parse_consume(parser, TOKEN_COMMA, "Expect ','");
+    Variable* name = parse_parameter(parser, scope);
+    DYNARRAY_PUSH_BACK(&parameters_vec, Variable*, &parser->scratch_arena,
+                       name);
   }
 
   parse_consume(parser, TOKEN_RIGHT_PAREN, "Expect )");
@@ -847,8 +868,6 @@ static Parameters parse_parameter_list(Parser* parser, Scope* scope)
     memcpy(params, parameters_vec.data,
            parameters_vec.length * sizeof(Variable*));
   }
-
-  // TODO: warn when the parameter list is empty in pre-C23 mode
 
   return (Parameters){
       .length = parameters_vec.length,

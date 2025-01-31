@@ -1,0 +1,8 @@
+{{filename}}:5:22: Error: Expect valid expression
+5 |   return foo(1, 2, 3,);
+  |                      ^
+
+{{filename}}:6:2: Error: Expect `}`
+6 | }
+  |  ^
+
