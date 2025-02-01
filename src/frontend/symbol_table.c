@@ -31,7 +31,7 @@ Variable* lookup_variable(const Scope* scope, StringView name)
   return lookup_variable(scope->parent, name);
 }
 
-Variable* add_variable(StringView name, Scope* scope, Arena* arena)
+Variable* add_variable(Scope* scope, StringView name, Arena* arena)
 {
   // check variable in current scope
   for (uint32_t i = 0; i < scope->length; ++i) {

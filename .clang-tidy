@@ -20,6 +20,7 @@ readability-simplify-*,
 -*-use-nullptr,
 -*-use-anonymous-namespace,
 -*-include-cleaner,
+-*-multi-level-implicit-pointer-conversion,
 '
 HeaderFilterRegex: 'catch.hpp'
 FormatStyle: 'file'

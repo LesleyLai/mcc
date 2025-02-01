@@ -4,7 +4,6 @@
 #include <mcc/dynarray.h>
 #include <mcc/format.h>
 
-#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -543,7 +542,7 @@ static VariableDecl parse_decl(Parser* parser, struct Scope* scope)
   MCC_ASSERT(name.tag == TOKEN_IDENTIFIER);
 
   const StringView identifier = str_from_token(parser->src, name);
-  Variable* variable = add_variable(identifier, scope, parser->permanent_arena);
+  Variable* variable = add_variable(scope, identifier, parser->permanent_arena);
   if (!variable) {
     const StringView error_msg =
         allocate_printf(parser->permanent_arena, "redefinition of '%.*s'",
@@ -812,7 +811,7 @@ static Variable* parse_parameter(Parser* parser, Scope* scope)
       parse_advance(parser);
     }
 
-    Variable* name = add_variable(identifier, scope, parser->permanent_arena);
+    Variable* name = add_variable(scope, identifier, parser->permanent_arena);
     // TODO: error handling
     MCC_ASSERT(name != nullptr);
     return name;
@@ -892,9 +891,12 @@ static FunctionDecl* parse_function_decl(Parser* parser)
 
   parse_consume(parser, TOKEN_KEYWORD_INT, "Expect keyword int");
   StringView function_name = parse_identifier(parser);
-  Variable* name = add_variable(function_name, parser->global_scope,
-                                parser->permanent_arena);
-  // TODO: support multiple function decl
+  Variable* name = lookup_variable(parser->global_scope, function_name);
+  if (!name) {
+    name = add_variable(parser->global_scope, function_name,
+                        parser->permanent_arena);
+  }
+  // TODO: error handling
   MCC_ASSERT(name != nullptr);
 
   Scope* function_scope =
@@ -911,7 +913,7 @@ static FunctionDecl* parse_function_decl(Parser* parser)
     parse_consume(parser, TOKEN_SEMICOLON, "Expect ;");
   }
 
-  name->type = func_type(typ_int, parameters.length, parser->permanent_arena);
+  name->type = typ_invalid;
 
   FunctionDecl* decl =
       ARENA_ALLOC_OBJECT(parser->permanent_arena, FunctionDecl);
@@ -955,6 +957,7 @@ static TranslationUnit* parse_translation_unit(Parser* parser)
   *tu = (TranslationUnit){
       .decl_count = decl_count,
       .decls = decls,
+      .global_scope = parser->global_scope,
   };
   parse_consume(parser, TOKEN_EOF, "Expect end of the file");
 

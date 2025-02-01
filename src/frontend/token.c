@@ -85,7 +85,7 @@ void print_tokens(const char* src, const Tokens* tokens,
     int src_padding_size = 10 - (int)(token.size);
     if (src_padding_size < 0) src_padding_size = 0;
 
-    printf("%-10s src=\"%.*s\"%*s line=%-2i column=%-2i offset=%u\n",
+    printf("%-10s src=\"%.*s\"%.*s line=%-2i column=%-2i offset=%u\n",
            token_type_string(token.tag), (int)token.size, src + token.start,
            src_padding_size, "", line_column.line, line_column.column,
            token.start);

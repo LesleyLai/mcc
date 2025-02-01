@@ -17,8 +17,7 @@ DiagnosticsContext create_diagnostic_context(const char* filename,
 
 static void write_diagnostic_position_indicator(StringBuffer* output,
                                                 SourceRange error_range,
-                                                uint32_t line_begin,
-                                                uint32_t line_end);
+                                                uint32_t line_begin);
 
 void write_diagnostics(StringBuffer* output, const Error* error,
                        const DiagnosticsContext* context)
@@ -55,20 +54,18 @@ void write_diagnostics(StringBuffer* output, const Error* error,
 
     string_buffer_printf(output, "%d | %.*s", line_num, (int)line_length,
                          source.start + line_begin);
-    write_diagnostic_position_indicator(output, error_range, line_begin,
-                                        line_end);
+    if (error_range.begin >= line_begin && error_range.end <= line_end) {
+      write_diagnostic_position_indicator(output, error_range, line_begin);
+    }
   }
 }
 
 static void write_diagnostic_position_indicator(StringBuffer* output,
                                                 SourceRange error_range,
-                                                uint32_t line_begin,
-                                                uint32_t line_end)
+                                                uint32_t line_begin)
 {
   string_buffer_printf(output, "  | ");
-  MCC_ASSERT(error_range.begin >= line_begin);
   MCC_ASSERT(error_range.end > error_range.begin);
-  MCC_ASSERT(error_range.end <= line_end);
 
   for (uint32_t i = line_begin; i < error_range.begin; ++i) {
     string_buffer_printf(output, " ");
@@ -91,7 +88,7 @@ void print_diagnostics(ErrorsView errors, const DiagnosticsContext* context)
     StringBuffer output = string_buffer_new(&diagnostics_arena);
     write_diagnostics(&output, &errors.data[i], context);
     StringView output_view = str_from_buffer(&output);
-    (void)fprintf(stderr, "%*s\n", (int)output_view.size, output_view.start);
+    (void)fprintf(stderr, "%.*s\n", (int)output_view.size, output_view.start);
     arena_reset(&diagnostics_arena);
   }
 }

@@ -18,6 +18,7 @@ struct ErrorVec {
 typedef struct Context {
   struct ErrorVec errors;
   Arena* permanent_arena;
+  const Scope* global_scope;
 } Context;
 
 #pragma region error reporter
@@ -97,6 +98,22 @@ static void report_incompatible_initialization(const Expr* initializer,
   string_buffer_append(&buffer, str("'"));
   error_at(str_from_buffer(&buffer), initializer->source_range, context);
 }
+
+static void report_conflicting_decl_type(FunctionDecl* decl, Context* context)
+{
+  StringView msg =
+      allocate_printf(context->permanent_arena, "conflicting types for '%.*s'",
+                      (int)decl->name.size, decl->name.start);
+  error_at(msg, decl->source_range, context);
+}
+
+static void report_multiple_definition(FunctionDecl* decl, Context* context)
+{
+  StringView msg =
+      allocate_printf(context->permanent_arena, "multiple definition of '%.*s'",
+                      (int)decl->name.size, decl->name.start);
+  error_at(msg, decl->source_range, context);
+}
 #pragma endregion
 
 [[nodiscard]]
@@ -111,6 +128,7 @@ static bool type_check_function_call(Expr* function_call, Context* context)
   if (!type_check_expr(function, context)) { return false; }
 
   if (function->type->tag != TYPE_FUNCTION) {
+    MCC_ASSERT(function->type->tag != TYPE_INVALID);
     report_calling_noncallable(function, context);
     return false;
   }
@@ -268,6 +286,11 @@ static bool type_check_stmt(Stmt* stmt, Context* context)
   decl->name->type = typ_int;
 
   if (decl->initializer) {
+    // TODO: handle redefinition of static/global variables
+    MCC_ASSERT(decl->name->has_definition == false);
+
+    decl->name->has_definition = true;
+
     if (!type_check_expr(decl->initializer, context)) { return false; }
 
     if (decl->initializer->type->tag != TYPE_INTEGER) {
@@ -297,19 +320,38 @@ static bool type_check_block(Block* block, Context* context)
 
 static void type_check_function_decl(FunctionDecl* decl, Context* context)
 {
+  Variable* function = lookup_variable(context->global_scope, decl->name);
+  if (function->type->tag == TYPE_INVALID) {
+    function->type =
+        func_type(typ_int, decl->params.length, context->permanent_arena);
+  } else {
+    MCC_ASSERT(function->type->tag == TYPE_FUNCTION);
+    const FunctionType* function_type = (FunctionType*)function->type;
+    if (function_type->return_type != typ_int ||
+        function_type->param_count != decl->params.length) {
+      report_conflicting_decl_type(decl, context);
+    }
+  }
+
   if (decl->body != nullptr) {
+    if (function->has_definition) {
+      report_multiple_definition(decl, context);
+      return;
+    }
+    function->has_definition = true;
+
     for (uint32_t i = 0; i < decl->params.length; ++i) {
       Variable* param = decl->params.data[i];
       param->type = typ_int;
     }
-
     type_check_block(decl->body, context);
   }
 }
 
 ErrorsView type_check(TranslationUnit* ast, Arena* permanent_arena)
 {
-  Context context = {.permanent_arena = permanent_arena};
+  Context context = {.permanent_arena = permanent_arena,
+                     .global_scope = ast->global_scope};
 
   for (uint32_t i = 0; i < ast->decl_count; ++i) {
     type_check_function_decl(ast->decls[i], &context);

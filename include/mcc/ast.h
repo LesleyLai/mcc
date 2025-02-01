@@ -64,6 +64,7 @@ typedef enum BinaryOpType {
 
 typedef struct Expr Expr;
 typedef struct Variable Variable; // identifier
+typedef struct Scope Scope;
 
 struct ConstExpr {
   int32_t val;
@@ -202,6 +203,7 @@ typedef struct FunctionDecl {
 typedef struct TranslationUnit {
   uint32_t decl_count;
   FunctionDecl** decls;
+  const Scope* global_scope;
 } TranslationUnit;
 
 void ast_print_translation_unit(const TranslationUnit* tu);

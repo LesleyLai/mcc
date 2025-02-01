@@ -12,6 +12,8 @@ typedef struct Variable {
   StringView rewrote_name; // name after alpha renaming
   uint32_t shadow_counter; // increase each time we have shadowing
   const Type* type;
+
+  bool has_definition; // prevent redefinition
 } Variable;
 
 // Represents a block scope
@@ -22,6 +24,6 @@ Scope* new_scope(Scope* parent, Arena* arena);
 Variable* lookup_variable(const Scope* scope, StringView name);
 
 // Return nullptr if a variable already exist in the same scope
-Variable* add_variable(StringView name, Scope* scope, Arena* arena);
+Variable* add_variable(Scope* scope, StringView name, Arena* arena);
 
 #endif // MCC_SYMBOL_TABLE_H

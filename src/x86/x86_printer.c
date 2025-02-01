@@ -71,7 +71,7 @@ static void print_x86_operand(X86Operand operand, X86Size size, FILE* stream)
     (void)fprintf(stream, "%s", x86_register_name(operand.reg, size));
     break;
   case X86_OPERAND_PSEUDO:
-    (void)fprintf(stream, "%*s", (int)operand.pseudo.size,
+    (void)fprintf(stream, "%.*s", (int)operand.pseudo.size,
                   operand.pseudo.start);
     break;
   case X86_OPERAND_STACK:
@@ -94,7 +94,7 @@ static void print_cond_jmp_instruction(X86Instruction instruction, FILE* stream)
   case X86_COND_LE: name = "jle"; break;
   }
   (void)fprintf(stream, "  %-6s ", name);
-  (void)fprintf(stream, ".L%*s", (int)instruction.jmpcc.label.size,
+  (void)fprintf(stream, ".L%.*s", (int)instruction.jmpcc.label.size,
                 instruction.jmpcc.label.start);
 }
 
@@ -175,14 +175,14 @@ void x86_print_instruction(X86Instruction instruction, FILE* stream)
     print_binary_instruction("cmp", instruction, stream);
     break;
   case X86_INST_JMP: {
-    (void)fprintf(stream, "  jmp .L%*s", (int)instruction.label.size,
+    (void)fprintf(stream, "  jmp .L%.*s", (int)instruction.label.size,
                   instruction.label.start);
     break;
   }
   case X86_INST_JMPCC: print_cond_jmp_instruction(instruction, stream); break;
   case X86_INST_SETCC: print_cond_set_instruction(instruction, stream); break;
   case X86_INST_LABEL: {
-    (void)fprintf(stream, ".L%*s:", (int)instruction.label.size,
+    (void)fprintf(stream, ".L%.*s:", (int)instruction.label.size,
                   instruction.label.start);
     break;
   }
