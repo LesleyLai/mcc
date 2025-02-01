@@ -395,7 +395,29 @@ static IRValue emit_ir_instructions_from_expr(const Expr* expr,
     push_instruction(context, ir_label(end_label));
     return result;
   }
-  case EXPR_CALL: MCC_UNIMPLEMENTED();
+  case EXPR_CALL: {
+    Expr* function = expr->call.function;
+    MCC_ASSERT(function->tag == EXPR_VARIABLE);
+    const StringView function_name = function->variable->rewrote_name;
+
+    uint32_t arg_count = expr->call.arg_count;
+    IRValue* args = ARENA_ALLOC_ARRAY(context->tu_context->permanent_arena,
+                                      IRValue, arg_count);
+    for (uint32_t i = 0; i < arg_count; ++i) {
+      args[i] = emit_ir_instructions_from_expr(expr->call.args[i], context);
+    }
+
+    const IRValue result = ir_variable(create_fresh_variable_name(context));
+    push_instruction(context, (IRInstruction){.typ = IR_CALL,
+                                              .call = {
+                                                  .func_name = function_name,
+                                                  .dest = result,
+                                                  .arg_count = arg_count,
+                                                  .args = args,
+                                              }});
+
+    return result;
+  }
   }
 
   MCC_UNREACHABLE();
@@ -677,7 +699,16 @@ static IRFunctionDef generate_ir_function_def(const FunctionDecl* decl,
            context.instructions.length * sizeof(IRInstruction));
   }
 
+  uint32_t param_count = decl->params.length;
+  StringView* parameters =
+      ARENA_ALLOC_ARRAY(tu_context->permanent_arena, StringView, param_count);
+  for (uint32_t i = 0; i < param_count; ++i) {
+    parameters[i] = decl->params.data[i]->rewrote_name;
+  }
+
   return (IRFunctionDef){.name = decl->name,
+                         .param_count = param_count,
+                         .params = parameters,
                          .instruction_count = context.instructions.length,
                          .instructions = instructions};
 }

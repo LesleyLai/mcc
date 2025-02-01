@@ -26,8 +26,11 @@ typedef struct IRProgram {
 
 typedef struct IRFunctionDef {
   StringView name;
-  size_t instruction_count;
+  uint32_t instruction_count;
+  uint32_t param_count;
+
   struct IRInstruction* instructions;
+  StringView* params;
 } IRFunctionDef;
 
 typedef enum IRValueType {

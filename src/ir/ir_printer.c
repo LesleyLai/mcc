@@ -35,7 +35,14 @@ void print_ir(const IRProgram* ir)
   for (size_t i = 0; i < ir->function_count; i++) {
     const IRFunctionDef ir_function = ir->functions[i];
     const StringView name = ir_function.name;
-    printf("func %.*s():\n", (int)name.size, name.start);
+    printf("func %.*s(", (int)name.size, name.start);
+    for (uint32_t j = 0; j < ir_function.param_count; ++j) {
+      if (j != 0) { printf(", "); }
+      printf("%.*s", (int)ir_function.params[j].size,
+             ir_function.params[j].start);
+    }
+    printf("):\n");
+
     for (size_t j = 0; j < ir_function.instruction_count; j++) {
       const IRInstruction instruction = ir_function.instructions[j];
       switch (instruction.typ) {
@@ -84,7 +91,15 @@ void print_ir(const IRProgram* ir)
                instruction.label.start);
       } break;
       case IR_CALL: {
-        MCC_UNIMPLEMENTED();
+        printf("  ");
+        print_ir_value(instruction.call.dest);
+        printf(" = call %.*s(", (int)instruction.call.func_name.size,
+               instruction.call.func_name.start);
+        for (uint32_t k = 0; k < instruction.call.arg_count; ++k) {
+          if (k != 0) { printf(", "); }
+          print_ir_value(instruction.call.args[k]);
+        }
+        printf(")\n");
       } break;
       }
     }
