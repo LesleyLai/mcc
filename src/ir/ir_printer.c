@@ -83,6 +83,9 @@ void print_ir(const IRProgram* ir)
         printf(".%.*s:\n", (int)instruction.label.size,
                instruction.label.start);
       } break;
+      case IR_CALL: {
+        MCC_UNIMPLEMENTED();
+      } break;
       }
     }
   }

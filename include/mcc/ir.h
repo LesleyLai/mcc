@@ -72,6 +72,9 @@ typedef enum IRInstructionType {
   IR_GREATER,                // dest = src1 > src2
   IR_GREATER_EQUAL,          // dest = src1 >= src2
 
+  // function call
+  IR_CALL,
+
   // unconditional jump
   // jmp <label>
   IR_JMP,
@@ -91,6 +94,14 @@ typedef struct IRInstruction {
       IRValue operand2;
       IRValue operand3;
     };
+    // Call
+    struct {
+      StringView func_name;
+      IRValue dest;
+      uint32_t arg_count;
+      IRValue* args;
+    } call;
+
     // Label or JMP
     StringView label;
     // Br

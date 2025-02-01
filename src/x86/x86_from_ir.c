@@ -252,6 +252,7 @@ X86FunctionDef x86_function_from_ir(const IRFunctionDef* ir_function,
                                           .label = ir_instruction->label,
                                       });
       break;
+    case IR_CALL: MCC_UNIMPLEMENTED(); break;
     }
   }
 

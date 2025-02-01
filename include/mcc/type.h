@@ -8,7 +8,6 @@
 #include "str.h"
 
 typedef enum TypeTag : uint8_t {
-  TYPE_INVALID = 0,
   TYPE_VOID,
   TYPE_INTEGER,
   TYPE_FUNCTION,
@@ -32,7 +31,6 @@ typedef struct FunctionType {
   uint32_t param_count;
 } FunctionType;
 
-extern const Type* typ_invalid;
 extern const Type* typ_void;
 extern const Type* typ_int;
 

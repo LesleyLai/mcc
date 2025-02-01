@@ -128,7 +128,7 @@ static bool type_check_function_call(Expr* function_call, Context* context)
   if (!type_check_expr(function, context)) { return false; }
 
   if (function->type->tag != TYPE_FUNCTION) {
-    MCC_ASSERT(function->type->tag != TYPE_INVALID);
+    MCC_ASSERT(function->type != nullptr);
     report_calling_noncallable(function, context);
     return false;
   }
@@ -159,13 +159,11 @@ static bool type_check_function_call(Expr* function_call, Context* context)
 [[nodiscard]]
 static bool type_check_expr(Expr* expr, Context* context)
 {
-  expr->type = typ_invalid;
   switch (expr->tag) {
   case EXPR_INVALID: MCC_UNREACHABLE(); break;
   case EXPR_CONST: expr->type = typ_int; return true;
   case EXPR_VARIABLE:
     MCC_ASSERT(expr->variable->type != nullptr);
-    MCC_ASSERT(expr->variable->type != TYPE_INVALID);
 
     expr->type = expr->variable->type;
     return true;
@@ -321,7 +319,7 @@ static bool type_check_block(Block* block, Context* context)
 static void type_check_function_decl(FunctionDecl* decl, Context* context)
 {
   Variable* function = lookup_variable(context->global_scope, decl->name);
-  if (function->type->tag == TYPE_INVALID) {
+  if (function->type == nullptr) {
     function->type =
         func_type(typ_int, decl->params.length, context->permanent_arena);
   } else {

@@ -153,7 +153,6 @@ static Expr* parse_number_literal(Parser* parser, Scope* scope)
 
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
   *result = (Expr){.tag = EXPR_CONST,
-                   .type = typ_invalid,
                    .source_range = token_source_range(token),
                    .const_expr = (struct ConstExpr){.val = val}};
   return result;
@@ -181,7 +180,6 @@ static Expr* parse_identifier_expr(Parser* parser, Scope* scope)
 
   // TODO: handle the case wher variable == nullptr
   *result = (Expr){.tag = EXPR_VARIABLE,
-                   .type = typ_invalid,
                    .source_range = token_source_range(token),
                    .variable = variable};
   return result;
@@ -295,7 +293,6 @@ static Expr* parse_precedence(Parser* parser, Precedence precedence,
     Expr* error_expr = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
     *error_expr = (Expr){
         .tag = EXPR_INVALID,
-        .type = typ_invalid,
         .source_range = token_source_range(previous_token),
     };
     return error_expr;
@@ -346,7 +343,6 @@ static Expr* parse_unary_op(Parser* parser, Scope* scope)
 
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
   *result = (Expr){.tag = EXPR_UNARY,
-                   .type = typ_invalid,
                    .source_range = result_source_range,
                    .unary_op = (struct UnaryOpExpr){
                        .unary_op_type = operator_type, .inner_expr = expr}};
@@ -417,7 +413,6 @@ static Expr* parse_binary_op(Parser* parser, Expr* lhs_expr,
 
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
   *result = (Expr){.tag = EXPR_BINARY,
-                   .type = typ_invalid,
                    .source_range = result_source_range,
                    .binary_op = (struct BinaryOpExpr){
                        .binary_op_type = binary_op_type,
@@ -452,7 +447,6 @@ static Expr* parse_ternary(Parser* parser, Expr* cond, struct Scope* scope)
 
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
   *result = (Expr){.tag = EXPR_TERNARY,
-                   .type = typ_invalid,
                    .source_range = source_range_union(cond->source_range,
                                                       false_expr->source_range),
                    .ternary = (struct TernaryExpr){.cond = cond,
@@ -500,7 +494,6 @@ static Expr* parse_function_call(Parser* parser, Expr* function, Scope* scope)
 
   Expr* expr = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
   *expr = (Expr){.tag = EXPR_CALL,
-                 .type = typ_invalid,
                  .source_range = source_range_union(
                      function->source_range,
                      token_source_range(parser_previous_token(parser))),
@@ -911,8 +904,6 @@ static FunctionDecl* parse_function_decl(Parser* parser)
   } else {
     parse_consume(parser, TOKEN_SEMICOLON, "Expect ;");
   }
-
-  name->type = typ_invalid;
 
   FunctionDecl* decl =
       ARENA_ALLOC_OBJECT(parser->permanent_arena, FunctionDecl);

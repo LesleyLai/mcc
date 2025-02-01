@@ -2,10 +2,6 @@
 #include <mcc/prelude.h>
 #include <mcc/type.h>
 
-const Type* typ_invalid = &(const Type){
-    .tag = TYPE_INVALID,
-};
-
 const Type* typ_void = &(const Type){
     .tag = TYPE_VOID,
 };
@@ -42,7 +38,6 @@ const Type* func_type(const Type* return_type, uint32_t param_count,
 void format_type_to(StringBuffer* buffer, const Type* typ)
 {
   switch (typ->tag) {
-  case TYPE_INVALID: MCC_UNREACHABLE(); return;
   case TYPE_VOID: string_buffer_append(buffer, str("void")); return;
   case TYPE_INTEGER: {
     const IntegerType* int_typ = (const IntegerType*)typ;
