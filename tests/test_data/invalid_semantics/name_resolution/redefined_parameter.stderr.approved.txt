@@ -1,0 +1,4 @@
+{{filename}}:3:7: Error: redefinition of 'a'
+3 |   int a = 5;
+  |       ^
+

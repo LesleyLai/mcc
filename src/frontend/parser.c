@@ -598,10 +598,8 @@ static BlockItem parse_block_item(Parser* parser, Scope* scope)
   return result;
 }
 
-static Block parse_block(Parser* parser, Scope* parent_scope)
+static Block parse_block(Parser* parser, Scope* scope)
 {
-  struct Scope* scope = new_scope(parent_scope, parser->permanent_arena);
-
   struct BlockItemVec items_vec = {};
 
   while (!token_match_or_eof(parser, TOKEN_RIGHT_BRACE)) {
@@ -681,7 +679,8 @@ static Stmt parse_stmt(Parser* parser, Scope* scope)
   case TOKEN_LEFT_BRACE: {
     parse_advance(parser);
 
-    const Block compound = parse_block(parser, scope);
+    Scope* block_scope = new_scope(scope, parser->permanent_arena);
+    const Block compound = parse_block(parser, block_scope);
     result = (Stmt){.tag = STMT_COMPOUND, .compound = compound};
     break;
   }
