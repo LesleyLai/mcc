@@ -1,14 +1,33 @@
 #include "x86_passes.h"
+
+#include <mcc/dynarray.h>
+#include <mcc/format.h>
 #include <mcc/ir.h>
 #include <mcc/prelude.h>
+
+static struct Symbols {
+  uint32_t length;
+  uint32_t capacity;
+  StringView* data;
+} symbols;
+
+static bool has_symbol(StringView name)
+{
+  for (uint32_t i = 0; i < symbols.length; ++i) {
+    if (str_eq(name, symbols.data[i])) return true;
+  }
+  return false;
+}
+
+static const X86Register arg_registers[] = {X86_REG_DI, X86_REG_SI, //
+                                            X86_REG_DX, X86_REG_CX, //
+                                            X86_REG_R8, X86_REG_R9};
 
 static X86Operand x86_operand_from_ir(IRValue ir_operand)
 {
   switch (ir_operand.typ) {
   case IR_VALUE_TYPE_CONSTANT: return immediate_operand(ir_operand.constant);
-  case IR_VALUE_TYPE_VARIABLE:
-    return (X86Operand){.typ = X86_OPERAND_PSEUDO,
-                        .pseudo = ir_operand.variable};
+  case IR_VALUE_TYPE_VARIABLE: return pseudo_operand(ir_operand.variable);
   }
   MCC_UNREACHABLE();
 }
@@ -114,11 +133,84 @@ static X86Instruction jmpcc(X86CondCode cond_code, StringView label)
                           }};
 }
 
+struct SplitResult {
+  uint32_t register_count;
+  uint32_t stack_count;
+};
+
+// Count the number of parameters/arguments pass via register and via stack
+static struct SplitResult count_register_stack_vars(uint32_t count)
+{
+  const uint32_t register_count = count > 6 ? 6 : count;
+  const uint32_t stack_count = count - register_count;
+  return (struct SplitResult){
+      .register_count = register_count,
+      .stack_count = stack_count,
+  };
+}
+
+static void generate_call_instruction(X86InstructionVector* instructions,
+                                      const IRInstruction* ir_instruction,
+                                      Arena* permanent_arena)
+{
+  struct SplitResult arg_counts =
+      count_register_stack_vars(ir_instruction->call.arg_count);
+  const uint32_t register_arg_count = arg_counts.register_count,
+                 stack_arg_count = arg_counts.stack_count;
+
+  // TODO: handle more arguments
+  MCC_ASSERT(stack_arg_count == 0);
+
+  for (uint32_t i = 0; i < register_arg_count; ++i) {
+    const X86Operand arg = x86_operand_from_ir(ir_instruction->call.args[i]);
+    push_instruction(instructions,
+                     binary_instruction(X86_INST_MOV, X86_SZ_4,
+                                        register_operand(arg_registers[i]),
+                                        arg));
+  }
+
+  StringView function_name = ir_instruction->call.func_name;
+  // On Linux, external functions need to be postfixed with `@PLT`
+  if (!has_symbol(function_name)) {
+    function_name =
+        allocate_printf(permanent_arena, "%.*s@PLT", (int)function_name.size,
+                        function_name.start);
+  }
+
+  push_instruction(instructions, (X86Instruction){
+                                     .typ = X86_INST_CALL,
+                                     .label = function_name,
+                                 });
+
+  const X86Operand dest = x86_operand_from_ir(ir_instruction->call.dest);
+  push_instruction(instructions,
+                   binary_instruction(X86_INST_MOV, X86_SZ_4, dest,
+                                      register_operand(X86_REG_AX)));
+}
+
 // First pass to generate assembly. Still need fixing later
 X86FunctionDef x86_function_from_ir(const IRFunctionDef* ir_function,
+                                    Arena* permanent_arena,
                                     Arena* scratch_arena)
 {
   X86InstructionVector instructions = {.arena = scratch_arena};
+
+  DYNARRAY_PUSH_BACK(&symbols, StringView, scratch_arena, ir_function->name);
+
+  struct SplitResult param_counts =
+      count_register_stack_vars(ir_function->param_count);
+  const uint32_t register_param_count = param_counts.register_count,
+                 stack_param_count = param_counts.stack_count;
+
+  // TODO: handle more parameters
+  MCC_ASSERT(stack_param_count == 0);
+  for (uint32_t i = 0; i < register_param_count; ++i) {
+    // move <parameter>, <arg register>
+    push_instruction(&instructions,
+                     binary_instruction(X86_INST_MOV, X86_SZ_4,
+                                        pseudo_operand(ir_function->params[i]),
+                                        register_operand(arg_registers[i])));
+  }
 
   for (size_t i = 0; i < ir_function->instruction_count; ++i) {
     const IRInstruction* ir_instruction = get_instruction(ir_function, i);
@@ -252,7 +344,10 @@ X86FunctionDef x86_function_from_ir(const IRFunctionDef* ir_function,
                                           .label = ir_instruction->label,
                                       });
       break;
-    case IR_CALL: MCC_UNIMPLEMENTED(); break;
+    case IR_CALL: {
+      generate_call_instruction(&instructions, ir_instruction, permanent_arena);
+      break;
+    }
     }
   }
 

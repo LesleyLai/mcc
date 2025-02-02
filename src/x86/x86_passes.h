@@ -13,6 +13,7 @@ struct IRFunctionDef;
 /// @note At this stage, the generated x86 function may still contain invalid
 /// instructions, as these are resolved in subsequent passes.
 X86FunctionDef x86_function_from_ir(const struct IRFunctionDef* ir_function,
+                                    Arena* permanent_arena,
                                     Arena* scratch_arena);
 
 /// @brief Replaces all pseudo-registers in the x86 function with allocated
@@ -25,7 +26,8 @@ X86FunctionDef x86_function_from_ir(const struct IRFunctionDef* ir_function,
 /// @param[inout] function Pointer to the x86 function whose pseudo-registers
 /// will be replaced.
 /// @return The size of the stack needed for the function in bytes.
-intptr_t replace_pseudo_registers(X86FunctionDef* function);
+intptr_t replace_pseudo_registers(X86FunctionDef* function,
+                                  Arena* permanent_arena);
 
 /// @brief Resolves invalid x86 instructions in the function.
 ///

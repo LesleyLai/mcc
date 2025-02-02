@@ -34,6 +34,10 @@ typedef enum X86Register {
   X86_REG_BX,
   X86_REG_CX,
   X86_REG_DX,
+  X86_REG_DI,
+  X86_REG_SI,
+  X86_REG_R8,
+  X86_REG_R9,
   X86_REG_R10,
   X86_REG_R11,
   X86_REG_SP, // Stack pointer
@@ -73,6 +77,7 @@ typedef enum X86InstructionType {
   X86_INST_NEG, // negation
   X86_INST_NOT, // bitwise complement
   X86_INST_IDIV,
+  X86_INST_PUSH,
 
   // binary instructions
   X86_INST_MOV,
@@ -86,11 +91,12 @@ typedef enum X86InstructionType {
   X86_INST_SAR, // Arithmetic Right Shift
   X86_INST_CMP, // Compare
 
+  // jump related instructions
   X86_INST_JMP,   // unconditional jump
   X86_INST_JMPCC, // conditional jump
   X86_INST_SETCC,
   X86_INST_LABEL,
-
+  X86_INST_CALL,
 } X86InstructionType;
 
 typedef enum X86CondCode {
@@ -123,7 +129,7 @@ struct X86Instruction {
       X86CondCode cond;
       X86Operand op;
     } setcc;
-    StringView label; // label or jmp
+    StringView label; // label, jmp, or call
   };
 };
 

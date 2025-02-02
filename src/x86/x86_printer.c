@@ -1,6 +1,5 @@
-#include <mcc/x86.h>
-
 #include <mcc/prelude.h>
+#include <mcc/x86.h>
 
 static const char* x86_register_name(X86Register reg, X86Size size)
 {
@@ -12,6 +11,10 @@ static const char* x86_register_name(X86Register reg, X86Size size)
     case X86_REG_BX: return "bl";
     case X86_REG_CX: return "cl";
     case X86_REG_DX: return "dl";
+    case X86_REG_DI: return "dil";
+    case X86_REG_SI: return "sil";
+    case X86_REG_R8: return "r8b";
+    case X86_REG_R9: return "r9b";
     case X86_REG_R10: return "r10b";
     case X86_REG_R11: return "r11b";
     case X86_REG_SP: return "spl";
@@ -26,6 +29,10 @@ static const char* x86_register_name(X86Register reg, X86Size size)
     case X86_REG_BX: return "ebx";
     case X86_REG_CX: return "ecx";
     case X86_REG_DX: return "edx";
+    case X86_REG_DI: return "edi";
+    case X86_REG_SI: return "esi";
+    case X86_REG_R8: return "r8d";
+    case X86_REG_R9: return "r9d";
     case X86_REG_R10: return "r10d";
     case X86_REG_R11: return "r11d";
     case X86_REG_SP: return "esp";
@@ -39,6 +46,10 @@ static const char* x86_register_name(X86Register reg, X86Size size)
     case X86_REG_BX: return "rbx";
     case X86_REG_CX: return "rcx";
     case X86_REG_DX: return "rdx";
+    case X86_REG_DI: return "rdi";
+    case X86_REG_SI: return "rsi";
+    case X86_REG_R8: return "r8";
+    case X86_REG_R9: return "r9";
     case X86_REG_R10: return "r10";
     case X86_REG_R11: return "r11";
     case X86_REG_SP: return "rsp";
@@ -145,6 +156,9 @@ void x86_print_instruction(X86Instruction instruction, FILE* stream)
   } break;
   case X86_INST_NEG: print_unary_instruction("neg", instruction, stream); break;
   case X86_INST_NOT: print_unary_instruction("not", instruction, stream); break;
+  case X86_INST_PUSH:
+    print_unary_instruction("not", instruction, stream);
+    break;
   case X86_INST_ADD:
     print_binary_instruction("add", instruction, stream);
     break;
@@ -186,6 +200,10 @@ void x86_print_instruction(X86Instruction instruction, FILE* stream)
                   instruction.label.start);
     break;
   }
+  case X86_INST_CALL:
+    (void)fprintf(stream, "  call   %.*s", (int)instruction.label.size,
+                  instruction.label.start);
+    break;
   }
 }
 
@@ -208,8 +226,8 @@ void x86_dump_assembly(const X86Program* program, FILE* stream)
   (void)fputs(".intel_syntax noprefix\n", stream);
 
   for (size_t i = 0; i < program->function_count; ++i) {
-    (void)fprintf(stream, ".globl %.*s\n", (int)program->functions->name.size,
-                  program->functions->name.start);
+    (void)fprintf(stream, ".globl %.*s\n", (int)program->functions[i].name.size,
+                  program->functions[i].name.start);
     dump_x86_function(&program->functions[i], stream);
   }
 

@@ -19,20 +19,21 @@ void push_instruction(X86InstructionVector* instructions,
                       X86Instruction instruction);
 
 #define X86_UNARY_INSTRUCTION_CASES                                            \
-  case X86_INST_NEG:                                                           \
-  case X86_INST_NOT:                                                           \
-  case X86_INST_IDIV
+  case X86_INST_NEG: [[fallthrough]];                                          \
+  case X86_INST_NOT: [[fallthrough]];                                          \
+  case X86_INST_IDIV: [[fallthrough]];                                         \
+  case X86_INST_PUSH
 
 #define X86_BINARY_INSTRUCTION_CASES                                           \
-  case X86_INST_MOV:                                                           \
-  case X86_INST_ADD:                                                           \
-  case X86_INST_SUB:                                                           \
-  case X86_INST_IMUL:                                                          \
-  case X86_INST_AND:                                                           \
-  case X86_INST_OR:                                                            \
-  case X86_INST_XOR:                                                           \
-  case X86_INST_SHL:                                                           \
-  case X86_INST_SAR:                                                           \
+  case X86_INST_MOV: [[fallthrough]];                                          \
+  case X86_INST_ADD: [[fallthrough]];                                          \
+  case X86_INST_SUB: [[fallthrough]];                                          \
+  case X86_INST_IMUL: [[fallthrough]];                                         \
+  case X86_INST_AND: [[fallthrough]];                                          \
+  case X86_INST_OR: [[fallthrough]];                                           \
+  case X86_INST_XOR: [[fallthrough]];                                          \
+  case X86_INST_SHL: [[fallthrough]];                                          \
+  case X86_INST_SAR: [[fallthrough]];                                          \
   case X86_INST_CMP
 
 // =============================================================================
@@ -46,6 +47,11 @@ static inline X86Operand immediate_operand(int32_t value)
 static inline X86Operand register_operand(X86Register reg)
 {
   return (X86Operand){.typ = X86_OPERAND_REGISTER, .reg = reg};
+}
+
+static inline X86Operand pseudo_operand(StringView name)
+{
+  return (X86Operand){.typ = X86_OPERAND_PSEUDO, .pseudo = name};
 }
 
 static inline X86Operand stack_operand(size_t offset)

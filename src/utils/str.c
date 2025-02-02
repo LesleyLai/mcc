@@ -46,7 +46,6 @@ StringBuffer string_buffer_from_view(StringView source, Arena* allocator)
   };
   memcpy(buffer.data_, source.start, source.size);
   buffer.data_[source.size] = '\0';
-
   return buffer;
 }
 

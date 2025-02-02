@@ -33,7 +33,8 @@ static bool is_binary(X86InstructionType typ)
   case X86_INST_JMP:
   case X86_INST_JMPCC:
   case X86_INST_SETCC:
-  case X86_INST_LABEL: return false;
+  case X86_INST_LABEL:
+  case X86_INST_CALL: return false;
   }
   MCC_UNREACHABLE();
 }
