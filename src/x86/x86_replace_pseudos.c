@@ -21,12 +21,12 @@ static intptr_t try_find_unique_name(const struct UniqueNameMap* map,
   return -1;
 }
 
-static size_t find_name_stack_offset(const struct UniqueNameMap* map,
-                                     StringView name)
+static intptr_t find_name_stack_offset(const struct UniqueNameMap* map,
+                                       StringView name)
 {
   const intptr_t index = try_find_unique_name(map, name);
   if (index < 0) { MCC_UNREACHABLE(); }
-  return (size_t)(index + 1) * 4;
+  return (index + 1) * 4;
 }
 
 static void add_unique_name(struct UniqueNameMap* unique_names, StringView name)

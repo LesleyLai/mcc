@@ -54,7 +54,7 @@ static inline X86Operand pseudo_operand(StringView name)
   return (X86Operand){.typ = X86_OPERAND_PSEUDO, .pseudo = name};
 }
 
-static inline X86Operand stack_operand(size_t offset)
+static inline X86Operand stack_operand(intptr_t offset)
 {
   return (X86Operand){.typ = X86_OPERAND_STACK, .stack = {.offset = offset}};
 }

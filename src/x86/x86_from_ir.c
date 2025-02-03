@@ -145,8 +145,14 @@ static void generate_call_instruction(X86InstructionVector* instructions,
   const uint32_t register_arg_count = arg_counts.register_count,
                  stack_arg_count = arg_counts.stack_count;
 
-  // TODO: handle more arguments
-  MCC_ASSERT(stack_arg_count == 0);
+  const uint32_t stack_padding = (stack_arg_count & 1) == 0 ? 0 : 8;
+  // Adjust stack alignment
+  if (stack_padding != 0) {
+    push_instruction(instructions,
+                     binary_instruction(X86_INST_SUB, X86_SZ_8,
+                                        register_operand(X86_REG_SP),
+                                        immediate_operand((int)stack_padding)));
+  }
 
   for (uint32_t i = 0; i < register_arg_count; ++i) {
     const X86Operand arg = x86_operand_from_ir(ir_instruction->call.args[i]);
@@ -154,6 +160,21 @@ static void generate_call_instruction(X86InstructionVector* instructions,
                      binary_instruction(X86_INST_MOV, X86_SZ_4,
                                         register_operand(arg_registers[i]),
                                         arg));
+  }
+
+  // Pass the remaining arguments to the stack in reverse order
+  for (uint32_t i = 0; i < stack_arg_count; ++i) {
+    const uint32_t stack_arg_index = stack_arg_count - i - 1;
+    const uint32_t arg_index = stack_arg_index + register_arg_count;
+
+    MCC_ASSERT(arg_index < ir_instruction->call.arg_count);
+
+    const X86Operand arg =
+        x86_operand_from_ir(ir_instruction->call.args[arg_index]);
+
+    // push <parameter>
+    push_instruction(instructions,
+                     unary_instruction(X86_INST_PUSH, X86_SZ_8, arg));
   }
 
   StringView function_name = ir_instruction->call.func_name;
@@ -168,6 +189,15 @@ static void generate_call_instruction(X86InstructionVector* instructions,
                                      .typ = X86_INST_CALL,
                                      .label = function_name,
                                  });
+
+  // Adjust stack pointer
+  const uint32_t bytes_to_remove = 8 * stack_arg_count + stack_padding;
+  if (bytes_to_remove != 0) {
+    push_instruction(
+        instructions,
+        binary_instruction(X86_INST_ADD, X86_SZ_8, register_operand(X86_REG_SP),
+                           immediate_operand((int)bytes_to_remove)));
+  }
 
   const X86Operand dest = x86_operand_from_ir(ir_instruction->call.dest);
   push_instruction(instructions,
@@ -190,14 +220,28 @@ X86FunctionDef x86_function_from_ir(const IRFunctionDef* ir_function,
   const uint32_t register_param_count = param_counts.register_count,
                  stack_param_count = param_counts.stack_count;
 
-  // TODO: handle more parameters
-  MCC_ASSERT(stack_param_count == 0);
   for (uint32_t i = 0; i < register_param_count; ++i) {
     // move <parameter>, <arg register>
     push_instruction(&instructions,
                      binary_instruction(X86_INST_MOV, X86_SZ_4,
                                         pseudo_operand(ir_function->params[i]),
                                         register_operand(arg_registers[i])));
+  }
+
+  // Pass the remaining arguments to the stack in reverse order
+  for (uint32_t i = 0; i < stack_param_count; ++i) {
+    const uint32_t stack_param_index = stack_param_count - i - 1;
+    const uint32_t param_index = stack_param_index + register_param_count;
+
+    MCC_ASSERT(param_index < ir_function->param_count);
+
+    // move <parameter>, <arg stack location>
+    push_instruction(
+        &instructions,
+        binary_instruction(
+            X86_INST_MOV, X86_SZ_4,
+            pseudo_operand(ir_function->params[param_index]),
+            stack_operand(-(intptr_t)(stack_param_index * 8 + 16))));
   }
 
   for (size_t i = 0; i < ir_function->instruction_count; ++i) {
@@ -305,10 +349,10 @@ X86FunctionDef x86_function_from_ir(const IRFunctionDef* ir_function,
 
       if (next_instruction != nullptr && next_instruction->typ == IR_LABEL) {
         if (str_eq(next_instruction->label, if_label)) {
-          // If the if_label is directly follow this instruction
+          // If if_label is directly follow this instruction
           skip_if = true;
         } else if (str_eq(next_instruction->label, else_label)) {
-          // If the else_label is directly follow this instruction
+          // If else_label is directly follow this instruction
           skip_else = true;
         }
       }

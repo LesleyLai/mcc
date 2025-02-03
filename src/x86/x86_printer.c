@@ -86,8 +86,15 @@ static void print_x86_operand(X86Operand operand, X86Size size, FILE* stream)
                   operand.pseudo.start);
     break;
   case X86_OPERAND_STACK:
-    (void)fprintf(stream, "%s [rbp-%li]", size_directive(size),
-                  operand.stack.offset);
+    if (operand.stack.offset > 0) {
+      (void)fprintf(stream, "%s [rbp-%li]", size_directive(size),
+                    operand.stack.offset);
+    } else if (operand.stack.offset < 0) {
+      (void)fprintf(stream, "%s [rbp+%li]", size_directive(size),
+                    -operand.stack.offset);
+    } else {
+      (void)fprintf(stream, "%s rbp", size_directive(size));
+    }
     break;
   }
 }
@@ -157,7 +164,7 @@ void x86_print_instruction(X86Instruction instruction, FILE* stream)
   case X86_INST_NEG: print_unary_instruction("neg", instruction, stream); break;
   case X86_INST_NOT: print_unary_instruction("not", instruction, stream); break;
   case X86_INST_PUSH:
-    print_unary_instruction("not", instruction, stream);
+    print_unary_instruction("push", instruction, stream);
     break;
   case X86_INST_ADD:
     print_binary_instruction("add", instruction, stream);

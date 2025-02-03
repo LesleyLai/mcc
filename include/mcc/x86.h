@@ -52,7 +52,7 @@ typedef enum X86OperandType {
 } X86OperandType;
 
 struct X86StackOperand {
-  size_t offset;
+  intptr_t offset;
 };
 
 struct X86Operand {
