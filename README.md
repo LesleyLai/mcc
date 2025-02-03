@@ -1,6 +1,6 @@
 # Mini C Compiler (MCC)
 
-Working-in-progress C compiler written in C. My goal is to make it able to self-host.
+Working-in-progress C compiler written in C23. My goal is to make it able to self-host.
 
 ## Status
 
@@ -54,4 +54,5 @@ Here are some useful resources consulted by me when writing this compiler
 
 - [Writing a C Compiler](https://norasandler.com/book/) book
 - Other small C compiler
-  implementations: [9cc](https://github.com/rui314/9cc) [chibicc](https://github.com/rui314/chibicc), [lacc](https://github.com/larmel/lacc), [cproc](https://github.com/michaelforney/cproc)
+  implementations: [9cc](https://github.com/rui314/9cc), [chibicc](https://github.com/rui314/chibicc), [lacc](https://github.com/larmel/lacc),
+  and [cproc](https://github.com/michaelforney/cproc)

@@ -59,9 +59,9 @@ static void replace_pseudo_register(struct UniqueNameMap* unique_names,
 // Replace all pseudo-registers with stack space
 // returns the stack space needed
 intptr_t replace_pseudo_registers(X86FunctionDef* function,
-                                  Arena* permanent_arena)
+                                  X86CodegenContext* context)
 {
-  struct UniqueNameMap unique_names = {.arena = permanent_arena};
+  struct UniqueNameMap unique_names = {.arena = context->permanent_arena};
 
   for (size_t i = 0; i < function->instruction_count; ++i) {
     X86Instruction* instruction = &function->instructions[i];

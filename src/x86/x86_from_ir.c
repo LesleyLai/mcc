@@ -1,23 +1,10 @@
 #include "x86_passes.h"
+#include "x86_symbols.h"
 
 #include <mcc/dynarray.h>
 #include <mcc/format.h>
 #include <mcc/ir.h>
 #include <mcc/prelude.h>
-
-static struct Symbols {
-  uint32_t length;
-  uint32_t capacity;
-  StringView* data;
-} symbols;
-
-static bool has_symbol(StringView name)
-{
-  for (uint32_t i = 0; i < symbols.length; ++i) {
-    if (str_eq(name, symbols.data[i])) return true;
-  }
-  return false;
-}
 
 static const X86Register arg_registers[] = {X86_REG_DI, X86_REG_SI, //
                                             X86_REG_DX, X86_REG_CX, //
@@ -151,7 +138,7 @@ static struct SplitResult count_register_stack_vars(uint32_t count)
 
 static void generate_call_instruction(X86InstructionVector* instructions,
                                       const IRInstruction* ir_instruction,
-                                      Arena* permanent_arena)
+                                      X86CodegenContext* context)
 {
   struct SplitResult arg_counts =
       count_register_stack_vars(ir_instruction->call.arg_count);
@@ -171,10 +158,10 @@ static void generate_call_instruction(X86InstructionVector* instructions,
 
   StringView function_name = ir_instruction->call.func_name;
   // On Linux, external functions need to be postfixed with `@PLT`
-  if (!has_symbol(function_name)) {
+  if (!has_symbol(context->symbols, function_name)) {
     function_name =
-        allocate_printf(permanent_arena, "%.*s@PLT", (int)function_name.size,
-                        function_name.start);
+        allocate_printf(context->permanent_arena, "%.*s@PLT",
+                        (int)function_name.size, function_name.start);
   }
 
   push_instruction(instructions, (X86Instruction){
@@ -190,12 +177,13 @@ static void generate_call_instruction(X86InstructionVector* instructions,
 
 // First pass to generate assembly. Still need fixing later
 X86FunctionDef x86_function_from_ir(const IRFunctionDef* ir_function,
-                                    Arena* permanent_arena,
-                                    Arena* scratch_arena)
+                                    X86CodegenContext* context)
 {
-  X86InstructionVector instructions = {.arena = scratch_arena};
+  // We use scratch arena here because the instructions generated here will be
+  // rewritten
+  X86InstructionVector instructions = {.arena = &context->scratch_arena};
 
-  DYNARRAY_PUSH_BACK(&symbols, StringView, scratch_arena, ir_function->name);
+  add_symbol(context->symbols, ir_function->name, context->permanent_arena);
 
   struct SplitResult param_counts =
       count_register_stack_vars(ir_function->param_count);
@@ -345,7 +333,7 @@ X86FunctionDef x86_function_from_ir(const IRFunctionDef* ir_function,
                                       });
       break;
     case IR_CALL: {
-      generate_call_instruction(&instructions, ir_instruction, permanent_arena);
+      generate_call_instruction(&instructions, ir_instruction, context);
       break;
     }
     }

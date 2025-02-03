@@ -44,6 +44,8 @@ add_library(mcc_lib
         x86/x86_fix_instructions.c
         x86/x86_replace_pseudos.c
         x86/x86_from_ir.c
+        x86/x86_symbols.h
+        x86/x86_symbols.c
 )
 target_link_libraries(mcc_lib
         PUBLIC mcc::compiler_options

@@ -7,14 +7,22 @@
 
 struct IRFunctionDef;
 
+// Backend symbols
+typedef struct Symbols Symbols;
+
+typedef struct X86CodegenContext {
+  Arena* permanent_arena;
+  Arena scratch_arena;
+  Symbols* symbols;
+} X86CodegenContext;
+
 /// @brief Converts an IR function into an x86 function.
 ///
 /// This is the first pass in the x86 generation process.
 /// @note At this stage, the generated x86 function may still contain invalid
 /// instructions, as these are resolved in subsequent passes.
 X86FunctionDef x86_function_from_ir(const struct IRFunctionDef* ir_function,
-                                    Arena* permanent_arena,
-                                    Arena* scratch_arena);
+                                    X86CodegenContext* context);
 
 /// @brief Replaces all pseudo-registers in the x86 function with allocated
 /// stack space.
@@ -27,7 +35,7 @@ X86FunctionDef x86_function_from_ir(const struct IRFunctionDef* ir_function,
 /// will be replaced.
 /// @return The size of the stack needed for the function in bytes.
 intptr_t replace_pseudo_registers(X86FunctionDef* function,
-                                  Arena* permanent_arena);
+                                  X86CodegenContext* context);
 
 /// @brief Resolves invalid x86 instructions in the function.
 ///
@@ -42,6 +50,6 @@ intptr_t replace_pseudo_registers(X86FunctionDef* function,
 /// final function definition.
 ///
 void fix_invalid_instructions(X86FunctionDef* function, intptr_t stack_size,
-                              Arena* permanent_arena);
+                              X86CodegenContext* context);
 
 #endif // MCC_X86_PASSES_H

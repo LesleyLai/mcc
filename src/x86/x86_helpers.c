@@ -8,10 +8,31 @@ void push_instruction(X86InstructionVector* instructions,
                      instruction);
 }
 
+static bool is_unary(X86InstructionType typ)
+{
+  switch (typ) {
+  case x86_INST_INVALID:
+    MCC_UNREACHABLE();
+  X86_UNARY_INSTRUCTION_CASES:
+    return true;
+  X86_BINARY_INSTRUCTION_CASES:
+  case X86_INST_NOP:
+  case X86_INST_RET:
+  case X86_INST_CDQ:
+  case X86_INST_JMP:
+  case X86_INST_JMPCC:
+  case X86_INST_SETCC:
+  case X86_INST_LABEL:
+  case X86_INST_CALL: return false;
+  }
+  MCC_UNREACHABLE();
+}
+
 X86Instruction unary_instruction(X86InstructionType type, X86Size size,
                                  X86Operand op)
 {
-  // TODO: verify type
+  MCC_ASSERT_MSG(is_unary(type),
+                 "Can't construct unary instruction from non-unary type");
   return (X86Instruction){.typ = type,
                           .unary = {
                               .size = size,

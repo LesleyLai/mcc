@@ -106,9 +106,9 @@ static void fix_cmp_instruction(X86InstructionVector* new_instructions,
 }
 
 void fix_invalid_instructions(X86FunctionDef* function, intptr_t stack_size,
-                              Arena* permanent_arena)
+                              X86CodegenContext* context)
 {
-  X86InstructionVector new_instructions = {.arena = permanent_arena};
+  X86InstructionVector new_instructions = {.arena = context->permanent_arena};
 
   if (stack_size > 0) {
     push_instruction(&new_instructions,
