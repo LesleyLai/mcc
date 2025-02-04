@@ -18,7 +18,7 @@ struct ErrorVec {
 typedef struct Context {
   struct ErrorVec errors;
   Arena* permanent_arena;
-  const Scope* global_scope;
+  Scope* global_scope;
 } Context;
 
 #pragma region error reporter
@@ -103,7 +103,7 @@ static void report_conflicting_decl_type(FunctionDecl* decl, Context* context)
 {
   StringView msg =
       allocate_printf(context->permanent_arena, "conflicting types for '%.*s'",
-                      (int)decl->name.size, decl->name.start);
+                      (int)decl->name->name.size, decl->name->name.start);
   error_at(msg, decl->source_range, context);
 }
 
@@ -111,7 +111,7 @@ static void report_multiple_definition(FunctionDecl* decl, Context* context)
 {
   StringView msg =
       allocate_printf(context->permanent_arena, "multiple definition of '%.*s'",
-                      (int)decl->name.size, decl->name.start);
+                      (int)decl->name->name.size, decl->name->name.start);
   error_at(msg, decl->source_range, context);
 }
 #pragma endregion
@@ -124,21 +124,21 @@ static bool type_check_function_call(Expr* function_call, Context* context)
 {
   MCC_ASSERT(function_call->tag == EXPR_CALL);
 
-  Expr* function = function_call->call.function;
-  if (!type_check_expr(function, context)) { return false; }
+  Expr* function_expr = function_call->call.function;
+  if (!type_check_expr(function_expr, context)) { return false; }
 
-  if (function->type->tag != TYPE_FUNCTION) {
-    MCC_ASSERT(function->type != nullptr);
-    report_calling_noncallable(function, context);
+  if (function_expr->type->tag != TYPE_FUNCTION) {
+    MCC_ASSERT(function_expr->type != nullptr);
+    report_calling_noncallable(function_expr, context);
     return false;
   }
 
-  const FunctionType* function_type = (const FunctionType*)function->type;
+  const FunctionType* function_type = (const FunctionType*)function_expr->type;
 
   const uint32_t arg_count = function_call->call.arg_count;
   if (function_type->param_count != arg_count) {
-    report_arg_count_mismatch(function, function_type->param_count, arg_count,
-                              context);
+    report_arg_count_mismatch(function_expr, function_type->param_count,
+                              arg_count, context);
     return false;
   }
 
@@ -164,7 +164,6 @@ static bool type_check_expr(Expr* expr, Context* context)
   case EXPR_CONST: expr->type = typ_int; return true;
   case EXPR_VARIABLE:
     MCC_ASSERT(expr->variable->type != nullptr);
-
     expr->type = expr->variable->type;
     return true;
   case EXPR_UNARY:
@@ -299,6 +298,8 @@ static bool type_check_stmt(Stmt* stmt, Context* context)
   return true;
 }
 
+static bool type_check_function_decl(FunctionDecl* decl, Context* context);
+
 static bool type_check_block(Block* block, Context* context)
 {
   bool result = true;
@@ -309,41 +310,58 @@ static bool type_check_block(Block* block, Context* context)
       result &= type_check_stmt(&item->stmt, context);
       break;
     case BLOCK_ITEM_DECL:
-      if (!type_check_variable_decl(&item->decl, context)) { return false; }
+      switch (item->decl.tag) {
+      case DECL_INVALID: MCC_UNREACHABLE(); break;
+      case DECL_VAR:
+        if (!type_check_variable_decl(&item->decl.var, context)) {
+          return false;
+        }
+        break;
+      case DECL_FUNC:
+        MCC_ASSERT(item->decl.func != nullptr);
+        if (!type_check_function_decl(item->decl.func, context)) {
+          return false;
+        }
+        break;
+      }
       break;
     }
   }
   return result;
 }
 
-static void type_check_function_decl(FunctionDecl* decl, Context* context)
+static bool type_check_function_decl(FunctionDecl* decl, Context* context)
 {
-  Variable* function = lookup_variable(context->global_scope, decl->name);
-  if (function->type == nullptr) {
-    function->type =
+  StringView function_name = decl->name->name;
+  Identifier* function_ident = hashmap_lookup(&functions, function_name);
+
+  if (function_ident->type == nullptr) {
+    function_ident->type =
         func_type(typ_int, decl->params.length, context->permanent_arena);
   } else {
-    MCC_ASSERT(function->type->tag == TYPE_FUNCTION);
-    const FunctionType* function_type = (FunctionType*)function->type;
+    MCC_ASSERT(function_ident->type->tag == TYPE_FUNCTION);
+    const FunctionType* function_type = (FunctionType*)function_ident->type;
     if (function_type->return_type != typ_int ||
         function_type->param_count != decl->params.length) {
       report_conflicting_decl_type(decl, context);
+      return false;
     }
   }
 
   if (decl->body != nullptr) {
-    if (function->has_definition) {
+    if (function_ident->has_definition) {
       report_multiple_definition(decl, context);
-      return;
+      return false;
     }
-    function->has_definition = true;
+    function_ident->has_definition = true;
 
     for (uint32_t i = 0; i < decl->params.length; ++i) {
-      Variable* param = decl->params.data[i];
+      Identifier* param = decl->params.data[i];
       param->type = typ_int;
     }
-    type_check_block(decl->body, context);
+    if (!type_check_block(decl->body, context)) { return false; }
   }
+  return true;
 }
 
 ErrorsView type_check(TranslationUnit* ast, Arena* permanent_arena)

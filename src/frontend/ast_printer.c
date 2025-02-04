@@ -67,32 +67,32 @@ static void ast_print_expr(const Expr* expr, int indent)
   switch (expr->tag) {
   case EXPR_INVALID: MCC_UNREACHABLE();
   case EXPR_CONST:
-    printf("%.*sIntegerLiteral ", indent, "");
+    printf("%*sIntegerLiteral ", indent, "");
     print_source_range(expr->source_range);
     printf(" %i\n", expr->const_expr.val);
     break;
   case EXPR_UNARY:
-    printf("%.*sUnaryOPExpr ", indent, "");
+    printf("%*sUnaryOPExpr ", indent, "");
     print_source_range(expr->source_range);
     printf(" operator: %s\n", unary_op_name(expr->unary_op.unary_op_type));
     ast_print_expr(expr->unary_op.inner_expr, indent + 2);
     break;
   case EXPR_BINARY:
-    printf("%.*sBinaryOPExpr ", indent, "");
+    printf("%*sBinaryOPExpr ", indent, "");
     print_source_range(expr->source_range);
     printf(" operator: %s\n", binary_op_name(expr->binary_op.binary_op_type));
     ast_print_expr(expr->binary_op.lhs, indent + 2);
     ast_print_expr(expr->binary_op.rhs, indent + 2);
     break;
   case EXPR_VARIABLE:
-    printf("%.*sVariableExpr ", indent, "");
+    printf("%*sVariableExpr ", indent, "");
     print_source_range(expr->source_range);
     printf(" ");
     print_str(expr->variable->name);
     printf("\n");
     break;
   case EXPR_TERNARY:
-    printf("%.*sTernaryExpr ", indent, "");
+    printf("%*sTernaryExpr ", indent, "");
     print_source_range(expr->source_range);
     printf("\n");
     ast_print_expr(expr->ternary.cond, indent + 2);
@@ -101,7 +101,7 @@ static void ast_print_expr(const Expr* expr, int indent)
     printf("\n");
     break;
   case EXPR_CALL:
-    printf("%.*sCallExpr ", indent, "");
+    printf("%*sCallExpr ", indent, "");
     print_source_range(expr->source_range);
     printf("\n");
     ast_print_expr(expr->call.function, indent + 2);
@@ -132,13 +132,25 @@ static const char* string_from_stmt_tag(StmtTag stmt_tag)
   MCC_UNREACHABLE();
 }
 
-static void ast_print_decl(const VariableDecl* decl, int indent)
+static void ast_print_var_decl(const VariableDecl* decl, int indent)
 {
-  printf("%.*sVariableDecl ", indent, "");
+  printf("%*sVariableDecl ", indent, "");
+  print_source_range(decl->source_range);
   printf("int ");
   print_str(decl->name->name);
   printf("\n");
   if (decl->initializer) { ast_print_expr(decl->initializer, indent + 2); }
+}
+
+static void ast_print_function_decl(const FunctionDecl* decl, int indent);
+
+static void ast_print_decl(const Decl* decl, int indent)
+{
+  switch (decl->tag) {
+  case DECL_INVALID: MCC_UNREACHABLE(); break;
+  case DECL_VAR: ast_print_var_decl(&decl->var, indent); break;
+  case DECL_FUNC: ast_print_function_decl(decl->func, indent); break;
+  }
 }
 
 static void ast_print_nullable_expr(const Expr* expr, int indent)
@@ -146,13 +158,13 @@ static void ast_print_nullable_expr(const Expr* expr, int indent)
   if (expr != nullptr) {
     ast_print_expr(expr, indent);
   } else {
-    printf("%.*s<<null>>\n", indent, "");
+    printf("%*s<<null>>\n", indent, "");
   }
 }
 
 static void ast_print_stmt(const Stmt* stmt, int indent)
 {
-  printf("%.*s%s ", indent, "", string_from_stmt_tag(stmt->tag));
+  printf("%*s%s ", indent, "", string_from_stmt_tag(stmt->tag));
   print_source_range(stmt->source_range);
   printf("\n");
 
@@ -181,7 +193,7 @@ static void ast_print_stmt(const Stmt* stmt, int indent)
     switch (stmt->for_loop.init.tag) {
     case FOR_INIT_INVALID: MCC_UNREACHABLE();
     case FOR_INIT_DECL:
-      ast_print_decl(stmt->for_loop.init.decl, indent + 2);
+      ast_print_var_decl(stmt->for_loop.init.decl, indent + 2);
       break;
     case FOR_INIT_EXPR: {
       ast_print_nullable_expr(stmt->for_loop.init.expr, indent + 2);
@@ -221,10 +233,11 @@ static void ast_print_parameters(Parameters parameters)
     printf("(");
     for (uint32_t i = 0; i < parameters.length; ++i) {
       if (i > 0) { printf(", "); }
-      const Variable* param = parameters.data[i];
+      const Identifier* param = parameters.data[i];
       printf("int");
       if (param->name.size != 0) {
-        printf(" %.*s", (int)param->name.size, param->name.start);
+        printf(" ");
+        print_str(param->name);
       }
     }
     printf(")\"\n");
@@ -233,10 +246,10 @@ static void ast_print_parameters(Parameters parameters)
 
 static void ast_print_function_decl(const FunctionDecl* decl, int indent)
 {
-  printf("%.*sFunctionDecl ", indent, "");
+  printf("%*sFunctionDecl ", indent, "");
   print_source_range(decl->source_range);
   printf(" \"int ");
-  print_str(decl->name);
+  print_str(decl->name->name);
   ast_print_parameters(decl->params);
 
   if (decl->body) { ast_print_block(decl->body, indent + 2); }

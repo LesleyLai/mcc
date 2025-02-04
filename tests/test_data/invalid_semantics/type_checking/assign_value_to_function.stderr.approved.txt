@@ -1,0 +1,4 @@
+{{filename}}:3:5: Error: invalid operands to binary expression ('int(void)' and 'int')
+3 |     x = 3;
+  |     ^~~~~
+

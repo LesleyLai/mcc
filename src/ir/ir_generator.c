@@ -398,7 +398,7 @@ static IRValue emit_ir_instructions_from_expr(const Expr* expr,
   case EXPR_CALL: {
     Expr* function = expr->call.function;
     MCC_ASSERT(function->tag == EXPR_VARIABLE);
-    const StringView function_name = function->variable->rewrote_name;
+    const StringView function_name = function->variable->name;
 
     uint32_t arg_count = expr->call.arg_count;
     IRValue* args = ARENA_ALLOC_ARRAY(context->tu_context->permanent_arena,
@@ -455,7 +455,21 @@ emit_ir_instructions_from_block_item(const BlockItem* item,
     emit_ir_instructions_from_stmt(&stmt, context, break_info);
   } break;
   case BLOCK_ITEM_DECL:
-    emit_ir_instructions_from_decl(&item->decl, context);
+    switch (item->decl.tag) {
+    case DECL_INVALID: MCC_UNREACHABLE(); break;
+    case DECL_VAR:
+      emit_ir_instructions_from_decl(&item->decl.var, context);
+      break;
+    case DECL_FUNC:
+      if (item->decl.func->body != nullptr) {
+        Error error =
+            (Error){.msg = str("nested function definition is not permitted"),
+                    .range = item->decl.func->source_range};
+        DYNARRAY_PUSH_BACK(&context->tu_context->errors, Error,
+                           context->tu_context->permanent_arena, error);
+      }
+      break;
+    }
     break;
   }
 }
@@ -670,7 +684,6 @@ static IRFunctionDef generate_ir_function_def(const FunctionDecl* decl,
                                               IRGenTUContext* tu_context)
 
 {
-
   IRGenProceduralContext context =
       (IRGenProceduralContext){.tu_context = tu_context,
                                .instructions = {},
@@ -706,7 +719,7 @@ static IRFunctionDef generate_ir_function_def(const FunctionDecl* decl,
     parameters[i] = decl->params.data[i]->rewrote_name;
   }
 
-  return (IRFunctionDef){.name = decl->name,
+  return (IRFunctionDef){.name = decl->name->name,
                          .param_count = param_count,
                          .params = parameters,
                          .instruction_count = context.instructions.length,

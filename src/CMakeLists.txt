@@ -15,6 +15,7 @@ add_library(mcc_lib
         ${include_dir}/dynarray.h
         ${include_dir}/type.h
         ${include_dir}/sema.h
+        ${include_dir}/hash_table.h
 
         utils/format.c
         utils/str.c
@@ -22,6 +23,7 @@ add_library(mcc_lib
         utils/arena_vm.c
         utils/diagnostic.c
         utils/cli_args.c
+        utils/hash_table.c
 
         frontend/line_numbers.c
         frontend/lexer.c

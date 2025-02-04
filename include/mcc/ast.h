@@ -63,7 +63,7 @@ typedef enum BinaryOpType {
 } BinaryOpType;
 
 typedef struct Expr Expr;
-typedef struct Variable Variable; // identifier
+typedef struct Identifier Identifier; // identifier
 typedef struct Scope Scope;
 
 struct ConstExpr {
@@ -101,14 +101,15 @@ typedef struct Expr {
     struct ConstExpr const_expr;
     struct UnaryOpExpr unary_op;
     struct BinaryOpExpr binary_op;
-    const Variable* variable;
+    const Identifier* variable;
     struct TernaryExpr ternary;
     struct CallExpr call;
   };
 } Expr;
 
 typedef struct VariableDecl {
-  Variable* name;
+  SourceRange source_range;
+  Identifier* name;
   Expr* initializer; // An optional initializer
 } VariableDecl;
 
@@ -175,6 +176,32 @@ struct Stmt {
   };
 };
 
+typedef struct Parameters {
+  uint32_t length;
+  Identifier** data;
+} Parameters;
+
+typedef struct FunctionDecl {
+  SourceRange source_range;
+  Identifier* name;
+  Parameters params;
+  Block* body; // Optional
+} FunctionDecl;
+
+typedef enum DeclTag {
+  DECL_INVALID = 0,
+  DECL_VAR,
+  DECL_FUNC,
+} DeclTag;
+
+typedef struct Decl {
+  DeclTag tag;
+  union {
+    struct VariableDecl var;
+    struct FunctionDecl* func;
+  };
+} Decl;
+
 enum BlockItemTag {
   BLOCK_ITEM_STMT,
   BLOCK_ITEM_DECL,
@@ -184,26 +211,14 @@ typedef struct BlockItem {
   enum BlockItemTag tag;
   union {
     Stmt stmt;
-    VariableDecl decl;
+    Decl decl;
   };
 } BlockItem;
-
-typedef struct Parameters {
-  uint32_t length;
-  Variable** data;
-} Parameters;
-
-typedef struct FunctionDecl {
-  SourceRange source_range;
-  StringView name;
-  Parameters params;
-  Block* body; // Optional
-} FunctionDecl;
 
 typedef struct TranslationUnit {
   uint32_t decl_count;
   FunctionDecl** decls;
-  const Scope* global_scope;
+  Scope* global_scope;
 } TranslationUnit;
 
 void ast_print_translation_unit(const TranslationUnit* tu);

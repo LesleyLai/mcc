@@ -40,7 +40,6 @@ static LineNumTable create_line_num_table(StringView src,
                                           Arena* permanent_arena,
                                           Arena scratch_arena)
 {
-
   struct U32DynArray line_starts_temp = {};
   DYNARRAY_PUSH_BACK(&line_starts_temp, uint32_t, &scratch_arena, 0);
 

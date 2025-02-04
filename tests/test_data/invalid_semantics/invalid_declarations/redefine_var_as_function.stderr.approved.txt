@@ -1,0 +1,4 @@
+{{filename}}:4:7: Error: redefinition of 'foo' as different kind of symbol
+4 |   int foo(void);
+  |       ^~~
+

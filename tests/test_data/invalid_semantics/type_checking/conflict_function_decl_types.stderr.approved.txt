@@ -1,4 +1,4 @@
-{{filename}}:2:1: Error: conflicting types for 'foo'
+{{filename}}:2:5: Error: conflicting types for 'foo'
 2 | int foo(int x)
 3 | {
 4 |   return x;

@@ -1,0 +1,6 @@
+{{filename}}:3:7: Error: nested function definition is not permitted
+3 |   int foo(void)
+4 |   {
+5 |     return 1;
+6 |   }
+

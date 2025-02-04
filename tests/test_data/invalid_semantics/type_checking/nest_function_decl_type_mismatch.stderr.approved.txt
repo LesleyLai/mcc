@@ -1,0 +1,6 @@
+{{filename}}:6:5: Error: conflicting types for 'foo'
+6 | int foo(int x)
+7 | {
+8 |   return x + 42;
+9 | }
+
