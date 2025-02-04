@@ -21,8 +21,9 @@ typedef struct X86CodegenContext {
 /// This is the first pass in the x86 generation process.
 /// @note At this stage, the generated x86 function may still contain invalid
 /// instructions, as these are resolved in subsequent passes.
-X86FunctionDef x86_function_from_ir(const struct IRFunctionDef* ir_function,
-                                    X86CodegenContext* context);
+X86InstructionVector
+x86_from_ir_function(const struct IRFunctionDef* ir_function,
+                     X86CodegenContext* context);
 
 /// @brief Replaces all pseudo-registers in the x86 function with allocated
 /// stack space.
@@ -31,10 +32,10 @@ X86FunctionDef x86_function_from_ir(const struct IRFunctionDef* ir_function,
 /// required stack size for the function and updates the instructions to use
 /// stack slots instead of pseudo-registers.
 ///
-/// @param[inout] function Pointer to the x86 function whose pseudo-registers
+/// @param[inout] instructions Instructions whose pseudo-registers
 /// will be replaced.
 /// @return The size of the stack needed for the function in bytes.
-uint32_t replace_pseudo_registers(X86FunctionDef* function,
+uint32_t replace_pseudo_registers(X86InstructionVector* instructions,
                                   X86CodegenContext* context);
 
 /// @brief Resolves invalid x86 instructions in the function.
@@ -44,12 +45,14 @@ uint32_t replace_pseudo_registers(X86FunctionDef* function,
 /// single instruction. This pass ensures the function adheres to valid x86
 /// instruction formats.
 ///
-/// @param[inout] function Pointer to the x86 function to be fixed.
+/// @param instructions Instructions to be fixed.
 /// @param stack_size The size of the stack allocated for the function.
 /// @param[inout] permanent_arena Permanent memory arena used for storing the
 /// final function definition.
+/// @return A new dynamic array of instructions
 ///
-void fix_invalid_instructions(X86FunctionDef* function, uint32_t stack_size,
-                              X86CodegenContext* context);
+X86InstructionVector
+fix_invalid_instructions(X86InstructionVector* instructions,
+                         uint32_t stack_size, X86CodegenContext* context);
 
 #endif // MCC_X86_PASSES_H

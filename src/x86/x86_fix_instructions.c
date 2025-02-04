@@ -98,16 +98,17 @@ static void fix_cmp_instruction(X86InstructionVector* new_instructions,
   }
 }
 
-void fix_invalid_instructions(X86FunctionDef* function, uint32_t stack_size,
-                              X86CodegenContext* context)
+X86InstructionVector
+fix_invalid_instructions(X86InstructionVector* instructions,
+                         uint32_t stack_size, X86CodegenContext* context)
 {
-  X86InstructionVector new_instructions = {.arena = context->permanent_arena};
+  X86InstructionVector new_instructions = {.arena = &context->scratch_arena};
 
   if (stack_size > 0) {
     push_instruction(&new_instructions, allocate_stack(stack_size));
   }
-  for (size_t j = 0; j < function->instruction_count; ++j) {
-    X86Instruction instruction = function->instructions[j];
+  for (size_t i = 0; i < instructions->length; ++i) {
+    X86Instruction instruction = instructions->data[i];
 
     switch (instruction.typ) {
     case X86_INST_MOV:
@@ -137,6 +138,5 @@ void fix_invalid_instructions(X86FunctionDef* function, uint32_t stack_size,
     }
   }
 
-  function->instruction_count = new_instructions.length;
-  function->instructions = new_instructions.data;
+  return new_instructions;
 }

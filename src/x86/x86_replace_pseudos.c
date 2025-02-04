@@ -58,13 +58,13 @@ static void replace_pseudo_register(struct UniqueNameMap* unique_names,
 
 // Replace all pseudo-registers with stack space
 // returns the stack space needed
-uint32_t replace_pseudo_registers(X86FunctionDef* function,
+uint32_t replace_pseudo_registers(X86InstructionVector* instructions,
                                   X86CodegenContext* context)
 {
   struct UniqueNameMap unique_names = {.arena = context->permanent_arena};
 
-  for (size_t i = 0; i < function->instruction_count; ++i) {
-    X86Instruction* instruction = &function->instructions[i];
+  for (size_t i = 0; i < instructions->length; ++i) {
+    X86Instruction* instruction = &instructions->data[i];
     switch (instruction->typ) {
     case x86_INST_INVALID:
       MCC_UNREACHABLE();
@@ -89,8 +89,8 @@ uint32_t replace_pseudo_registers(X86FunctionDef* function,
     }
   }
 
-  for (size_t j = 0; j < function->instruction_count; ++j) {
-    X86Instruction* instruction = &function->instructions[j];
+  for (size_t j = 0; j < instructions->length; ++j) {
+    X86Instruction* instruction = &instructions->data[j];
     switch (instruction->typ) {
     case x86_INST_INVALID:
       MCC_UNREACHABLE();

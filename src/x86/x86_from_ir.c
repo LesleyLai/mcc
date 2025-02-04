@@ -190,8 +190,8 @@ static void push_call_instruction(X86InstructionVector* instructions,
 }
 
 // First pass to generate assembly. Still need fixing later
-X86FunctionDef x86_function_from_ir(const IRFunctionDef* ir_function,
-                                    X86CodegenContext* context)
+X86InstructionVector x86_from_ir_function(const IRFunctionDef* ir_function,
+                                          X86CodegenContext* context)
 {
   // We use scratch arena here because the instructions generated here will be
   // rewritten
@@ -359,7 +359,5 @@ X86FunctionDef x86_function_from_ir(const IRFunctionDef* ir_function,
     }
   }
 
-  return (X86FunctionDef){.name = ir_function->name,
-                          .instructions = instructions.data,
-                          .instruction_count = instructions.length};
+  return instructions;
 }
