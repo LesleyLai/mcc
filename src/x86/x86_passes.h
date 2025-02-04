@@ -34,7 +34,7 @@ X86FunctionDef x86_function_from_ir(const struct IRFunctionDef* ir_function,
 /// @param[inout] function Pointer to the x86 function whose pseudo-registers
 /// will be replaced.
 /// @return The size of the stack needed for the function in bytes.
-intptr_t replace_pseudo_registers(X86FunctionDef* function,
+uint32_t replace_pseudo_registers(X86FunctionDef* function,
                                   X86CodegenContext* context);
 
 /// @brief Resolves invalid x86 instructions in the function.
@@ -49,7 +49,7 @@ intptr_t replace_pseudo_registers(X86FunctionDef* function,
 /// @param[inout] permanent_arena Permanent memory arena used for storing the
 /// final function definition.
 ///
-void fix_invalid_instructions(X86FunctionDef* function, intptr_t stack_size,
+void fix_invalid_instructions(X86FunctionDef* function, uint32_t stack_size,
                               X86CodegenContext* context);
 
 #endif // MCC_X86_PASSES_H

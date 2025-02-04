@@ -11,7 +11,7 @@ static X86FunctionDef x86_generate_function(const IRFunctionDef* ir_function,
 {
   // passes to generate an x86 assembly function
   X86FunctionDef function = x86_function_from_ir(ir_function, context);
-  const intptr_t stack_size = replace_pseudo_registers(&function, context);
+  const uint32_t stack_size = replace_pseudo_registers(&function, context);
   fix_invalid_instructions(&function, stack_size, context);
 
   return function;

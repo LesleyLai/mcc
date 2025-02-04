@@ -67,4 +67,30 @@ X86Instruction unary_instruction(X86InstructionType type, X86Size size,
 X86Instruction binary_instruction(X86InstructionType type, X86Size size,
                                   X86Operand dest, X86Operand src);
 
+// Constructs an x86 mov instruction
+static inline X86Instruction mov(X86Size size, X86Operand dest, X86Operand src)
+{
+  return binary_instruction(X86_INST_MOV, size, dest, src);
+}
+
+// Constructs an x86 cmp instruction
+static inline X86Instruction cmp(X86Size size, X86Operand dest, X86Operand src)
+{
+  return binary_instruction(X86_INST_CMP, size, dest, src);
+}
+
+static inline X86Instruction allocate_stack(uint32_t size)
+{
+  return binary_instruction(X86_INST_SUB, X86_SZ_8,
+                            register_operand(X86_REG_SP),
+                            immediate_operand((int)size));
+}
+
+static inline X86Instruction deallocate_stack(uint32_t size)
+{
+  return binary_instruction(X86_INST_ADD, X86_SZ_8,
+                            register_operand(X86_REG_SP),
+                            immediate_operand((int)size));
+}
+
 #endif // MCC_X86_HELPERS_H

@@ -27,8 +27,7 @@ static void push_unary_instruction(X86InstructionVector* instructions,
   const X86Operand dst = x86_operand_from_ir(ir_instruction->operand1);
   const X86Operand src = x86_operand_from_ir(ir_instruction->operand2);
 
-  push_instruction(instructions,
-                   binary_instruction(X86_INST_MOV, X86_SZ_4, dst, src));
+  push_instruction(instructions, mov(X86_SZ_4, dst, src));
   push_instruction(instructions, unary_instruction(type, X86_SZ_4, dst));
 }
 
@@ -40,8 +39,7 @@ static void push_binary_instruction(X86InstructionVector* instructions,
   const X86Operand lhs = x86_operand_from_ir(ir_instruction->operand2);
   const X86Operand rhs = x86_operand_from_ir(ir_instruction->operand3);
 
-  push_instruction(instructions,
-                   binary_instruction(X86_INST_MOV, X86_SZ_4, dst, lhs));
+  push_instruction(instructions, mov(X86_SZ_4, dst, lhs));
   push_instruction(instructions, binary_instruction(type, X86_SZ_4, dst, rhs));
 }
 
@@ -54,8 +52,7 @@ static void push_div_mod_instruction(X86InstructionVector* instructions,
 
   // mov eax, <lhs>
   push_instruction(instructions,
-                   binary_instruction(X86_INST_MOV, X86_SZ_4,
-                                      register_operand(X86_REG_AX), lhs));
+                   mov(X86_SZ_4, register_operand(X86_REG_AX), lhs));
 
   // cdq
   push_instruction(instructions, (X86Instruction){.typ = X86_INST_CDQ});
@@ -68,12 +65,11 @@ static void push_div_mod_instruction(X86InstructionVector* instructions,
   // if mod: mov <dst>, edx
   const X86Operand src =
       register_operand(ir_instruction->typ == IR_DIV ? X86_REG_AX : X86_REG_DX);
-  push_instruction(instructions,
-                   binary_instruction(X86_INST_MOV, X86_SZ_4, dst, src));
+  push_instruction(instructions, mov(X86_SZ_4, dst, src));
 }
 
-static void generate_comparison_instruction(X86InstructionVector* instructions,
-                                            const IRInstruction* ir_instruction)
+static void push_comparison_instruction(X86InstructionVector* instructions,
+                                        const IRInstruction* ir_instruction)
 {
   const X86Operand dest = x86_operand_from_ir(ir_instruction->operand1);
   const X86Operand lhs = x86_operand_from_ir(ir_instruction->operand2);
@@ -91,13 +87,10 @@ static void generate_comparison_instruction(X86InstructionVector* instructions,
   }
 
   // mov dest, 0
-  push_instruction(
-      instructions,
-      binary_instruction(X86_INST_MOV, X86_SZ_4, dest, immediate_operand(0)));
+  push_instruction(instructions, mov(X86_SZ_4, dest, immediate_operand(0)));
 
   // cmp lhs, rhs
-  push_instruction(instructions,
-                   binary_instruction(X86_INST_CMP, X86_SZ_4, lhs, rhs));
+  push_instruction(instructions, cmp(X86_SZ_4, lhs, rhs));
 
   // setcc dest
   push_instruction(instructions,
@@ -136,9 +129,9 @@ static struct SplitResult count_register_stack_vars(uint32_t count)
   };
 }
 
-static void generate_call_instruction(X86InstructionVector* instructions,
-                                      const IRInstruction* ir_instruction,
-                                      X86CodegenContext* context)
+static void push_call_instruction(X86InstructionVector* instructions,
+                                  const IRInstruction* ir_instruction,
+                                  X86CodegenContext* context)
 {
   struct SplitResult arg_counts =
       count_register_stack_vars(ir_instruction->call.arg_count);
@@ -148,18 +141,13 @@ static void generate_call_instruction(X86InstructionVector* instructions,
   const uint32_t stack_padding = (stack_arg_count & 1) == 0 ? 0 : 8;
   // Adjust stack alignment
   if (stack_padding != 0) {
-    push_instruction(instructions,
-                     binary_instruction(X86_INST_SUB, X86_SZ_8,
-                                        register_operand(X86_REG_SP),
-                                        immediate_operand((int)stack_padding)));
+    push_instruction(instructions, allocate_stack(stack_padding));
   }
 
   for (uint32_t i = 0; i < register_arg_count; ++i) {
     const X86Operand arg = x86_operand_from_ir(ir_instruction->call.args[i]);
     push_instruction(instructions,
-                     binary_instruction(X86_INST_MOV, X86_SZ_4,
-                                        register_operand(arg_registers[i]),
-                                        arg));
+                     mov(X86_SZ_4, register_operand(arg_registers[i]), arg));
   }
 
   // Pass the remaining arguments to the stack in reverse order
@@ -193,16 +181,12 @@ static void generate_call_instruction(X86InstructionVector* instructions,
   // Adjust stack pointer
   const uint32_t bytes_to_remove = 8 * stack_arg_count + stack_padding;
   if (bytes_to_remove != 0) {
-    push_instruction(
-        instructions,
-        binary_instruction(X86_INST_ADD, X86_SZ_8, register_operand(X86_REG_SP),
-                           immediate_operand((int)bytes_to_remove)));
+    push_instruction(instructions, deallocate_stack(bytes_to_remove));
   }
 
   const X86Operand dest = x86_operand_from_ir(ir_instruction->call.dest);
   push_instruction(instructions,
-                   binary_instruction(X86_INST_MOV, X86_SZ_4, dest,
-                                      register_operand(X86_REG_AX)));
+                   mov(X86_SZ_4, dest, register_operand(X86_REG_AX)));
 }
 
 // First pass to generate assembly. Still need fixing later
@@ -223,9 +207,8 @@ X86FunctionDef x86_function_from_ir(const IRFunctionDef* ir_function,
   for (uint32_t i = 0; i < register_param_count; ++i) {
     // move <parameter>, <arg register>
     push_instruction(&instructions,
-                     binary_instruction(X86_INST_MOV, X86_SZ_4,
-                                        pseudo_operand(ir_function->params[i]),
-                                        register_operand(arg_registers[i])));
+                     mov(X86_SZ_4, pseudo_operand(ir_function->params[i]),
+                         register_operand(arg_registers[i])));
   }
 
   // Pass the remaining arguments to the stack in reverse order
@@ -238,9 +221,7 @@ X86FunctionDef x86_function_from_ir(const IRFunctionDef* ir_function,
     // move <parameter>, <arg stack location>
     push_instruction(
         &instructions,
-        binary_instruction(
-            X86_INST_MOV, X86_SZ_4,
-            pseudo_operand(ir_function->params[param_index]),
+        mov(X86_SZ_4, pseudo_operand(ir_function->params[param_index]),
             stack_operand(-(intptr_t)(stack_param_index * 8 + 16))));
   }
 
@@ -251,8 +232,7 @@ X86FunctionDef x86_function_from_ir(const IRFunctionDef* ir_function,
     case IR_RETURN: {
       // move eax, <op>
       push_instruction(&instructions,
-                       binary_instruction(
-                           X86_INST_MOV, X86_SZ_4, register_operand(X86_REG_AX),
+                       mov(X86_SZ_4, register_operand(X86_REG_AX),
                            x86_operand_from_ir(ir_instruction->operand1)));
 
       push_instruction(&instructions, (X86Instruction){.typ = X86_INST_RET});
@@ -262,8 +242,7 @@ X86FunctionDef x86_function_from_ir(const IRFunctionDef* ir_function,
       X86Operand dest = x86_operand_from_ir(ir_instruction->operand1);
       X86Operand src = x86_operand_from_ir(ir_instruction->operand2);
       // mov dest src
-      push_instruction(&instructions,
-                       binary_instruction(X86_INST_MOV, X86_SZ_4, dest, src));
+      push_instruction(&instructions, mov(X86_SZ_4, dest, src));
     } break;
     case IR_NEG:
       push_unary_instruction(&instructions, X86_INST_NEG, ir_instruction);
@@ -276,12 +255,10 @@ X86FunctionDef x86_function_from_ir(const IRFunctionDef* ir_function,
       X86Operand src = x86_operand_from_ir(ir_instruction->operand2);
       X86Operand zero = immediate_operand(0);
       // mov dest 0
-      push_instruction(&instructions,
-                       binary_instruction(X86_INST_MOV, X86_SZ_4, dest, zero));
+      push_instruction(&instructions, mov(X86_SZ_4, dest, zero));
 
       // cmp src, 0
-      push_instruction(&instructions,
-                       binary_instruction(X86_INST_CMP, X86_SZ_4, src, zero));
+      push_instruction(&instructions, cmp(X86_SZ_4, src, zero));
 
       // sete dest
       push_instruction(
@@ -323,7 +300,7 @@ X86FunctionDef x86_function_from_ir(const IRFunctionDef* ir_function,
     case IR_LESS_EQUAL:
     case IR_GREATER:
     case IR_GREATER_EQUAL:
-      generate_comparison_instruction(&instructions, ir_instruction);
+      push_comparison_instruction(&instructions, ir_instruction);
       break;
     case IR_JMP:
       push_instruction(&instructions, (X86Instruction){
@@ -338,8 +315,7 @@ X86FunctionDef x86_function_from_ir(const IRFunctionDef* ir_function,
 
       // cmp cond, 0
       push_instruction(&instructions,
-                       binary_instruction(X86_INST_CMP, X86_SZ_4, cond,
-                                          immediate_operand(0)));
+                       cmp(X86_SZ_4, cond, immediate_operand(0)));
 
       const IRInstruction* next_instruction =
           get_instruction(ir_function, i + 1);
@@ -377,7 +353,7 @@ X86FunctionDef x86_function_from_ir(const IRFunctionDef* ir_function,
                                       });
       break;
     case IR_CALL: {
-      generate_call_instruction(&instructions, ir_instruction, context);
+      push_call_instruction(&instructions, ir_instruction, context);
       break;
     }
     }
