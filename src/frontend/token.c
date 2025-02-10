@@ -75,7 +75,6 @@ static const char* token_type_string(TokenTag type)
 void print_tokens(const char* src, const Tokens* tokens,
                   const LineNumTable* line_num_table)
 {
-  // TODO: fix this
   for (uint32_t i = 0; i < tokens->token_count; ++i) {
     const Token token = get_token(tokens, i);
 

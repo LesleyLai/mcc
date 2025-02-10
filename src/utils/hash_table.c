@@ -33,9 +33,9 @@ static HashNode** hashmap_lookup_node(HashMap* map, StringView key)
   return node;
 }
 
-void* hashmap_lookup(const HashMap* map, StringView key)
+void* hashmap_lookup(HashMap map, StringView key)
 {
-  HashNode** node_ptr = hashmap_lookup_node((HashMap*)map, key);
+  HashNode** node_ptr = hashmap_lookup_node(&map, key);
   if (*node_ptr == nullptr) { return nullptr; }
   return (*node_ptr)->value_ptr;
 }

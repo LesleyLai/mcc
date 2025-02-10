@@ -21,20 +21,20 @@ TEST_CASE("Hash Map", "[hash_map]")
   *value_ptr2 = 11;
   REQUIRE(hashmap_try_insert(&map, str("11"), value_ptr2, &arena) == true);
 
-  int* result = (int*)hashmap_lookup(&map, str("2"));
+  int* result = (int*)hashmap_lookup(map, str("2"));
   REQUIRE(result == nullptr);
 
-  result = (int*)hashmap_lookup(&map, str("42"));
+  result = (int*)hashmap_lookup(map, str("42"));
   REQUIRE(result != nullptr);
   REQUIRE(*result == 42);
 
-  result = (int*)hashmap_lookup(&map, str("11"));
+  result = (int*)hashmap_lookup(map, str("11"));
   REQUIRE(result != nullptr);
   REQUIRE(*result == 11);
 
   // try insert will not overwrite the entry
   REQUIRE(hashmap_try_insert(&map, str("42"), value_ptr2, &arena) == false);
-  result = (int*)hashmap_lookup(&map, str("42"));
+  result = (int*)hashmap_lookup(map, str("42"));
   REQUIRE(result != nullptr);
   REQUIRE(*result == 42);
 }

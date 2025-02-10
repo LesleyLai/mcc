@@ -20,7 +20,7 @@ Scope* new_scope(Scope* parent, Arena* arena)
 
 Identifier* lookup_identifier(const Scope* scope, StringView name)
 {
-  Identifier* identifier = hashmap_lookup(&scope->identifiers, name);
+  Identifier* identifier = hashmap_lookup(scope->identifiers, name);
   if (identifier != nullptr) return identifier;
   if (scope->parent == nullptr) return nullptr;
 
@@ -31,7 +31,7 @@ Identifier* add_identifier(Scope* scope, StringView name, IdentifierKind kind,
                            Arena* arena)
 {
   // check variable in current scope
-  if (hashmap_lookup(&scope->identifiers, name) != nullptr) { return nullptr; }
+  if (hashmap_lookup(scope->identifiers, name) != nullptr) { return nullptr; }
 
   // lookup variable in parent scopes
   const Identifier* parent_variable = nullptr;

@@ -334,7 +334,7 @@ static bool type_check_function_decl(FunctionDecl* decl, Context* context)
 {
   StringView function_name = decl->name->name;
   Identifier* function_ident =
-      hashmap_lookup(&context->functions, function_name);
+      hashmap_lookup(context->functions, function_name);
 
   if (function_ident->type == nullptr) {
     function_ident->type =

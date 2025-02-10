@@ -344,8 +344,6 @@ static Expr* parse_unary_op(Parser* parser, Scope* scope)
   // Inner expression
   Expr* expr = parse_precedence(parser, PREC_UNARY, scope);
 
-  // TODO: type check
-
   // build result
   // TODO: better way to handle the case where expr == NULL
   SourceRange result_source_range =
@@ -414,8 +412,6 @@ static Expr* parse_binary_op(Parser* parser, Expr* lhs_expr,
       scope);
 
   BinaryOpType binary_op_type = binop_type_from_token_type(operator_type);
-
-  // TODO: type check
 
   // build result
   const SourceRange result_source_range =

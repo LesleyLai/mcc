@@ -10,8 +10,8 @@ struct HashMap {
   struct HashNode* root;
 };
 
-// Returns a pointer to value if the key if found, or nullptr otherwise
-void* hashmap_lookup(const HashMap* hashMap, StringView key);
+// Returns a pointer to value if the key is found, or nullptr otherwise
+void* hashmap_lookup(HashMap hashMap, StringView key);
 
 /*
  * Attempts to insert a key-value pair into the hash map.
