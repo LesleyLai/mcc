@@ -13,6 +13,8 @@ uint64_t hash64(StringView s)
   return h;
 }
 
+typedef struct HashNode HashNode;
+
 struct HashNode {
   HashNode* child[4];
   StringView key;
@@ -20,9 +22,9 @@ struct HashNode {
 };
 
 // Returns the Node that contains the value pointer, or nullptr otherwise
-static HashNode** hashmap_lookup_node(HashMap* table, StringView key)
+static HashNode** hashmap_lookup_node(HashMap* map, StringView key)
 {
-  HashNode** node = &table->root;
+  HashNode** node = &map->root;
 
   for (uint64_t h = hash64(key); *node != nullptr; h <<= 2) {
     if (str_eq(key, (*node)->key)) { return node; }
@@ -31,21 +33,21 @@ static HashNode** hashmap_lookup_node(HashMap* table, StringView key)
   return node;
 }
 
-void* hashmap_lookup(const HashMap* table, StringView key)
+void* hashmap_lookup(const HashMap* map, StringView key)
 {
-  HashNode** node_ptr = hashmap_lookup_node((HashMap*)table, key);
+  HashNode** node_ptr = hashmap_lookup_node((HashMap*)map, key);
   if (*node_ptr == nullptr) { return nullptr; }
   return (*node_ptr)->value_ptr;
 }
 
-void hashmap_insert(HashMap* table, StringView key, void* value_ptr,
-                    Arena* arena)
+bool hashmap_try_insert(HashMap* map, StringView key, void* value_ptr,
+                        Arena* arena)
 {
-  HashNode** node_ptr = hashmap_lookup_node(table, key);
+  HashNode** node_ptr = hashmap_lookup_node(map, key);
+  if (*node_ptr != nullptr) { return false; }
 
-  MCC_ASSERT_MSG(*node_ptr == nullptr, "Overwrite hash table entry!");
-
-  MCC_ASSERT(arena != nullptr);
   *node_ptr = ARENA_ALLOC_OBJECT(arena, HashNode);
   **node_ptr = (HashNode){.key = key, .value_ptr = value_ptr};
+
+  return true;
 }

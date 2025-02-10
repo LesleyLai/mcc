@@ -916,10 +916,8 @@ static FunctionDecl* parse_function_decl(Parser* parser, Token name_token,
     }
   }
 
-  if (hashmap_lookup(&parser->functions, name) == nullptr) {
-    hashmap_insert(&parser->functions, name, function_ident,
-                   parser->permanent_arena);
-  }
+  hashmap_try_insert(&parser->functions, name, function_ident,
+                     parser->permanent_arena);
 
   Scope* function_scope =
       new_scope(parser->global_scope, parser->permanent_arena);

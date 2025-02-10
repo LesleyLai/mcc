@@ -58,6 +58,8 @@ Identifier* add_identifier(Scope* scope, StringView name, IdentifierKind kind,
     };
   }
 
-  hashmap_insert(&scope->identifiers, name, variable, arena);
+  const bool insert_succeed =
+      hashmap_try_insert(&scope->identifiers, name, variable, arena);
+  MCC_ASSERT(insert_succeed);
   return variable;
 }

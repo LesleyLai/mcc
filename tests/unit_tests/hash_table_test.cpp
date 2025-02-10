@@ -7,28 +7,34 @@ extern "C" {
 
 #include "arenas.hpp"
 
-TEST_CASE("Hash Table", "[hash_table]")
+TEST_CASE("Hash Map", "[hash_map]")
 {
   Arena arena = get_scratch_arena();
 
-  HashMap table = HashMap{.root = nullptr};
+  HashMap map = HashMap{.root = nullptr};
 
   int* value_ptr = ARENA_ALLOC_OBJECT(&arena, int);
   *value_ptr = 42;
-  hashmap_insert(&table, str("42"), value_ptr, &arena);
+  REQUIRE(hashmap_try_insert(&map, str("42"), value_ptr, &arena) == true);
 
   int* value_ptr2 = ARENA_ALLOC_OBJECT(&arena, int);
   *value_ptr2 = 11;
-  hashmap_insert(&table, str("11"), value_ptr2, &arena);
+  REQUIRE(hashmap_try_insert(&map, str("11"), value_ptr2, &arena) == true);
 
-  void* result = hashmap_lookup(&table, str("2"));
-  MCC_ASSERT(result == nullptr);
+  int* result = (int*)hashmap_lookup(&map, str("2"));
+  REQUIRE(result == nullptr);
 
-  int* result2 = (int*)hashmap_lookup(&table, str("42"));
-  MCC_ASSERT(result2 != nullptr);
-  MCC_ASSERT(*result2 == 42);
+  result = (int*)hashmap_lookup(&map, str("42"));
+  REQUIRE(result != nullptr);
+  REQUIRE(*result == 42);
 
-  int* result3 = (int*)hashmap_lookup(&table, str("11"));
-  MCC_ASSERT(result3 != nullptr);
-  MCC_ASSERT(*result3 == 11);
+  result = (int*)hashmap_lookup(&map, str("11"));
+  REQUIRE(result != nullptr);
+  REQUIRE(*result == 11);
+
+  // try insert will not overwrite the entry
+  REQUIRE(hashmap_try_insert(&map, str("42"), value_ptr2, &arena) == false);
+  result = (int*)hashmap_lookup(&map, str("42"));
+  REQUIRE(result != nullptr);
+  REQUIRE(*result == 42);
 }
