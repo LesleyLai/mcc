@@ -8,8 +8,6 @@ struct Scope {
   struct Scope* parent;
 };
 
-HashMap functions;
-
 Scope* new_scope(Scope* parent, Arena* arena)
 {
   struct Scope* map = ARENA_ALLOC_OBJECT(arena, Scope);

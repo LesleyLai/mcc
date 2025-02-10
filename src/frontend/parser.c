@@ -30,6 +30,7 @@ typedef struct Parser {
   struct ErrorVec errors;
 
   struct Scope* global_scope;
+  HashMap functions;
 } Parser;
 
 #pragma region source range operations
@@ -915,8 +916,9 @@ static FunctionDecl* parse_function_decl(Parser* parser, Token name_token,
     }
   }
 
-  if (hashmap_lookup(&functions, name) == nullptr) {
-    hashmap_insert(&functions, name, function_ident, parser->permanent_arena);
+  if (hashmap_lookup(&parser->functions, name) == nullptr) {
+    hashmap_insert(&parser->functions, name, function_ident,
+                   parser->permanent_arena);
   }
 
   Scope* function_scope =
@@ -981,6 +983,7 @@ static TranslationUnit* parse_translation_unit(Parser* parser)
       .decl_count = decl_count,
       .decls = decls,
       .global_scope = parser->global_scope,
+      .functions = parser->functions,
   };
   parse_consume(parser, TOKEN_EOF, "Expect end of the file");
 
@@ -990,14 +993,12 @@ static TranslationUnit* parse_translation_unit(Parser* parser)
 ParseResult parse(const char* src, Tokens tokens, Arena* permanent_arena,
                   Arena scratch_arena)
 {
-  Scope* global_scope = new_scope(nullptr, permanent_arena);
-  functions = (HashMap){};
-
   Parser parser = {.src = src,
                    .tokens = tokens,
                    .permanent_arena = permanent_arena,
                    .scratch_arena = scratch_arena,
-                   .global_scope = global_scope};
+                   .global_scope = new_scope(nullptr, permanent_arena),
+                   .functions = (HashMap){}};
 
   TranslationUnit* tu = parse_translation_unit(&parser);
 

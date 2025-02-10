@@ -1,6 +1,7 @@
 #ifndef MCC_AST_H
 #define MCC_AST_H
 
+#include "hash_table.h"
 #include "source_location.h"
 #include "str.h"
 #include "type.h"
@@ -219,6 +220,11 @@ typedef struct TranslationUnit {
   uint32_t decl_count;
   FunctionDecl** decls;
   Scope* global_scope;
+
+  // Besides stored in the scopes, the identifiers of functions in a translation
+  // unit are also refered to in a separate hash table. This is useful because
+  // each named only map to one instance of a function no matter the scope
+  HashMap functions;
 } TranslationUnit;
 
 void ast_print_translation_unit(const TranslationUnit* tu);

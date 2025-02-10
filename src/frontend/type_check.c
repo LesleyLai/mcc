@@ -18,7 +18,7 @@ struct ErrorVec {
 typedef struct Context {
   struct ErrorVec errors;
   Arena* permanent_arena;
-  Scope* global_scope;
+  HashMap functions;
 } Context;
 
 #pragma region error reporter
@@ -333,7 +333,8 @@ static bool type_check_block(Block* block, Context* context)
 static bool type_check_function_decl(FunctionDecl* decl, Context* context)
 {
   StringView function_name = decl->name->name;
-  Identifier* function_ident = hashmap_lookup(&functions, function_name);
+  Identifier* function_ident =
+      hashmap_lookup(&context->functions, function_name);
 
   if (function_ident->type == nullptr) {
     function_ident->type =
@@ -367,7 +368,7 @@ static bool type_check_function_decl(FunctionDecl* decl, Context* context)
 ErrorsView type_check(TranslationUnit* ast, Arena* permanent_arena)
 {
   Context context = {.permanent_arena = permanent_arena,
-                     .global_scope = ast->global_scope};
+                     .functions = ast->functions};
 
   for (uint32_t i = 0; i < ast->decl_count; ++i) {
     type_check_function_decl(ast->decls[i], &context);
