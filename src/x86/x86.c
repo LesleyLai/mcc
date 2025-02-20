@@ -31,7 +31,7 @@ static X86FunctionDef x86_generate_function(const IRFunctionDef* ir_function,
   context->scratch_arena = old_scratch_arena;
 
   return (X86FunctionDef){
-      .name = ir_function->name,
+      .name = get_ir_function_name(ir_function),
       .instructions = instruction_buffer,
       .instruction_count = fixed_instructions.length,
   };

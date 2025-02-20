@@ -25,13 +25,14 @@ typedef struct IRProgram {
 } IRProgram;
 
 typedef struct IRFunctionDef {
-  StringView name;
-  uint32_t instruction_count;
   uint32_t param_count;
-
-  struct IRInstruction* instructions;
   StringView* params;
+  uint32_t block_count;
+  struct IRBasicBlock** blocks;
 } IRFunctionDef;
+
+// The name of a function is just the name of its fjrst basic block
+StringView get_ir_function_name(const IRFunctionDef* function);
 
 typedef enum IRValueType {
   IR_VALUE_TYPE_CONSTANT,
@@ -46,9 +47,26 @@ typedef struct IRValue {
   };
 } IRValue;
 
+typedef enum IRBasicBlockTailInstructionKind {
+  IR_BLOCK_TAIL_INVALID,
+  IR_BLOCK_TAIL_RETURN,
+} IRBasicBlockTailInstructionKind;
+
+typedef struct IRBasicBlock {
+  StringView name;
+  uint32_t instruction_count;
+  struct IRInstruction* instructions;
+
+  struct {
+    IRBasicBlockTailInstructionKind kind;
+    union {
+      IRValue return_val;
+    };
+  } tail;
+} IRBasicBlock;
+
 typedef enum IRInstructionType {
   IR_INVALID = 0,
-  IR_RETURN, // return val
 
   // unary
   IR_COPY,       // dest = src

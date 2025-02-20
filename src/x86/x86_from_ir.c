@@ -98,10 +98,9 @@ static void push_comparison_instruction(X86InstructionVector* instructions,
                                     .setcc = {.cond = cond_code, .op = dest}});
 }
 
-static const IRInstruction* get_instruction(const IRFunctionDef* function,
-                                            size_t i)
+static const IRInstruction* get_instruction(const IRBasicBlock* block, size_t i)
 {
-  return i < function->instruction_count ? &function->instructions[i] : nullptr;
+  return i < block->instruction_count ? &block->instructions[i] : nullptr;
 }
 
 static X86Instruction jmpcc(X86CondCode cond_code, StringView label)
@@ -189,6 +188,147 @@ static void push_call_instruction(X86InstructionVector* instructions,
                    mov(X86_SZ_4, dest, register_operand(X86_REG_AX)));
 }
 
+static void push_basic_block(X86InstructionVector* instructions,
+                             const IRBasicBlock* ir_block,
+                             X86CodegenContext* context)
+{
+  for (uint32_t i = 0; i < ir_block->instruction_count; ++i) {
+    const IRInstruction* ir_instruction = get_instruction(ir_block, i);
+    switch (ir_instruction->typ) {
+    case IR_INVALID: MCC_UNREACHABLE(); break;
+    case IR_COPY: {
+      X86Operand dest = x86_operand_from_ir(ir_instruction->operand1);
+      X86Operand src = x86_operand_from_ir(ir_instruction->operand2);
+      // mov dest src
+      push_instruction(instructions, mov(X86_SZ_4, dest, src));
+    } break;
+    case IR_NEG:
+      push_unary_instruction(instructions, X86_INST_NEG, ir_instruction);
+      break;
+    case IR_COMPLEMENT:
+      push_unary_instruction(instructions, X86_INST_NOT, ir_instruction);
+      break;
+    case IR_NOT: {
+      X86Operand dest = x86_operand_from_ir(ir_instruction->operand1);
+      X86Operand src = x86_operand_from_ir(ir_instruction->operand2);
+      X86Operand zero = immediate_operand(0);
+      // mov dest 0
+      push_instruction(instructions, mov(X86_SZ_4, dest, zero));
+
+      // cmp src, 0
+      push_instruction(instructions, cmp(X86_SZ_4, src, zero));
+
+      // sete dest
+      push_instruction(
+          instructions,
+          (X86Instruction){.typ = X86_INST_SETCC,
+                           .setcc = {.cond = X86_COND_E, .op = dest}});
+    } break;
+
+    case IR_ADD:
+      push_binary_instruction(instructions, X86_INST_ADD, ir_instruction);
+      break;
+    case IR_SUB:
+      push_binary_instruction(instructions, X86_INST_SUB, ir_instruction);
+      break;
+    case IR_MUL:
+      push_binary_instruction(instructions, X86_INST_IMUL, ir_instruction);
+      break;
+    case IR_DIV:
+    case IR_MOD: push_div_mod_instruction(instructions, ir_instruction); break;
+    case IR_BITWISE_AND:
+      push_binary_instruction(instructions, X86_INST_AND, ir_instruction);
+      break;
+    case IR_BITWISE_OR:
+      push_binary_instruction(instructions, X86_INST_OR, ir_instruction);
+      break;
+    case IR_BITWISE_XOR:
+      push_binary_instruction(instructions, X86_INST_XOR, ir_instruction);
+      break;
+    case IR_SHIFT_LEFT:
+      push_binary_instruction(instructions, X86_INST_SHL, ir_instruction);
+      break;
+    case IR_SHIFT_RIGHT_ARITHMETIC:
+      push_binary_instruction(instructions, X86_INST_SAR, ir_instruction);
+      break;
+    case IR_SHIFT_RIGHT_LOGICAL: MCC_UNIMPLEMENTED(); break;
+    case IR_EQUAL:
+    case IR_NOT_EQUAL:
+    case IR_LESS:
+    case IR_LESS_EQUAL:
+    case IR_GREATER:
+    case IR_GREATER_EQUAL:
+      push_comparison_instruction(instructions, ir_instruction);
+      break;
+    case IR_JMP:
+      push_instruction(instructions, (X86Instruction){
+                                         .typ = X86_INST_JMP,
+                                         .label = ir_instruction->label,
+                                     });
+      break;
+    case IR_BR: {
+      const X86Operand cond = x86_operand_from_ir(ir_instruction->cond);
+      const StringView if_label = ir_instruction->if_label;
+      const StringView else_label = ir_instruction->else_label;
+
+      // cmp cond, 0
+      push_instruction(instructions, cmp(X86_SZ_4, cond, immediate_operand(0)));
+
+      const IRInstruction* next_instruction = get_instruction(ir_block, i + 1);
+
+      bool skip_if = false;
+      bool skip_else = false;
+
+      if (next_instruction != nullptr && next_instruction->typ == IR_LABEL) {
+        if (str_eq(next_instruction->label, if_label)) {
+          // If if_label is directly follow this instruction
+          skip_if = true;
+        } else if (str_eq(next_instruction->label, else_label)) {
+          // If else_label is directly follow this instruction
+          skip_else = true;
+        }
+      }
+
+      MCC_ASSERT_MSG(
+          !(skip_if && skip_else),
+          "Need to at least generate jump instruction for one branch");
+      if (!skip_if) {
+        // jne .if_label
+        push_instruction(instructions, jmpcc(X86_COND_NE, if_label));
+      }
+      if (!skip_else) {
+        // je .else_label
+        push_instruction(instructions, jmpcc(X86_COND_E, else_label));
+      }
+
+    } break;
+    case IR_LABEL:
+      push_instruction(instructions, (X86Instruction){
+                                         .typ = X86_INST_LABEL,
+                                         .label = ir_instruction->label,
+                                     });
+      break;
+    case IR_CALL: {
+      push_call_instruction(instructions, ir_instruction, context);
+      break;
+    }
+    }
+  }
+
+  switch (ir_block->tail.kind) {
+  case IR_BLOCK_TAIL_INVALID: MCC_UNREACHABLE();
+  case IR_BLOCK_TAIL_RETURN: {
+    // move eax, <op>
+    push_instruction(instructions,
+                     mov(X86_SZ_4, register_operand(X86_REG_AX),
+                         x86_operand_from_ir(ir_block->tail.return_val)));
+
+    push_instruction(instructions, (X86Instruction){.typ = X86_INST_RET});
+    break;
+  }
+  }
+}
+
 // First pass to generate assembly. Still need fixing later
 X86InstructionVector x86_from_ir_function(const IRFunctionDef* ir_function,
                                           X86CodegenContext* context)
@@ -197,7 +337,8 @@ X86InstructionVector x86_from_ir_function(const IRFunctionDef* ir_function,
   // rewritten
   X86InstructionVector instructions = {.arena = &context->scratch_arena};
 
-  add_symbol(context->symbols, ir_function->name, context->permanent_arena);
+  add_symbol(context->symbols, get_ir_function_name(ir_function),
+             context->permanent_arena);
 
   struct SplitResult param_counts =
       count_register_stack_vars(ir_function->param_count);
@@ -225,138 +366,9 @@ X86InstructionVector x86_from_ir_function(const IRFunctionDef* ir_function,
             stack_operand(-(intptr_t)(stack_param_index * 8 + 16))));
   }
 
-  for (size_t i = 0; i < ir_function->instruction_count; ++i) {
-    const IRInstruction* ir_instruction = get_instruction(ir_function, i);
-    switch (ir_instruction->typ) {
-    case IR_INVALID: MCC_UNREACHABLE(); break;
-    case IR_RETURN: {
-      // move eax, <op>
-      push_instruction(&instructions,
-                       mov(X86_SZ_4, register_operand(X86_REG_AX),
-                           x86_operand_from_ir(ir_instruction->operand1)));
-
-      push_instruction(&instructions, (X86Instruction){.typ = X86_INST_RET});
-      break;
-    }
-    case IR_COPY: {
-      X86Operand dest = x86_operand_from_ir(ir_instruction->operand1);
-      X86Operand src = x86_operand_from_ir(ir_instruction->operand2);
-      // mov dest src
-      push_instruction(&instructions, mov(X86_SZ_4, dest, src));
-    } break;
-    case IR_NEG:
-      push_unary_instruction(&instructions, X86_INST_NEG, ir_instruction);
-      break;
-    case IR_COMPLEMENT:
-      push_unary_instruction(&instructions, X86_INST_NOT, ir_instruction);
-      break;
-    case IR_NOT: {
-      X86Operand dest = x86_operand_from_ir(ir_instruction->operand1);
-      X86Operand src = x86_operand_from_ir(ir_instruction->operand2);
-      X86Operand zero = immediate_operand(0);
-      // mov dest 0
-      push_instruction(&instructions, mov(X86_SZ_4, dest, zero));
-
-      // cmp src, 0
-      push_instruction(&instructions, cmp(X86_SZ_4, src, zero));
-
-      // sete dest
-      push_instruction(
-          &instructions,
-          (X86Instruction){.typ = X86_INST_SETCC,
-                           .setcc = {.cond = X86_COND_E, .op = dest}});
-    } break;
-
-    case IR_ADD:
-      push_binary_instruction(&instructions, X86_INST_ADD, ir_instruction);
-      break;
-    case IR_SUB:
-      push_binary_instruction(&instructions, X86_INST_SUB, ir_instruction);
-      break;
-    case IR_MUL:
-      push_binary_instruction(&instructions, X86_INST_IMUL, ir_instruction);
-      break;
-    case IR_DIV:
-    case IR_MOD: push_div_mod_instruction(&instructions, ir_instruction); break;
-    case IR_BITWISE_AND:
-      push_binary_instruction(&instructions, X86_INST_AND, ir_instruction);
-      break;
-    case IR_BITWISE_OR:
-      push_binary_instruction(&instructions, X86_INST_OR, ir_instruction);
-      break;
-    case IR_BITWISE_XOR:
-      push_binary_instruction(&instructions, X86_INST_XOR, ir_instruction);
-      break;
-    case IR_SHIFT_LEFT:
-      push_binary_instruction(&instructions, X86_INST_SHL, ir_instruction);
-      break;
-    case IR_SHIFT_RIGHT_ARITHMETIC:
-      push_binary_instruction(&instructions, X86_INST_SAR, ir_instruction);
-      break;
-    case IR_SHIFT_RIGHT_LOGICAL: MCC_UNIMPLEMENTED(); break;
-    case IR_EQUAL:
-    case IR_NOT_EQUAL:
-    case IR_LESS:
-    case IR_LESS_EQUAL:
-    case IR_GREATER:
-    case IR_GREATER_EQUAL:
-      push_comparison_instruction(&instructions, ir_instruction);
-      break;
-    case IR_JMP:
-      push_instruction(&instructions, (X86Instruction){
-                                          .typ = X86_INST_JMP,
-                                          .label = ir_instruction->label,
-                                      });
-      break;
-    case IR_BR: {
-      const X86Operand cond = x86_operand_from_ir(ir_instruction->cond);
-      const StringView if_label = ir_instruction->if_label;
-      const StringView else_label = ir_instruction->else_label;
-
-      // cmp cond, 0
-      push_instruction(&instructions,
-                       cmp(X86_SZ_4, cond, immediate_operand(0)));
-
-      const IRInstruction* next_instruction =
-          get_instruction(ir_function, i + 1);
-
-      bool skip_if = false;
-      bool skip_else = false;
-
-      if (next_instruction != nullptr && next_instruction->typ == IR_LABEL) {
-        if (str_eq(next_instruction->label, if_label)) {
-          // If if_label is directly follow this instruction
-          skip_if = true;
-        } else if (str_eq(next_instruction->label, else_label)) {
-          // If else_label is directly follow this instruction
-          skip_else = true;
-        }
-      }
-
-      MCC_ASSERT_MSG(
-          !(skip_if && skip_else),
-          "Need to at least generate jump instruction for one branch");
-      if (!skip_if) {
-        // jne .if_label
-        push_instruction(&instructions, jmpcc(X86_COND_NE, if_label));
-      }
-      if (!skip_else) {
-        // je .else_label
-        push_instruction(&instructions, jmpcc(X86_COND_E, else_label));
-      }
-
-    } break;
-    case IR_LABEL:
-      push_instruction(&instructions, (X86Instruction){
-                                          .typ = X86_INST_LABEL,
-                                          .label = ir_instruction->label,
-                                      });
-      break;
-    case IR_CALL: {
-      push_call_instruction(&instructions, ir_instruction, context);
-      break;
-    }
-    }
+  // TODO: generate instructions for basic blocks
+  for (size_t i = 0; i < ir_function->block_count; ++i) {
+    push_basic_block(&instructions, ir_function->blocks[i], context);
   }
 
   return instructions;

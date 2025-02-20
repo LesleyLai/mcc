@@ -20,6 +20,12 @@
   case BINARY_OP_SHIFT_LEFT_EQUAL:                                             \
   case BINARY_OP_SHIFT_RIGHT_EQUAL
 
+StringView get_ir_function_name(const IRFunctionDef* function)
+{
+  MCC_ASSERT(function->block_count > 0);
+  return function->blocks[0]->name;
+}
+
 /*
  * =============================================================================
  * Convenient "constructors"
@@ -33,12 +39,6 @@ static IRValue ir_constant(int32_t constant)
 static IRValue ir_variable(StringView name)
 {
   return (IRValue){.typ = IR_VALUE_TYPE_VARIABLE, .variable = name};
-}
-
-static IRInstruction ir_single_operand_instr(IRInstructionType typ,
-                                             IRValue operand)
-{
-  return (IRInstruction){.typ = typ, .operand1 = operand};
 }
 
 static IRInstruction ir_unary_instr(IRInstructionType typ, IRValue dst,
@@ -112,6 +112,12 @@ typedef struct IRInstructions {
   uint32_t capacity;
 } IRInstructions;
 
+typedef struct IRBasicBlocks {
+  IRBasicBlock** data;
+  uint32_t length;
+  uint32_t capacity;
+} IRBasicBlocks;
+
 struct ErrorVec {
   size_t length;
   size_t capacity;
@@ -129,15 +135,20 @@ typedef struct IRGenTUContext {
 // context only for the a single function
 typedef struct IRGenProceduralContext {
   IRGenTUContext* tu_context;
-  IRInstructions instructions;
+  IRBasicBlocks blocks;
   int fresh_variable_counter;
   int fresh_label_counter;
+
+  StringView current_block_name;
+  IRInstructions
+      current_block_instructions; // instructions for the current block
+
 } IRGenProceduralContext;
 
 static void push_instruction(IRGenProceduralContext* context,
                              IRInstruction instruction)
 {
-  DYNARRAY_PUSH_BACK(&context->instructions, IRInstruction,
+  DYNARRAY_PUSH_BACK(&context->current_block_instructions, IRInstruction,
                      context->tu_context->scratch_arena, instruction);
 }
 
@@ -497,10 +508,33 @@ static void emit_ir_instructions_from_stmt(const Stmt* stmt,
     emit_ir_instructions_from_expr(stmt->expr, context);
   } break;
   case STMT_RETURN: {
+    IRBasicBlock* block =
+        ARENA_ALLOC_OBJECT(context->tu_context->permanent_arena, IRBasicBlock);
+
     const IRValue return_value =
         emit_ir_instructions_from_expr(stmt->ret.expr, context);
 
-    push_instruction(context, ir_single_operand_instr(IR_RETURN, return_value));
+    IRInstruction* instructions = nullptr;
+    if (context->current_block_instructions.data != nullptr) {
+      instructions =
+          ARENA_ALLOC_ARRAY(context->tu_context->permanent_arena, IRInstruction,
+                            context->current_block_instructions.length);
+      memcpy(instructions, context->current_block_instructions.data,
+             context->current_block_instructions.length *
+                 sizeof(IRInstruction));
+    }
+
+    *block = (IRBasicBlock){
+        .name = context->current_block_name,
+        .instruction_count = context->current_block_instructions.length,
+        .instructions = instructions,
+        .tail = {.kind = IR_BLOCK_TAIL_RETURN, .return_val = return_value}};
+
+    DYNARRAY_PUSH_BACK(&context->blocks, IRBasicBlock*,
+                       context->tu_context->scratch_arena, block);
+
+    // clear current instructions
+    context->current_block_instructions = (IRInstructions){};
   } break;
   case STMT_COMPOUND: {
     for (size_t i = 0; i < stmt->compound.child_count; ++i) {
@@ -684,34 +718,63 @@ static IRFunctionDef generate_ir_function_def(const FunctionDecl* decl,
                                               IRGenTUContext* tu_context)
 
 {
-  IRGenProceduralContext context =
-      (IRGenProceduralContext){.tu_context = tu_context,
-                               .instructions = {},
-                               .fresh_variable_counter = 0};
+  IRGenProceduralContext context = (IRGenProceduralContext){
+      .tu_context = tu_context,
+      .current_block_instructions = {},
+      .fresh_variable_counter = 0,
+      // The name of the entry basic block will be the function name
+      .current_block_name = decl->name->name};
 
   for (size_t i = 0; i < decl->body->child_count; ++i) {
     emit_ir_instructions_from_block_item(&decl->body->children[i], &context,
                                          nullptr);
   }
 
+  // TODO
+  {
+    IRBasicBlock* block =
+        ARENA_ALLOC_OBJECT(tu_context->permanent_arena, IRBasicBlock);
+
+    IRInstruction* instructions = nullptr;
+    if (context.current_block_instructions.data != nullptr) {
+      instructions =
+          ARENA_ALLOC_ARRAY(context.tu_context->permanent_arena, IRInstruction,
+                            context.current_block_instructions.length);
+      memcpy(instructions, context.current_block_instructions.data,
+             context.current_block_instructions.length * sizeof(IRInstruction));
+    }
+
+    *block = (IRBasicBlock){
+        .name = context.current_block_name,
+        .instruction_count = context.current_block_instructions.length,
+        .instructions = instructions,
+        .tail = {.kind = IR_BLOCK_TAIL_RETURN, .return_val = ir_constant(0)}};
+
+    DYNARRAY_PUSH_BACK(&context.blocks, IRBasicBlock*,
+                       context.tu_context->scratch_arena, block);
+
+    // clear current instructions
+    context.current_block_instructions = (IRInstructions){};
+  }
+
   // return 0 for main if there is no return statement at the end
   // TODO: should only do that for the main function
-  if (context.instructions.length == 0 ||
-      context.instructions.data[context.instructions.length - 1].typ !=
-          IR_RETURN) {
-    push_instruction(&context,
-                     ir_single_operand_instr(IR_RETURN, ir_constant(0)));
-  }
+  // TODO: reenable this
+  //  if (context.instructions.length == 0 ||
+  //      context.instructions.data[context.instructions.length - 1].typ !=
+  //          IR_RETURN) {
+  //    push_instruction(&context,
+  //                     ir_single_operand_instr(IR_RETURN, ir_constant(0)));
+  //  }
 
-  // allocate and copy instructions to permanent arena
-  IRInstruction* instructions = nullptr;
-  if (context.instructions.data != nullptr) {
-    instructions = ARENA_ALLOC_ARRAY(tu_context->permanent_arena, IRInstruction,
-                                     context.instructions.length);
-    memcpy(instructions, context.instructions.data,
-           context.instructions.length * sizeof(IRInstruction));
-  }
+  // allocate and copy blocks to permanent arena
+  const uint32_t block_count = context.blocks.length;
+  IRBasicBlock** blocks = nullptr;
+  blocks = ARENA_ALLOC_ARRAY(tu_context->permanent_arena, IRBasicBlock*,
+                             block_count);
+  memcpy(blocks, context.blocks.data, block_count * sizeof(IRBasicBlock*));
 
+  // parameters
   uint32_t param_count = decl->params.length;
   StringView* parameters =
       ARENA_ALLOC_ARRAY(tu_context->permanent_arena, StringView, param_count);
@@ -719,11 +782,10 @@ static IRFunctionDef generate_ir_function_def(const FunctionDecl* decl,
     parameters[i] = decl->params.data[i]->rewrote_name;
   }
 
-  return (IRFunctionDef){.name = decl->name->name,
-                         .param_count = param_count,
+  return (IRFunctionDef){.param_count = param_count,
                          .params = parameters,
-                         .instruction_count = context.instructions.length,
-                         .instructions = instructions};
+                         .blocks = blocks,
+                         .block_count = block_count};
 }
 
 typedef struct IRFunctionVec {
