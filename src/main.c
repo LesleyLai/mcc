@@ -174,7 +174,8 @@ int main(int argc, char* argv[])
   }
   TranslationUnit* tu = parse_result.ast;
   if (args.stop_after_parser) {
-    ast_print_translation_unit(tu);
+    StringView ast_str = string_from_ast(tu, &permanent_arena);
+    printf("%.*s\n", (int)ast_str.size, ast_str.start);
     return 0;
   }
 

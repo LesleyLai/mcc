@@ -1,17 +1,13 @@
 #include <mcc/ast.h>
+#include <mcc/format.h>
 #include <mcc/prelude.h>
 
 #include "symbol_table.h"
 
-static void print_str(StringView str)
-{
-  printf("%.*s", (int)str.size, str.start);
-}
-
-static void print_source_range(SourceRange range)
+static void format_source_range(StringBuffer* output, SourceRange range)
 {
   // TODO: print line and columns
-  printf("<%d..%d>", range.begin, range.end);
+  string_buffer_printf(output, "<%d..%d>", range.begin, range.end);
 }
 
 static const char* unary_op_name(UnaryOpType unary_op_type)
@@ -62,57 +58,58 @@ static const char* binary_op_name(BinaryOpType binary_op_type)
   MCC_ASSERT_MSG(false, "invalid enum");
 }
 
-static void ast_print_expr(const Expr* expr, int indent)
+static void format_expr(StringBuffer* output, const Expr* expr, int indent)
 {
   switch (expr->tag) {
   case EXPR_INVALID: MCC_UNREACHABLE();
   case EXPR_CONST:
-    printf("%*sIntegerLiteral ", indent, "");
-    print_source_range(expr->source_range);
-    printf(" %i\n", expr->const_expr.val);
+    string_buffer_printf(output, "%*sIntegerLiteral ", indent, "");
+    format_source_range(output, expr->source_range);
+    string_buffer_printf(output, " %i\n", expr->const_expr.val);
     break;
   case EXPR_UNARY:
-    printf("%*sUnaryOPExpr ", indent, "");
-    print_source_range(expr->source_range);
-    printf(" operator: %s\n", unary_op_name(expr->unary_op.unary_op_type));
-    ast_print_expr(expr->unary_op.inner_expr, indent + 2);
+    string_buffer_printf(output, "%*sUnaryOPExpr ", indent, "");
+    format_source_range(output, expr->source_range);
+    string_buffer_printf(output, " operator: %s\n",
+                         unary_op_name(expr->unary_op.unary_op_type));
+    format_expr(output, expr->unary_op.inner_expr, indent + 2);
     break;
   case EXPR_BINARY:
-    printf("%*sBinaryOPExpr ", indent, "");
-    print_source_range(expr->source_range);
-    printf(" operator: %s\n", binary_op_name(expr->binary_op.binary_op_type));
-    ast_print_expr(expr->binary_op.lhs, indent + 2);
-    ast_print_expr(expr->binary_op.rhs, indent + 2);
+    string_buffer_printf(output, "%*sBinaryOPExpr ", indent, "");
+    format_source_range(output, expr->source_range);
+    string_buffer_printf(output, " operator: %s\n",
+                         binary_op_name(expr->binary_op.binary_op_type));
+    format_expr(output, expr->binary_op.lhs, indent + 2);
+    format_expr(output, expr->binary_op.rhs, indent + 2);
     break;
   case EXPR_VARIABLE:
-    printf("%*sVariableExpr ", indent, "");
-    print_source_range(expr->source_range);
-    printf(" ");
-    print_str(expr->variable->name);
-    printf("\n");
+    string_buffer_printf(output, "%*sVariableExpr ", indent, "");
+    format_source_range(output, expr->source_range);
+    string_buffer_printf(output, " %.*s\n", (int)expr->variable->name.size,
+                         expr->variable->name.start);
     break;
   case EXPR_TERNARY:
-    printf("%*sTernaryExpr ", indent, "");
-    print_source_range(expr->source_range);
-    printf("\n");
-    ast_print_expr(expr->ternary.cond, indent + 2);
-    ast_print_expr(expr->ternary.true_expr, indent + 2);
-    ast_print_expr(expr->ternary.false_expr, indent + 2);
-    printf("\n");
+    string_buffer_printf(output, "%*sTernaryExpr ", indent, "");
+    format_source_range(output, expr->source_range);
+    string_buffer_printf(output, "\n");
+    format_expr(output, expr->ternary.cond, indent + 2);
+    format_expr(output, expr->ternary.true_expr, indent + 2);
+    format_expr(output, expr->ternary.false_expr, indent + 2);
+    string_buffer_printf(output, "\n");
     break;
   case EXPR_CALL:
-    printf("%*sCallExpr ", indent, "");
-    print_source_range(expr->source_range);
-    printf("\n");
-    ast_print_expr(expr->call.function, indent + 2);
+    string_buffer_printf(output, "%*sCallExpr ", indent, "");
+    format_source_range(output, expr->source_range);
+    string_buffer_printf(output, "\n");
+    format_expr(output, expr->call.function, indent + 2);
     for (uint32_t i = 0; i < expr->call.arg_count; ++i) {
-      ast_print_expr(expr->call.args[i], indent + 2);
+      format_expr(output, expr->call.args[i], indent + 2);
     }
     break;
   }
 }
 
-static void ast_print_block(const Block* block, int indent);
+static void format_blocks(StringBuffer* output, const Block* block, int indent);
 
 static const char* string_from_stmt_tag(StmtTag stmt_tag)
 {
@@ -132,148 +129,161 @@ static const char* string_from_stmt_tag(StmtTag stmt_tag)
   MCC_UNREACHABLE();
 }
 
-static void ast_print_storage_class(StorageClass storage_class)
+static void format_storage_class(StringBuffer* output,
+                                 StorageClass storage_class)
 {
   switch (storage_class) {
   case STORAGE_CLASS_NONE: break;
-  case STORAGE_CLASS_EXTERN: printf(" extern"); break;
-  case STORAGE_CLASS_STATIC: printf(" static"); break;
+  case STORAGE_CLASS_EXTERN:
+    string_buffer_append(output, str("extern "));
+    break;
+  case STORAGE_CLASS_STATIC:
+    string_buffer_append(output, str("static "));
+    break;
   }
 }
 
-static void ast_print_var_decl(const VariableDecl* decl, int indent)
+static void format_var_decl(StringBuffer* output, const VariableDecl* decl,
+                            int indent)
 {
-  printf("%*sVariableDecl ", indent, "");
-  print_source_range(decl->source_range);
-  printf(" 'int ");
-  print_str(decl->name->name);
-  printf("'");
-  ast_print_storage_class(decl->storage_class);
-  printf("\n");
-  if (decl->initializer) { ast_print_expr(decl->initializer, indent + 2); }
+  string_buffer_printf(output, "%*sVariableDecl ", indent, "");
+  format_source_range(output, decl->source_range);
+  string_buffer_printf(output, " %.*s: ", (int)decl->name->name.size,
+                       decl->name->name.start);
+  format_storage_class(output, decl->storage_class);
+  string_buffer_append(output, str("int\n"));
+  if (decl->initializer) { format_expr(output, decl->initializer, indent + 2); }
 }
 
-static void ast_print_function_decl(const FunctionDecl* decl, int indent);
+static void format_function_decl(StringBuffer* output, const FunctionDecl* decl,
+                                 int indent);
 
-static void ast_print_decl(const Decl* decl, int indent)
+static void format_decl(StringBuffer* output, const Decl* decl, int indent)
 {
   switch (decl->tag) {
   case DECL_INVALID: MCC_UNREACHABLE(); break;
-  case DECL_VAR: ast_print_var_decl(&decl->var, indent); break;
-  case DECL_FUNC: ast_print_function_decl(decl->func, indent); break;
+  case DECL_VAR: format_var_decl(output, &decl->var, indent); break;
+  case DECL_FUNC: format_function_decl(output, decl->func, indent); break;
   }
 }
 
-static void ast_print_nullable_expr(const Expr* expr, int indent)
+static void format_nullable_expr(StringBuffer* output, const Expr* expr,
+                                 int indent)
 {
   if (expr != nullptr) {
-    ast_print_expr(expr, indent);
+    format_expr(output, expr, indent);
   } else {
-    printf("%*s<<null>>\n", indent, "");
+    string_buffer_printf(output, "%*s<<null>>\n", indent, "");
   }
 }
 
-static void ast_print_stmt(const Stmt* stmt, int indent)
+static void format_stmt(StringBuffer* output, const Stmt* stmt, int indent)
 {
-  printf("%*s%s ", indent, "", string_from_stmt_tag(stmt->tag));
-  print_source_range(stmt->source_range);
-  printf("\n");
+  string_buffer_printf(output, "%*s%s ", indent, "",
+                       string_from_stmt_tag(stmt->tag));
+  format_source_range(output, stmt->source_range);
+  string_buffer_append(output, str("\n"));
 
   switch (stmt->tag) {
   case STMT_INVALID: MCC_UNREACHABLE();
   case STMT_EMPTY: break;
-  case STMT_EXPR: ast_print_expr(stmt->ret.expr, indent + 2); break;
-  case STMT_COMPOUND: ast_print_block(&stmt->compound, indent + 2); break;
-  case STMT_RETURN: ast_print_expr(stmt->ret.expr, indent + 2); break;
+  case STMT_EXPR: format_expr(output, stmt->ret.expr, indent + 2); break;
+  case STMT_COMPOUND: format_blocks(output, &stmt->compound, indent + 2); break;
+  case STMT_RETURN: format_expr(output, stmt->ret.expr, indent + 2); break;
   case STMT_IF:
-    ast_print_expr(stmt->if_then.cond, indent + 2);
-    ast_print_stmt(stmt->if_then.then, indent + 2);
+    format_expr(output, stmt->if_then.cond, indent + 2);
+    format_stmt(output, stmt->if_then.then, indent + 2);
     if (stmt->if_then.els != nullptr) {
-      ast_print_stmt(stmt->if_then.els, indent + 2);
+      format_stmt(output, stmt->if_then.els, indent + 2);
     }
     break;
   case STMT_WHILE:
-    ast_print_expr(stmt->while_loop.cond, indent + 2);
-    ast_print_stmt(stmt->while_loop.body, indent + 2);
+    format_expr(output, stmt->while_loop.cond, indent + 2);
+    format_stmt(output, stmt->while_loop.body, indent + 2);
     break;
   case STMT_DO_WHILE:
-    ast_print_stmt(stmt->while_loop.body, indent + 2);
-    ast_print_expr(stmt->while_loop.cond, indent + 2);
+    format_stmt(output, stmt->while_loop.body, indent + 2);
+    format_expr(output, stmt->while_loop.cond, indent + 2);
     break;
   case STMT_FOR:
     switch (stmt->for_loop.init.tag) {
     case FOR_INIT_INVALID: MCC_UNREACHABLE();
     case FOR_INIT_DECL:
-      ast_print_var_decl(stmt->for_loop.init.decl, indent + 2);
+      format_var_decl(output, stmt->for_loop.init.decl, indent + 2);
       break;
     case FOR_INIT_EXPR: {
-      ast_print_nullable_expr(stmt->for_loop.init.expr, indent + 2);
+      format_nullable_expr(output, stmt->for_loop.init.expr, indent + 2);
     } break;
     }
 
-    ast_print_nullable_expr(stmt->for_loop.cond, indent + 2);
-    ast_print_nullable_expr(stmt->for_loop.post, indent + 2);
-    ast_print_stmt(stmt->for_loop.body, indent + 2);
+    format_nullable_expr(output, stmt->for_loop.cond, indent + 2);
+    format_nullable_expr(output, stmt->for_loop.post, indent + 2);
+    format_stmt(output, stmt->for_loop.body, indent + 2);
     break;
   case STMT_BREAK:
   case STMT_CONTINUE: break;
   }
 }
 
-static void ast_print_block_item(const BlockItem* item, int indent)
+static void format_block_item(StringBuffer* output, const BlockItem* item,
+                              int indent)
 {
   switch (item->tag) {
-  case BLOCK_ITEM_DECL: ast_print_decl(&item->decl, indent); return;
-  case BLOCK_ITEM_STMT: ast_print_stmt(&item->stmt, indent); return;
+  case BLOCK_ITEM_DECL: format_decl(output, &item->decl, indent); return;
+  case BLOCK_ITEM_STMT: format_stmt(output, &item->stmt, indent); return;
   }
   MCC_UNREACHABLE();
 }
 
-static void ast_print_block(const Block* block, int indent)
+static void format_blocks(StringBuffer* output, const Block* block, int indent)
 {
   for (size_t i = 0; i < block->child_count; ++i) {
-    ast_print_block_item(&block->children[i], indent);
+    format_block_item(output, &block->children[i], indent);
   }
 }
 
-static void ast_print_parameters(Parameters parameters)
+static void format_parameters(StringBuffer* output, Parameters parameters)
 {
   if (parameters.length == 0) {
-    printf("(void)");
+    string_buffer_printf(output, "(void)");
   } else {
-    printf("(");
+    string_buffer_printf(output, "(");
     for (uint32_t i = 0; i < parameters.length; ++i) {
-      if (i > 0) { printf(", "); }
+      if (i > 0) { string_buffer_printf(output, ", "); }
       const Identifier* param = parameters.data[i];
-      printf("int");
+      string_buffer_printf(output, "int");
       if (param->name.size != 0) {
-        printf(" ");
-        print_str(param->name);
+        string_buffer_printf(output, " %.*s", (int)param->name.size,
+                             param->name.start);
       }
     }
-    printf(")");
+    string_buffer_printf(output, ")");
   }
 }
 
-static void ast_print_function_decl(const FunctionDecl* decl, int indent)
+static void format_function_decl(StringBuffer* output, const FunctionDecl* decl,
+                                 int indent)
 {
-  printf("%*sFunctionDecl ", indent, "");
-  print_source_range(decl->source_range);
-  printf(" \'int ");
-  print_str(decl->name->name);
-  ast_print_parameters(decl->params);
-  printf("\'");
+  string_buffer_printf(output, "%*sFunctionDecl ", indent, "");
+  format_source_range(output, decl->source_range);
 
-  ast_print_storage_class(decl->storage_class);
-  printf("\n");
+  string_buffer_printf(output, " %.*s: ", (int)decl->name->name.size,
+                       decl->name->name.start);
+  format_storage_class(output, decl->storage_class);
+  string_buffer_printf(output, "int");
+  format_parameters(output, decl->params);
+  string_buffer_printf(output, "\n");
 
-  if (decl->body) { ast_print_block(decl->body, indent + 2); }
+  if (decl->body) { format_blocks(output, decl->body, indent + 2); }
 }
 
-void ast_print_translation_unit(const TranslationUnit* tu)
+StringView string_from_ast(const TranslationUnit* tu, Arena* permanent_arena)
 {
-  printf("TranslationUnit\n");
+  StringBuffer output = string_buffer_new(permanent_arena);
+  string_buffer_append(&output, str("TranslationUnit\n"));
   for (size_t i = 0; i < tu->decl_count; ++i) {
-    ast_print_decl(tu->decls + i, 2);
+    format_decl(&output, tu->decls + i, 2);
   }
+
+  return str_from_buffer(&output);
 }

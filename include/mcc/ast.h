@@ -237,6 +237,6 @@ typedef struct TranslationUnit {
   HashMap functions;
 } TranslationUnit;
 
-void ast_print_translation_unit(const TranslationUnit* tu);
+StringView string_from_ast(const TranslationUnit* tu, Arena* permanent_arena);
 
 #endif // MCC_AST_H
