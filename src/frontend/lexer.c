@@ -164,7 +164,16 @@ static TokenTag get_identifier_type(Lexer* lexer)
   case 'c':
     return check_keyword(lexer, 1, str("ontinue"), TOKEN_KEYWORD_CONTINUE);
   case 'd': return check_keyword(lexer, 1, str("o"), TOKEN_KEYWORD_DO);
-  case 'e': return check_keyword(lexer, 1, str("lse"), TOKEN_KEYWORD_ELSE);
+  case 'e': {
+    if (lexer->current - lexer->previous > 1) {
+      switch (lexer->previous[1]) {
+      case 'l': return check_keyword(lexer, 2, str("se"), TOKEN_KEYWORD_ELSE);
+      case 'x':
+        return check_keyword(lexer, 2, str("tern"), TOKEN_KEYWORD_EXTERN);
+      default: break;
+      }
+    }
+  } break;
   case 'f': return check_keyword(lexer, 1, str("or"), TOKEN_KEYWORD_FOR);
   case 'i': {
     if (lexer->current - lexer->previous > 1) {
@@ -177,6 +186,7 @@ static TokenTag get_identifier_type(Lexer* lexer)
   } break;
   case 'v': return check_keyword(lexer, 1, str("oid"), TOKEN_KEYWORD_VOID);
   case 'r': return check_keyword(lexer, 1, str("eturn"), TOKEN_KEYWORD_RETURN);
+  case 's': return check_keyword(lexer, 1, str("tatic"), TOKEN_KEYWORD_STATIC);
   case 't':
     return check_keyword(lexer, 1, str("ypedef"), TOKEN_KEYWORD_TYPEDEF);
   case 'w': return check_keyword(lexer, 1, str("hile"), TOKEN_KEYWORD_WHILE);

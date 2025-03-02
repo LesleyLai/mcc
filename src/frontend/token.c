@@ -63,6 +63,8 @@ static const char* token_type_string(TokenTag type)
   case TOKEN_KEYWORD_FOR: return "for";
   case TOKEN_KEYWORD_BREAK: return "break";
   case TOKEN_KEYWORD_CONTINUE: return "continue";
+  case TOKEN_KEYWORD_STATIC: return "static";
+  case TOKEN_KEYWORD_EXTERN: return "extern";
   case TOKEN_IDENTIFIER: return "identifier";
   case TOKEN_INTEGER: return "integer";
   case TOKEN_ERROR: return "error";
