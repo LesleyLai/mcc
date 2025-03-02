@@ -742,11 +742,18 @@ IRGenerationResult ir_generate(const TranslationUnit* ast,
                                             .errors = (struct ErrorVec){}};
 
   for (size_t i = 0; i < ast->decl_count; i++) {
-    if (ast->decls[i]->body != nullptr) {
-      IRFunctionDef function_def =
-          generate_ir_function_def(ast->decls[i], &context);
-      DYNARRAY_PUSH_BACK(&ir_function_vec, IRFunctionDef, &scratch_arena,
-                         function_def);
+    Decl* decl = &ast->decls[i];
+    switch (decl->tag) {
+    case DECL_INVALID: MCC_UNREACHABLE(); break;
+    case DECL_VAR: MCC_UNIMPLEMENTED(); break;
+    case DECL_FUNC:
+      if (decl->func->body != nullptr) {
+        IRFunctionDef function_def =
+            generate_ir_function_def(decl->func, &context);
+        DYNARRAY_PUSH_BACK(&ir_function_vec, IRFunctionDef, &scratch_arena,
+                           function_def);
+      }
+      break;
     }
   }
 

@@ -79,7 +79,6 @@ static void parse_panic_at_token(Parser* parser, StringView error_msg,
 {
   parse_panic_at(parser, error_msg, token_source_range(token));
 }
-
 #pragma endregion
 
 #pragma region parser helpers
@@ -537,11 +536,94 @@ struct BlockItemVec {
   BlockItem* data;
 };
 
-static FunctionDecl* parse_function_decl(Parser* parser, Token name_token,
-                                         struct Scope* scope);
+static void assign_type_if_null(Parser* parser, const Type** target_type,
+                                const Type* new_type)
+{
+  if (*target_type == nullptr) {
+    *target_type = new_type;
+  } else {
+    StringBuffer message = string_buffer_new(parser->permanent_arena);
+    string_buffer_append(&message, str("Cannot combine with previous `"));
+    format_type_to(&message, *target_type);
+    string_buffer_append(&message, str("` type specifier"));
+    parse_panic_at_token(parser, str_from_buffer(&message),
+                         parser_current_token(parser));
+  }
+}
 
-static VariableDecl parse_variable_decl(Parser* parser, Token name_token,
-                                        struct Scope* scope)
+static void assign_storage_class_if_none(Parser* parser,
+                                         StorageClass* target_class,
+                                         StorageClass new_class)
+{
+  if (*target_class == STORAGE_CLASS_NONE) {
+    *target_class = new_class;
+  } else {
+    parse_panic_at_token(
+        parser, str("multiple storage classes in declaration specifiers"),
+        parser_current_token(parser));
+  }
+}
+
+typedef struct DeclSpecifier {
+  const Type* type;
+  StorageClass storage_class;
+} DeclSpecifier;
+
+// Declaration specifiers include types, storage durations, and type
+// modifiers. They are converted into a single type and at most one storage
+// class specifier.
+//
+// Note the ANSI-C style defaulting to `int` is not supported. Instead, we
+// always want a type
+//
+// Examples:
+// - int
+// - static const int
+static DeclSpecifier parse_decl_specifiers(Parser* parser)
+{
+  const Type* type = nullptr;
+  StorageClass storage_class = STORAGE_CLASS_NONE;
+
+  while (true) {
+    Token current_token = parser_current_token(parser);
+    switch (current_token.tag) {
+    case TOKEN_KEYWORD_VOID:
+      assign_type_if_null(parser, &type, typ_void);
+      break;
+    case TOKEN_KEYWORD_INT: assign_type_if_null(parser, &type, typ_int); break;
+    case TOKEN_KEYWORD_EXTERN:
+      assign_storage_class_if_none(parser, &storage_class,
+                                   STORAGE_CLASS_EXTERN);
+      break;
+    case TOKEN_KEYWORD_STATIC:
+      assign_storage_class_if_none(parser, &storage_class,
+                                   STORAGE_CLASS_STATIC);
+      break;
+    default: goto done;
+    }
+
+    parse_advance(parser);
+  }
+
+done:
+  if (type == nullptr) {
+    parse_panic_at_token(
+        parser, str("A type specifier is required for all declarations"),
+        parser_current_token(parser));
+  }
+  return (DeclSpecifier){
+      .type = type,
+      .storage_class = storage_class,
+  };
+}
+
+static FunctionDecl* parse_function_decl(Parser* parser,
+                                         DeclSpecifier decl_specifier,
+                                         Token name_token, struct Scope* scope);
+
+static VariableDecl parse_variable_decl(Parser* parser,
+                                        DeclSpecifier decl_specifier,
+                                        Token name_token, struct Scope* scope)
 {
   const StringView name = str_from_token(parser->src, name_token);
   Identifier* variable =
@@ -561,25 +643,26 @@ static VariableDecl parse_variable_decl(Parser* parser, Token name_token,
   parse_consume(parser, TOKEN_SEMICOLON, "expect ';'");
 
   // TODO: handle the case where variable == nullptr
-  return (VariableDecl){.name = variable, .initializer = initializer};
+  return (VariableDecl){.type = decl_specifier.type,
+                        .storage_class = decl_specifier.storage_class,
+                        .name = variable,
+                        .initializer = initializer};
 }
 
 static Decl parse_decl(Parser* parser, struct Scope* scope)
 {
-  const Token name = parser_current_token(parser);
-  // TODO: proper error handling
-  MCC_ASSERT(name.tag == TOKEN_IDENTIFIER);
-  parse_advance(parser);
+  const DeclSpecifier decl_specifier = parse_decl_specifiers(parser);
+  const Token name_token = parse_identifier(parser);
 
   if (parser_current_token(parser).tag == TOKEN_LEFT_PAREN) {
     return (Decl){
         .tag = DECL_FUNC,
-        .func = parse_function_decl(parser, name, scope),
+        .func = parse_function_decl(parser, decl_specifier, name_token, scope),
     };
   } else {
     return (Decl){
         .tag = DECL_VAR,
-        .var = parse_variable_decl(parser, name, scope),
+        .var = parse_variable_decl(parser, decl_specifier, name_token, scope),
     };
   }
 }
@@ -598,12 +681,25 @@ static void parser_panic_synchronize(Parser* parser)
   }
 }
 
-static BlockItem parse_block_item(Parser* parser, Scope* scope)
+// Check whether the current token can be treated as the start of the
+// declaration specifier
+static bool is_decl_specifier(Parser* parser)
 {
   const Token current_token = parser_current_token(parser);
+  switch (current_token.tag) {
+  case TOKEN_KEYWORD_VOID: [[fallthrough]];
+  case TOKEN_KEYWORD_INT: [[fallthrough]];
+  case TOKEN_KEYWORD_EXTERN: [[fallthrough]];
+  case TOKEN_KEYWORD_STATIC: return true;
+  default: return false;
+  }
+}
+
+static BlockItem parse_block_item(Parser* parser, Scope* scope)
+{
   BlockItem result;
-  if (current_token.tag == TOKEN_KEYWORD_INT) {
-    parse_advance(parser);
+
+  if (is_decl_specifier(parser)) {
     result =
         (BlockItem){.tag = BLOCK_ITEM_DECL, .decl = parse_decl(parser, scope)};
   } else {
@@ -746,16 +842,23 @@ static Stmt parse_stmt(Parser* parser, Scope* scope)
     // init
     ForInit init = {};
     switch (parser_current_token(parser).tag) {
+      // TODO: handle cases other than int
     case TOKEN_KEYWORD_INT: {
       // for loop introduce a new scope
       scope = new_scope(scope, parser->permanent_arena);
+
+      // TODO: fix this
+      const DeclSpecifier specifier = {
+          .type = typ_int,
+          .storage_class = STORAGE_CLASS_NONE,
+      };
 
       parse_advance(parser);
       VariableDecl* decl =
           ARENA_ALLOC_OBJECT(parser->permanent_arena, VariableDecl);
 
       const Token name_token = parse_identifier(parser);
-      *decl = parse_variable_decl(parser, name_token, scope);
+      *decl = parse_variable_decl(parser, specifier, name_token, scope);
       init = (ForInit){.tag = FOR_INIT_DECL, .decl = decl};
     } break;
     case TOKEN_SEMICOLON: {
@@ -897,8 +1000,9 @@ static Parameters parse_parameter_list(Parser* parser, Scope* scope)
   };
 }
 
-static FunctionDecl* parse_function_decl(Parser* parser, Token name_token,
-                                         struct Scope* scope)
+static FunctionDecl* parse_function_decl(Parser* parser,
+                                         DeclSpecifier decl_specifier,
+                                         Token name_token, Scope* scope)
 {
   StringView name = str_from_token(parser->src, name_token);
   Identifier* function_ident =
@@ -936,8 +1040,11 @@ static FunctionDecl* parse_function_decl(Parser* parser, Token name_token,
   FunctionDecl* decl =
       ARENA_ALLOC_OBJECT(parser->permanent_arena, FunctionDecl);
   *decl = (FunctionDecl){
-      source_range_union(token_source_range(name_token),
-                         token_source_range(parser_previous_token(parser))),
+      .return_type = decl_specifier.type,
+      .storage_class = decl_specifier.storage_class,
+      .source_range =
+          source_range_union(token_source_range(name_token),
+                             token_source_range(parser_previous_token(parser))),
       .name = function_ident,
       .params = parameters,
       .body = body,
@@ -946,33 +1053,25 @@ static FunctionDecl* parse_function_decl(Parser* parser, Token name_token,
 }
 #pragma endregion
 
-struct FunctionDeclVec {
+struct DeclVec {
   uint32_t length;
   uint32_t capacity;
-  FunctionDecl** data;
+  Decl* data;
 };
 
 static TranslationUnit* parse_translation_unit(Parser* parser)
 {
-  struct FunctionDeclVec function_decl_vec = {};
+  struct DeclVec decl_vec = {};
 
   while (parser_current_token(parser).tag != TOKEN_EOF) {
-    parse_consume(parser, TOKEN_KEYWORD_INT, "Expect keyword int");
-
-    const Token name_token = parse_identifier(parser);
-
-    FunctionDecl* decl =
-        parse_function_decl(parser, name_token, parser->global_scope);
-    DYNARRAY_PUSH_BACK(&function_decl_vec, FunctionDecl*,
-                       &parser->scratch_arena, decl);
+    Decl decl = parse_decl(parser, parser->global_scope);
+    DYNARRAY_PUSH_BACK(&decl_vec, Decl, &parser->scratch_arena, decl);
   }
 
-  const uint32_t decl_count = function_decl_vec.length;
-  FunctionDecl** decls =
-      ARENA_ALLOC_ARRAY(parser->permanent_arena, FunctionDecl*, decl_count);
-  if (function_decl_vec.length != 0) {
-    memcpy(decls, function_decl_vec.data,
-           function_decl_vec.length * sizeof(FunctionDecl*));
+  const uint32_t decl_count = decl_vec.length;
+  Decl* decls = ARENA_ALLOC_ARRAY(parser->permanent_arena, Decl, decl_count);
+  if (decl_vec.length != 0) {
+    memcpy(decls, decl_vec.data, decl_vec.length * sizeof(Decl));
   }
 
   TranslationUnit* tu =

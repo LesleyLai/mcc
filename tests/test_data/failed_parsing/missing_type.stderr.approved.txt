@@ -1,4 +1,4 @@
-{{filename}}:1:1: Error: Expect keyword int
+{{filename}}:1:1: Error: A type specifier is required for all declarations
 1 | main(void) {
   | ^~~~
 

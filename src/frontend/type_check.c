@@ -300,6 +300,21 @@ static bool type_check_stmt(Stmt* stmt, Context* context)
 
 static bool type_check_function_decl(FunctionDecl* decl, Context* context);
 
+static bool type_check_decl(Decl* decl, Context* context)
+{
+  switch (decl->tag) {
+  case DECL_INVALID: MCC_UNREACHABLE(); break;
+  case DECL_VAR:
+    if (!type_check_variable_decl(&decl->var, context)) { return false; }
+    break;
+  case DECL_FUNC:
+    MCC_ASSERT(decl->func != nullptr);
+    if (!type_check_function_decl(decl->func, context)) { return false; }
+    break;
+  }
+  return true;
+}
+
 static bool type_check_block(Block* block, Context* context)
 {
   bool result = true;
@@ -310,20 +325,7 @@ static bool type_check_block(Block* block, Context* context)
       result &= type_check_stmt(&item->stmt, context);
       break;
     case BLOCK_ITEM_DECL:
-      switch (item->decl.tag) {
-      case DECL_INVALID: MCC_UNREACHABLE(); break;
-      case DECL_VAR:
-        if (!type_check_variable_decl(&item->decl.var, context)) {
-          return false;
-        }
-        break;
-      case DECL_FUNC:
-        MCC_ASSERT(item->decl.func != nullptr);
-        if (!type_check_function_decl(item->decl.func, context)) {
-          return false;
-        }
-        break;
-      }
+      result &= type_check_decl(&item->decl, context);
       break;
     }
   }
@@ -371,7 +373,7 @@ ErrorsView type_check(TranslationUnit* ast, Arena* permanent_arena)
                      .functions = ast->functions};
 
   for (uint32_t i = 0; i < ast->decl_count; ++i) {
-    type_check_function_decl(ast->decls[i], &context);
+    type_check_decl(&ast->decls[i], &context);
   }
 
   return (ErrorsView){

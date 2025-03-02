@@ -132,12 +132,23 @@ static const char* string_from_stmt_tag(StmtTag stmt_tag)
   MCC_UNREACHABLE();
 }
 
+static void ast_print_storage_class(StorageClass storage_class)
+{
+  switch (storage_class) {
+  case STORAGE_CLASS_NONE: break;
+  case STORAGE_CLASS_EXTERN: printf(" extern"); break;
+  case STORAGE_CLASS_STATIC: printf(" static"); break;
+  }
+}
+
 static void ast_print_var_decl(const VariableDecl* decl, int indent)
 {
   printf("%*sVariableDecl ", indent, "");
   print_source_range(decl->source_range);
-  printf("int ");
+  printf(" 'int ");
   print_str(decl->name->name);
+  printf("'");
+  ast_print_storage_class(decl->storage_class);
   printf("\n");
   if (decl->initializer) { ast_print_expr(decl->initializer, indent + 2); }
 }
@@ -228,7 +239,7 @@ static void ast_print_block(const Block* block, int indent)
 static void ast_print_parameters(Parameters parameters)
 {
   if (parameters.length == 0) {
-    printf("(void)\"\n");
+    printf("(void)");
   } else {
     printf("(");
     for (uint32_t i = 0; i < parameters.length; ++i) {
@@ -240,7 +251,7 @@ static void ast_print_parameters(Parameters parameters)
         print_str(param->name);
       }
     }
-    printf(")\"\n");
+    printf(")");
   }
 }
 
@@ -248,9 +259,13 @@ static void ast_print_function_decl(const FunctionDecl* decl, int indent)
 {
   printf("%*sFunctionDecl ", indent, "");
   print_source_range(decl->source_range);
-  printf(" \"int ");
+  printf(" \'int ");
   print_str(decl->name->name);
   ast_print_parameters(decl->params);
+  printf("\'");
+
+  ast_print_storage_class(decl->storage_class);
+  printf("\n");
 
   if (decl->body) { ast_print_block(decl->body, indent + 2); }
 }
@@ -259,6 +274,6 @@ void ast_print_translation_unit(const TranslationUnit* tu)
 {
   printf("TranslationUnit\n");
   for (size_t i = 0; i < tu->decl_count; ++i) {
-    ast_print_function_decl(tu->decls[i], 2);
+    ast_print_decl(tu->decls + i, 2);
   }
 }

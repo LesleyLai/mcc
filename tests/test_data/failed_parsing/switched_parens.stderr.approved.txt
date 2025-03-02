@@ -1,4 +1,4 @@
-{{filename}}:1:10: Error: Expect (
+{{filename}}:1:10: Error: expect ';'
 1 | int main )( {
   |          ^
 

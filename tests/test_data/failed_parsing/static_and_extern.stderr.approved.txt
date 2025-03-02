@@ -1,0 +1,4 @@
+{{filename}}:1:8: Error: multiple storage classes in declaration specifiers
+1 | static extern int a;
+  |        ^~~~~~
+

@@ -108,7 +108,15 @@ typedef struct Expr {
   };
 } Expr;
 
+typedef enum StorageClass {
+  STORAGE_CLASS_NONE = 0,
+  STORAGE_CLASS_EXTERN,
+  STORAGE_CLASS_STATIC,
+} StorageClass;
+
 typedef struct VariableDecl {
+  const Type* type;
+  StorageClass storage_class;
   SourceRange source_range;
   Identifier* name;
   Expr* initializer; // An optional initializer
@@ -183,6 +191,8 @@ typedef struct Parameters {
 } Parameters;
 
 typedef struct FunctionDecl {
+  const Type* return_type;
+  StorageClass storage_class;
   SourceRange source_range;
   Identifier* name;
   Parameters params;
@@ -218,7 +228,7 @@ typedef struct BlockItem {
 
 typedef struct TranslationUnit {
   uint32_t decl_count;
-  FunctionDecl** decls;
+  Decl* decls;
   Scope* global_scope;
 
   // Besides stored in the scopes, the identifiers of functions in a translation

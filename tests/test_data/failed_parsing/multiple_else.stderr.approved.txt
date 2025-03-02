@@ -2,7 +2,7 @@
 7 |   } else {
   |     ^~~~
 
-{{filename}}:10:1: Error: Expect keyword int
+{{filename}}:10:1: Error: A type specifier is required for all declarations
 10 | }
   | ^
 

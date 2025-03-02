@@ -13,6 +13,7 @@ add_executable(mcc_unit_tests
         dynarray_test.cpp
         line_numbers_test.cpp
         hash_table_test.cpp
+        ../test_data/failed_parsing/multiple_storage_class_fun.c
 )
 target_link_libraries(mcc_unit_tests PUBLIC mcc_lib mcc::compiler_warnings Catch2::Catch2WithMain fmt::fmt)
 
