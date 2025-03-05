@@ -181,7 +181,7 @@ static Expr* parse_identifier_expr(Parser* parser, Scope* scope)
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
 
   // If local variable does not exist
-  const Identifier* variable = lookup_identifier(scope, identifier);
+  const IdentifierInfo* variable = lookup_identifier(scope, identifier);
   if (!variable) {
     const StringView error_msg = allocate_printf(
         parser->permanent_arena, "use of undeclared identifier '%.*s'",
@@ -626,8 +626,9 @@ static VariableDecl parse_variable_decl(Parser* parser,
                                         Token name_token, struct Scope* scope)
 {
   const StringView name = str_from_token(parser->src, name_token);
-  Identifier* variable =
-      add_identifier(scope, name, IDENT_OBJECT, parser->permanent_arena);
+  // TODO: handle different linkages
+  IdentifierInfo* variable = add_identifier(
+      scope, name, IDENT_OBJECT, LINKAGE_NONE, parser->permanent_arena);
   if (!variable) {
     const StringView error_msg =
         allocate_printf(parser->permanent_arena, "redefinition of '%.*s'",
@@ -912,10 +913,10 @@ static Stmt parse_stmt(Parser* parser, Scope* scope)
 struct ParameterVec {
   uint32_t length;
   uint32_t capacity;
-  Identifier** data;
+  IdentifierInfo** data;
 };
 
-static Identifier* parse_parameter(Parser* parser, Scope* scope)
+static IdentifierInfo* parse_parameter(Parser* parser, Scope* scope)
 {
   const Token current_token = parser_current_token(parser);
 
@@ -936,8 +937,8 @@ static Identifier* parse_parameter(Parser* parser, Scope* scope)
       parse_advance(parser);
     }
 
-    Identifier* name = add_identifier(scope, identifier, IDENT_OBJECT,
-                                      parser->permanent_arena);
+    IdentifierInfo* name = add_identifier(
+        scope, identifier, IDENT_OBJECT, LINKAGE_NONE, parser->permanent_arena);
     // TODO: error handling
     MCC_ASSERT(name != nullptr);
     return name;
@@ -974,24 +975,24 @@ static Parameters parse_parameter_list(Parser* parser, Scope* scope)
 
   {
     // first parameter
-    Identifier* name = parse_parameter(parser, scope);
-    DYNARRAY_PUSH_BACK(&parameters_vec, Identifier*, &parser->scratch_arena,
+    IdentifierInfo* name = parse_parameter(parser, scope);
+    DYNARRAY_PUSH_BACK(&parameters_vec, IdentifierInfo*, &parser->scratch_arena,
                        name);
   }
   while (!token_match_or_eof(parser, TOKEN_RIGHT_PAREN)) {
     parse_consume(parser, TOKEN_COMMA, "Expect ','");
-    Identifier* name = parse_parameter(parser, scope);
-    DYNARRAY_PUSH_BACK(&parameters_vec, Identifier*, &parser->scratch_arena,
+    IdentifierInfo* name = parse_parameter(parser, scope);
+    DYNARRAY_PUSH_BACK(&parameters_vec, IdentifierInfo*, &parser->scratch_arena,
                        name);
   }
 
   parse_consume(parser, TOKEN_RIGHT_PAREN, "Expect )");
 
-  Identifier** params = ARENA_ALLOC_ARRAY(parser->permanent_arena, Identifier*,
-                                          parameters_vec.length);
+  IdentifierInfo** params = ARENA_ALLOC_ARRAY(
+      parser->permanent_arena, IdentifierInfo*, parameters_vec.length);
   if (parameters_vec.length != 0) {
     memcpy(params, parameters_vec.data,
-           parameters_vec.length * sizeof(Identifier*));
+           parameters_vec.length * sizeof(IdentifierInfo*));
   }
 
   return (Parameters){
@@ -1005,8 +1006,8 @@ static FunctionDecl* parse_function_decl(Parser* parser,
                                          Token name_token, Scope* scope)
 {
   StringView name = str_from_token(parser->src, name_token);
-  Identifier* function_ident =
-      add_identifier(scope, name, IDENT_FUNCTION, parser->permanent_arena);
+  IdentifierInfo* function_ident = add_identifier(
+      scope, name, IDENT_FUNCTION, LINKAGE_EXTERNAL, parser->permanent_arena);
 
   if (!function_ident) {
     function_ident = lookup_identifier(scope, name);

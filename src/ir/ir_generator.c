@@ -726,16 +726,16 @@ static IRFunctionDef generate_ir_function_def(const FunctionDecl* decl,
                          .instructions = instructions};
 }
 
-typedef struct IRFunctionVec {
-  IRFunctionDef* data;
+typedef struct IRTopLevelVec {
+  IRTopLevel** data;
   uint32_t length;
   uint32_t capacity;
-} IRFunctionVec;
+} IRTopLevelVec;
 
 IRGenerationResult ir_generate(const TranslationUnit* ast,
                                Arena* permanent_arena, Arena scratch_arena)
 {
-  IRFunctionVec ir_function_vec = {};
+  IRTopLevelVec top_level_vec = {};
 
   IRGenTUContext context = (IRGenTUContext){.permanent_arena = permanent_arena,
                                             .scratch_arena = &scratch_arena,
@@ -745,29 +745,49 @@ IRGenerationResult ir_generate(const TranslationUnit* ast,
     Decl* decl = &ast->decls[i];
     switch (decl->tag) {
     case DECL_INVALID: MCC_UNREACHABLE(); break;
-    case DECL_VAR: MCC_UNIMPLEMENTED(); break;
+    case DECL_VAR: {
+      IRTopLevel* top_level = ARENA_ALLOC_OBJECT(permanent_arena, IRTopLevel);
+
+      int32_t value = 0;
+      if (decl->var.initializer) {
+        MCC_ASSERT(decl->var.initializer->tag == EXPR_CONST);
+        value = decl->var.initializer->const_expr.val;
+      }
+
+      *top_level = (IRTopLevel){
+          .tag = IR_TOP_LEVEL_VARIABLE,
+          .variable =
+              (IRGlobalVariable){.name = decl->var.name->name, .value = value},
+      };
+      DYNARRAY_PUSH_BACK(&top_level_vec, IRTopLevel*, &scratch_arena,
+                         top_level);
+
+    } break;
     case DECL_FUNC:
       if (decl->func->body != nullptr) {
-        IRFunctionDef function_def =
-            generate_ir_function_def(decl->func, &context);
-        DYNARRAY_PUSH_BACK(&ir_function_vec, IRFunctionDef, &scratch_arena,
-                           function_def);
+        IRTopLevel* top_level = ARENA_ALLOC_OBJECT(permanent_arena, IRTopLevel);
+        *top_level = (IRTopLevel){
+            .tag = IR_TOP_LEVEL_FUNCTION,
+            .function = generate_ir_function_def(decl->func, &context),
+        };
+        DYNARRAY_PUSH_BACK(&top_level_vec, IRTopLevel*, &scratch_arena,
+                           top_level);
       }
       break;
     }
   }
 
-  IRFunctionDef* ir_functions =
-      ARENA_ALLOC_ARRAY(permanent_arena, IRFunctionDef, ir_function_vec.length);
-  memcpy(ir_functions, ir_function_vec.data,
-         ir_function_vec.length * sizeof(IRFunctionDef));
+  IRTopLevel** ir_top_levels =
+      ARENA_ALLOC_ARRAY(permanent_arena, IRTopLevel*, top_level_vec.length);
+  memcpy(ir_top_levels, top_level_vec.data,
+         top_level_vec.length * sizeof(IRTopLevel*));
 
   IRProgram* program = nullptr;
   if (context.errors.length == 0) {
     program = ARENA_ALLOC_OBJECT(permanent_arena, IRProgram);
     *program = (IRProgram){
-        .function_count = ir_function_vec.length,
-        .functions = ir_functions,
+        .top_level_count = top_level_vec.length,
+        .top_levels = ir_top_levels,
     };
   }
 

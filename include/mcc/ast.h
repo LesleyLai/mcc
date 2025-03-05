@@ -64,7 +64,7 @@ typedef enum BinaryOpType {
 } BinaryOpType;
 
 typedef struct Expr Expr;
-typedef struct Identifier Identifier; // identifier
+typedef struct IdentifierInfo IdentifierInfo; // identifier
 typedef struct Scope Scope;
 
 struct ConstExpr {
@@ -102,7 +102,7 @@ typedef struct Expr {
     struct ConstExpr const_expr;
     struct UnaryOpExpr unary_op;
     struct BinaryOpExpr binary_op;
-    const Identifier* variable;
+    const IdentifierInfo* variable;
     struct TernaryExpr ternary;
     struct CallExpr call;
   };
@@ -118,7 +118,7 @@ typedef struct VariableDecl {
   const Type* type;
   StorageClass storage_class;
   SourceRange source_range;
-  Identifier* name;
+  IdentifierInfo* name;
   Expr* initializer; // An optional initializer
 } VariableDecl;
 
@@ -187,14 +187,14 @@ struct Stmt {
 
 typedef struct Parameters {
   uint32_t length;
-  Identifier** data;
+  IdentifierInfo** data;
 } Parameters;
 
 typedef struct FunctionDecl {
   const Type* return_type;
   StorageClass storage_class;
   SourceRange source_range;
-  Identifier* name;
+  IdentifierInfo* name;
   Parameters params;
   Block* body; // Optional
 } FunctionDecl;

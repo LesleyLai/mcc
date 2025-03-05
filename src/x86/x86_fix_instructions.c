@@ -1,12 +1,18 @@
 #include "x86_passes.h"
 
+[[nodiscard]]
+static bool is_address(X86OperandType operand_type)
+{
+  return operand_type == X86_OPERAND_STACK || operand_type == X86_OPERAND_DATA;
+}
+
 static void fix_binary_instruction(X86InstructionVector* new_instructions,
                                    X86Instruction instruction)
 {
   // Fix this binary instruction if both source and destination are memory
   // addresses
-  if (instruction.binary.src.typ == X86_OPERAND_STACK &&
-      instruction.binary.dest.typ == X86_OPERAND_STACK) {
+  if (is_address(instruction.binary.src.typ) &&
+      is_address(instruction.binary.dest.typ)) {
     const X86Operand temp_register = register_operand(X86_REG_R10);
     push_instruction(
         new_instructions,
@@ -24,7 +30,7 @@ static void fix_binary_instruction(X86InstructionVector* new_instructions,
 static void fix_shift_instruction(X86InstructionVector* new_instructions,
                                   X86Instruction instruction)
 {
-  if (instruction.binary.dest.typ == X86_OPERAND_STACK) {
+  if (is_address(instruction.binary.dest.typ)) {
     push_instruction(
         new_instructions,
         mov(X86_SZ_1, register_operand(X86_REG_CX), instruction.binary.src));
@@ -41,7 +47,7 @@ static void fix_imul_instruction(X86InstructionVector* new_instructions,
 {
   // imul can't use a memory address as its destination, regardless of its
   // source operand
-  if (instruction.binary.dest.typ == X86_OPERAND_STACK) {
+  if (is_address(instruction.binary.dest.typ)) {
     const X86Operand temp_register = register_operand(X86_REG_R11);
     push_instruction(
         new_instructions,
@@ -84,8 +90,7 @@ static void fix_cmp_instruction(X86InstructionVector* new_instructions,
 
   // the first argument of cmp can't be an immediate operands
   const bool first_is_immediate = first.typ == X86_OPERAND_IMMEDIATE;
-  const bool both_are_address =
-      first.typ == X86_OPERAND_STACK && second.typ == X86_OPERAND_STACK;
+  const bool both_are_address = is_address(first.typ) && is_address(second.typ);
 
   if (first_is_immediate || both_are_address) {
     const X86Operand temp_register = register_operand(X86_REG_R10);

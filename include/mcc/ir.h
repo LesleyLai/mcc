@@ -20,8 +20,8 @@ IRGenerationResult ir_generate(const struct TranslationUnit* ast,
 void print_ir(const struct IRProgram* ir);
 
 typedef struct IRProgram {
-  size_t function_count;
-  struct IRFunctionDef* functions;
+  size_t top_level_count;
+  struct IRTopLevel** top_levels;
 } IRProgram;
 
 typedef struct IRFunctionDef {
@@ -32,6 +32,25 @@ typedef struct IRFunctionDef {
   struct IRInstruction* instructions;
   StringView* params;
 } IRFunctionDef;
+
+typedef struct IRGlobalVariable {
+  StringView name;
+  int32_t value;
+} IRGlobalVariable;
+
+typedef enum IRTopLevelTag {
+  IR_TOP_LEVEL_INVALID,
+  IR_TOP_LEVEL_FUNCTION,
+  IR_TOP_LEVEL_VARIABLE,
+} IRTopLevelTag;
+
+typedef struct IRTopLevel {
+  IRTopLevelTag tag;
+  union {
+    IRFunctionDef function;
+    IRGlobalVariable variable;
+  };
+} IRTopLevel;
 
 typedef enum IRValueType {
   IR_VALUE_TYPE_CONSTANT,

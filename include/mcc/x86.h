@@ -2,22 +2,44 @@
 #define MCC_X86_H
 
 #include "arena.h"
+#include "hash_table.h"
 #include "str.h"
 
 typedef struct X86Program X86Program;
+typedef struct X86TopLevel X86TopLevel;
+typedef struct X86GlobalVariable X86GlobalVariable;
 typedef struct X86FunctionDef X86FunctionDef;
 typedef struct X86Instruction X86Instruction;
 typedef struct X86Operand X86Operand;
 
 struct X86Program {
-  size_t function_count;
-  X86FunctionDef* functions;
+  size_t top_level_count;
+  X86TopLevel* top_levels;
+};
+
+typedef enum X86TopLevelTag {
+  X86_TOPLEVEL_INVALID = 0,
+  X86_TOPLEVEL_VARIABLE,
+  X86_TOPLEVEL_FUNCTION,
+} X86TopLevelTag;
+
+struct X86TopLevel {
+  X86TopLevelTag tag;
+  union {
+    X86FunctionDef* function;
+    X86GlobalVariable* variable;
+  };
 };
 
 struct X86FunctionDef {
   StringView name;
   size_t instruction_count;
   X86Instruction* instructions;
+};
+
+struct X86GlobalVariable {
+  StringView name;
+  int32_t value;
 };
 
 // Size in bytes
@@ -49,6 +71,7 @@ typedef enum X86OperandType {
   X86_OPERAND_REGISTER,
   X86_OPERAND_PSEUDO, // Represent a temporary variable
   X86_OPERAND_STACK,  // Something on the stack
+  X86_OPERAND_DATA,   // Global variable
 } X86OperandType;
 
 struct X86StackOperand {
@@ -62,6 +85,7 @@ struct X86Operand {
     X86Register reg;
     StringView pseudo;
     struct X86StackOperand stack;
+    StringView data;
   };
 };
 

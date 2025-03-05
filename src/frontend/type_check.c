@@ -335,7 +335,7 @@ static bool type_check_block(Block* block, Context* context)
 static bool type_check_function_decl(FunctionDecl* decl, Context* context)
 {
   StringView function_name = decl->name->name;
-  Identifier* function_ident =
+  IdentifierInfo* function_ident =
       hashmap_lookup(&context->functions, function_name);
 
   if (function_ident->type == nullptr) {
@@ -359,7 +359,7 @@ static bool type_check_function_decl(FunctionDecl* decl, Context* context)
     function_ident->has_definition = true;
 
     for (uint32_t i = 0; i < decl->params.length; ++i) {
-      Identifier* param = decl->params.data[i];
+      IdentifierInfo* param = decl->params.data[i];
       param->type = typ_int;
     }
     if (!type_check_block(decl->body, context)) { return false; }

@@ -1,4 +1,5 @@
 #include "x86_passes.h"
+#include "x86_symbols.h"
 
 #include <mcc/dynarray.h>
 
@@ -48,11 +49,20 @@ static void add_unique_name_if_pseudo(struct UniqueNameMap* unique_names,
 
 // If operand is a pseudo register, replace it with a stack address
 static void replace_pseudo_register(struct UniqueNameMap* unique_names,
-                                    X86Operand* operand)
+                                    X86Operand* operand,
+                                    X86CodegenContext* context)
 {
   if (operand->typ == X86_OPERAND_PSEUDO) {
-    *operand =
-        stack_operand(find_name_stack_offset(unique_names, operand->pseudo));
+    if (has_symbol(context->symbols, operand->pseudo)) {
+      const StringView name = operand->pseudo;
+      *operand = (X86Operand){
+          .typ = X86_OPERAND_DATA,
+          .data = name,
+      };
+    } else {
+      *operand =
+          stack_operand(find_name_stack_offset(unique_names, operand->pseudo));
+    }
   }
 }
 
@@ -96,14 +106,15 @@ uint32_t replace_pseudo_registers(X86InstructionVector* instructions,
       MCC_UNREACHABLE();
       break;
     X86_UNARY_INSTRUCTION_CASES: {
-      replace_pseudo_register(&unique_names, &instruction->unary.op);
+      replace_pseudo_register(&unique_names, &instruction->unary.op, context);
     } break;
     X86_BINARY_INSTRUCTION_CASES: {
-      replace_pseudo_register(&unique_names, &instruction->binary.src);
-      replace_pseudo_register(&unique_names, &instruction->binary.dest);
+      replace_pseudo_register(&unique_names, &instruction->binary.src, context);
+      replace_pseudo_register(&unique_names, &instruction->binary.dest,
+                              context);
     } break;
     case X86_INST_SETCC: {
-      replace_pseudo_register(&unique_names, &instruction->setcc.op);
+      replace_pseudo_register(&unique_names, &instruction->setcc.op, context);
     } break;
     case X86_INST_NOP: [[fallthrough]];
     case X86_INST_RET: [[fallthrough]];

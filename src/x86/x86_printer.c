@@ -96,6 +96,10 @@ static void print_x86_operand(X86Operand operand, X86Size size, FILE* stream)
       (void)fprintf(stream, "%s rbp", size_directive(size));
     }
     break;
+  case X86_OPERAND_DATA:
+    (void)fprintf(stream, "%s [rip + %.*s]", size_directive(size),
+                  (int)operand.data.size, operand.data.start);
+    break;
   }
 }
 
@@ -232,10 +236,30 @@ void x86_dump_assembly(const X86Program* program, FILE* stream)
 {
   (void)fputs(".intel_syntax noprefix\n", stream);
 
-  for (size_t i = 0; i < program->function_count; ++i) {
-    (void)fprintf(stream, ".globl %.*s\n", (int)program->functions[i].name.size,
-                  program->functions[i].name.start);
-    dump_x86_function(&program->functions[i], stream);
+  for (size_t i = 0; i < program->top_level_count; ++i) {
+    const X86TopLevel top_level = program->top_levels[i];
+    switch (top_level.tag) {
+    case X86_TOPLEVEL_INVALID: MCC_UNREACHABLE(); break;
+    case X86_TOPLEVEL_VARIABLE: {
+      X86GlobalVariable* variable = top_level.variable;
+      (void)fprintf(stream, ".globl %.*s\n", (int)variable->name.size,
+                    variable->name.start);
+      (void)fprintf(stream, ".data\n");
+      (void)fprintf(stream, ".align 4\n");
+      (void)fprintf(stream, "%.*s:\n", (int)variable->name.size,
+                    variable->name.start);
+      (void)fprintf(stream, "    .long %d\n", variable->value);
+    } break;
+    case X86_TOPLEVEL_FUNCTION: {
+      X86FunctionDef* function = top_level.function;
+      (void)fprintf(stream, ".globl %.*s\n", (int)function->name.size,
+                    function->name.start);
+      (void)fprintf(stream, ".type %.*s, @function\n", (int)function->name.size,
+                    function->name.start);
+      (void)fprintf(stream, ".text\n");
+      dump_x86_function(function, stream);
+    } break;
+    }
   }
 
 #ifdef __linux__
