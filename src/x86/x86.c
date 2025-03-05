@@ -40,7 +40,9 @@ static X86FunctionDef x86_generate_function(const IRFunctionDef* ir_function,
 X86Program x86_generate_assembly(IRProgram* ir, Arena* permanent_arena,
                                  Arena scratch_arena)
 {
-  const size_t function_count = ir->function_count;
+  // TODO: fix this
+
+  const size_t function_count = ir->top_level_count;
   X86FunctionDef* functions =
       ARENA_ALLOC_ARRAY(permanent_arena, X86FunctionDef, function_count);
 
@@ -51,7 +53,10 @@ X86Program x86_generate_assembly(IRProgram* ir, Arena* permanent_arena,
   };
 
   for (size_t i = 0; i < function_count; ++i) {
-    functions[i] = x86_generate_function(&ir->functions[i], &context);
+    if (ir->top_levels[i]->tag == IR_TOP_LEVEL_FUNCTION) {
+      functions[i] =
+          x86_generate_function(&ir->top_levels[i]->function, &context);
+    }
   }
 
   return (X86Program){.function_count = function_count, .functions = functions};

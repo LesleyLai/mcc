@@ -250,7 +250,7 @@ static void format_parameters(StringBuffer* output, Parameters parameters)
     string_buffer_printf(output, "(");
     for (uint32_t i = 0; i < parameters.length; ++i) {
       if (i > 0) { string_buffer_printf(output, ", "); }
-      const Identifier* param = parameters.data[i];
+      const IdentifierInfo* param = parameters.data[i];
       string_buffer_printf(output, "int");
       if (param->name.size != 0) {
         string_buffer_printf(output, " %.*s", (int)param->name.size,
