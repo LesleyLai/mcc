@@ -244,11 +244,19 @@ void x86_dump_assembly(const X86Program* program, FILE* stream)
       X86GlobalVariable* variable = top_level.variable;
       (void)fprintf(stream, ".globl %.*s\n", (int)variable->name.size,
                     variable->name.start);
-      (void)fprintf(stream, ".data\n");
-      (void)fprintf(stream, ".align 4\n");
-      (void)fprintf(stream, "%.*s:\n", (int)variable->name.size,
-                    variable->name.start);
-      (void)fprintf(stream, "    .long %d\n", variable->value);
+      if (variable->value == 0) {
+        (void)fprintf(stream, ".bss\n");
+        (void)fprintf(stream, ".align 4\n");
+        (void)fprintf(stream, "%.*s:\n", (int)variable->name.size,
+                      variable->name.start);
+        (void)fprintf(stream, "    .zero 4\n");
+      } else {
+        (void)fprintf(stream, ".data\n");
+        (void)fprintf(stream, ".align 4\n");
+        (void)fprintf(stream, "%.*s:\n", (int)variable->name.size,
+                      variable->name.start);
+        (void)fprintf(stream, "    .long %d\n", variable->value);
+      }
     } break;
     case X86_TOPLEVEL_FUNCTION: {
       X86FunctionDef* function = top_level.function;
