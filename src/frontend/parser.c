@@ -29,8 +29,7 @@ typedef struct Parser {
 
   struct ErrorVec errors;
 
-  struct Scope* global_scope;
-  HashMap functions;
+  SymbolTable* symbol_table;
 } Parser;
 
 #pragma region source range operations
@@ -175,24 +174,24 @@ static Expr* parse_identifier_expr(Parser* parser, Scope* scope)
 
   MCC_ASSERT(token.tag == TOKEN_IDENTIFIER);
 
-  const StringView identifier = str_from_token(parser->src, token);
+  const StringView name = str_from_token(parser->src, token);
 
   // TODO: handle typedef
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
 
   // If local variable does not exist
-  const IdentifierInfo* variable = lookup_identifier(scope, identifier);
-  if (!variable) {
+  const IdentifierInfo* variable_identifier = lookup_identifier(scope, name);
+  if (!variable_identifier) {
     const StringView error_msg = allocate_printf(
         parser->permanent_arena, "use of undeclared identifier '%.*s'",
-        (int)identifier.size, identifier.start);
+        (int)name.size, name.start);
     parse_error_at(parser, error_msg, token_source_range(token));
   }
 
   // TODO: handle the case wher variable == nullptr
   *result = (Expr){.tag = EXPR_VARIABLE,
                    .source_range = token_source_range(token),
-                   .variable = variable};
+                   .variable = variable_identifier};
   return result;
 }
 
@@ -215,19 +214,18 @@ typedef enum Precedence {
   PREC_PRIMARY
 } Precedence;
 
-static Expr* parse_expr(Parser* parser, struct Scope* scope);
-static Expr* parse_group(Parser* parser, struct Scope* scope);
-static Expr* parse_unary_op(Parser* parser, struct Scope* scope);
+static Expr* parse_expr(Parser* parser, Scope* scope);
+static Expr* parse_group(Parser* parser, Scope* scope);
+static Expr* parse_unary_op(Parser* parser, Scope* scope);
 static Expr* parse_binop_left(Parser* parser, Expr* lhs_expr,
-                              struct Scope* scope); // left associative
+                              Scope* scope); // left associative
 static Expr* parse_assignment(Parser* parser, Expr* lhs_expr,
-                              struct Scope* scope); // right associative
+                              Scope* scope); // right associative
 static Expr* parse_ternary(Parser* parser, Expr* cond, struct Scope* scope);
-static Expr* parse_function_call(Parser* parser, Expr* function,
-                                 struct Scope* scope);
+static Expr* parse_function_call(Parser* parser, Expr* function, Scope* scope);
 
-typedef Expr* (*PrefixParseFn)(Parser*, struct Scope* scope);
-typedef Expr* (*InfixParseFn)(Parser*, Expr*, struct Scope* scope);
+typedef Expr* (*PrefixParseFn)(Parser*, Scope* scope);
+typedef Expr* (*InfixParseFn)(Parser*, Expr*, Scope* scope);
 
 typedef struct ParseRule {
   PrefixParseFn prefix;
@@ -619,21 +617,34 @@ done:
 
 static FunctionDecl* parse_function_decl(Parser* parser,
                                          DeclSpecifier decl_specifier,
-                                         Token name_token, struct Scope* scope);
+                                         Token name_token, Scope* scope);
 
 static VariableDecl parse_variable_decl(Parser* parser,
                                         DeclSpecifier decl_specifier,
-                                        Token name_token, struct Scope* scope)
+                                        Token name_token, Scope* scope)
 {
   const StringView name = str_from_token(parser->src, name_token);
-  // TODO: handle different linkages
-  IdentifierInfo* variable = add_identifier(
-      scope, name, IDENT_OBJECT, LINKAGE_NONE, parser->permanent_arena);
+
+  const bool is_global_variable = scope == parser->symbol_table->global_scope;
+
+  // TODO: properly handle linkage
+  Linkage linkage = LINKAGE_NONE;
+  if (is_global_variable) { linkage = LINKAGE_EXTERNAL; }
+
+  IdentifierInfo* variable =
+      add_identifier(parser->symbol_table, scope, name, IDENT_OBJECT, linkage,
+                     parser->permanent_arena);
   if (!variable) {
-    const StringView error_msg =
-        allocate_printf(parser->permanent_arena, "redefinition of '%.*s'",
-                        (int)name.size, name.start);
-    parse_error_at(parser, error_msg, token_source_range(name_token));
+    if (linkage != LINKAGE_NONE) {
+      variable = lookup_identifier(scope, name);
+      MCC_ASSERT(variable != nullptr);
+
+    } else {
+      const StringView error_msg =
+          allocate_printf(parser->permanent_arena, "redefinition of '%.*s'",
+                          (int)name.size, name.start);
+      parse_error_at(parser, error_msg, token_source_range(name_token));
+    }
   }
 
   Expr* initializer = nullptr;
@@ -646,11 +657,11 @@ static VariableDecl parse_variable_decl(Parser* parser,
   // TODO: handle the case where variable == nullptr
   return (VariableDecl){.type = decl_specifier.type,
                         .storage_class = decl_specifier.storage_class,
-                        .name = variable,
+                        .identifier = variable,
                         .initializer = initializer};
 }
 
-static Decl parse_decl(Parser* parser, struct Scope* scope)
+static Decl parse_decl(Parser* parser, Scope* scope)
 {
   const DeclSpecifier decl_specifier = parse_decl_specifiers(parser);
   const Token name_token = parse_identifier(parser);
@@ -937,8 +948,9 @@ static IdentifierInfo* parse_parameter(Parser* parser, Scope* scope)
       parse_advance(parser);
     }
 
-    IdentifierInfo* name = add_identifier(
-        scope, identifier, IDENT_OBJECT, LINKAGE_NONE, parser->permanent_arena);
+    IdentifierInfo* name =
+        add_identifier(parser->symbol_table, scope, identifier, IDENT_OBJECT,
+                       LINKAGE_NONE, parser->permanent_arena);
     // TODO: error handling
     MCC_ASSERT(name != nullptr);
     return name;
@@ -1006,8 +1018,9 @@ static FunctionDecl* parse_function_decl(Parser* parser,
                                          Token name_token, Scope* scope)
 {
   StringView name = str_from_token(parser->src, name_token);
-  IdentifierInfo* function_ident = add_identifier(
-      scope, name, IDENT_FUNCTION, LINKAGE_EXTERNAL, parser->permanent_arena);
+  IdentifierInfo* function_ident =
+      add_identifier(parser->symbol_table, scope, name, IDENT_FUNCTION,
+                     LINKAGE_EXTERNAL, parser->permanent_arena);
 
   if (!function_ident) {
     function_ident = lookup_identifier(scope, name);
@@ -1021,11 +1034,8 @@ static FunctionDecl* parse_function_decl(Parser* parser,
     }
   }
 
-  hashmap_try_insert(&parser->functions, name, function_ident,
-                     parser->permanent_arena);
-
   Scope* function_scope =
-      new_scope(parser->global_scope, parser->permanent_arena);
+      new_scope(parser->symbol_table->global_scope, parser->permanent_arena);
   const Parameters parameters = parse_parameter_list(parser, function_scope);
 
   Block* body = NULL;
@@ -1065,7 +1075,7 @@ static TranslationUnit* parse_translation_unit(Parser* parser)
   struct DeclVec decl_vec = {};
 
   while (parser_current_token(parser).tag != TOKEN_EOF) {
-    Decl decl = parse_decl(parser, parser->global_scope);
+    Decl decl = parse_decl(parser, parser->symbol_table->global_scope);
     DYNARRAY_PUSH_BACK(&decl_vec, Decl, &parser->scratch_arena, decl);
   }
 
@@ -1077,12 +1087,9 @@ static TranslationUnit* parse_translation_unit(Parser* parser)
 
   TranslationUnit* tu =
       ARENA_ALLOC_OBJECT(parser->permanent_arena, TranslationUnit);
-  *tu = (TranslationUnit){
-      .decl_count = decl_count,
-      .decls = decls,
-      .global_scope = parser->global_scope,
-      .functions = parser->functions,
-  };
+  *tu = (TranslationUnit){.decl_count = decl_count,
+                          .decls = decls,
+                          .symbol_table = parser->symbol_table};
   parse_consume(parser, TOKEN_EOF, "Expect end of the file");
 
   return tu;
@@ -1091,12 +1098,17 @@ static TranslationUnit* parse_translation_unit(Parser* parser)
 ParseResult parse(const char* src, Tokens tokens, Arena* permanent_arena,
                   Arena scratch_arena)
 {
+  SymbolTable* symbol_table = ARENA_ALLOC_OBJECT(permanent_arena, SymbolTable);
+  *symbol_table = (SymbolTable){
+      .global_symbols = (HashMap){},
+      .global_scope = new_scope(nullptr, permanent_arena),
+  };
+
   Parser parser = {.src = src,
                    .tokens = tokens,
                    .permanent_arena = permanent_arena,
                    .scratch_arena = scratch_arena,
-                   .global_scope = new_scope(nullptr, permanent_arena),
-                   .functions = (HashMap){}};
+                   .symbol_table = symbol_table};
 
   TranslationUnit* tu = parse_translation_unit(&parser);
 

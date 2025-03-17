@@ -40,8 +40,6 @@ static X86FunctionDef x86_generate_function(const IRFunctionDef* ir_function,
 X86Program x86_generate_assembly(IRProgram* ir, Arena* permanent_arena,
                                  Arena scratch_arena)
 {
-  // TODO: fix this
-
   const size_t top_level_count = ir->top_level_count;
   X86TopLevel* top_levels =
       ARENA_ALLOC_ARRAY(permanent_arena, X86TopLevel, top_level_count);

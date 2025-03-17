@@ -18,7 +18,7 @@ struct ErrorVec {
 typedef struct Context {
   struct ErrorVec errors;
   Arena* permanent_arena;
-  HashMap functions;
+  SymbolTable* symbol_table;
 } Context;
 
 #pragma region error reporter
@@ -114,6 +114,15 @@ static void report_multiple_definition(FunctionDecl* decl, Context* context)
                       (int)decl->name->name.size, decl->name->name.start);
   error_at(msg, decl->source_range, context);
 }
+
+static void report_redefinition_of_var(VariableDecl* decl, Context* context)
+{
+  StringView msg = allocate_printf(
+      context->permanent_arena, "redefinition of '%.*s'",
+      (int)decl->identifier->name.size, decl->identifier->name.start);
+  error_at(msg, decl->source_range, context);
+}
+
 #pragma endregion
 
 [[nodiscard]]
@@ -280,13 +289,15 @@ static bool type_check_stmt(Stmt* stmt, Context* context)
 [[nodiscard]] static bool type_check_variable_decl(VariableDecl* decl,
                                                    Context* context)
 {
-  decl->name->type = typ_int;
+  decl->identifier->type = typ_int;
 
   if (decl->initializer) {
-    // TODO: handle redefinition of static/global variables
-    MCC_ASSERT(decl->name->has_definition == false);
+    if (decl->identifier->has_definition) {
+      report_redefinition_of_var(decl, context);
+      return false;
+    }
 
-    decl->name->has_definition = true;
+    decl->identifier->has_definition = true;
 
     if (!type_check_expr(decl->initializer, context)) { return false; }
 
@@ -336,7 +347,7 @@ static bool type_check_function_decl(FunctionDecl* decl, Context* context)
 {
   StringView function_name = decl->name->name;
   IdentifierInfo* function_ident =
-      hashmap_lookup(&context->functions, function_name);
+      hashmap_lookup(&context->symbol_table->global_symbols, function_name);
 
   if (function_ident->type == nullptr) {
     function_ident->type =
@@ -370,7 +381,7 @@ static bool type_check_function_decl(FunctionDecl* decl, Context* context)
 ErrorsView type_check(TranslationUnit* ast, Arena* permanent_arena)
 {
   Context context = {.permanent_arena = permanent_arena,
-                     .functions = ast->functions};
+                     .symbol_table = ast->symbol_table};
 
   for (uint32_t i = 0; i < ast->decl_count; ++i) {
     type_check_decl(&ast->decls[i], &context);

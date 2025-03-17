@@ -440,7 +440,7 @@ static void emit_ir_instructions_from_decl(const VariableDecl* decl,
         emit_ir_instructions_from_expr(decl->initializer, context);
     push_instruction(
         context,
-        ir_unary_instr(IR_COPY, ir_variable(decl->name->rewrote_name), value));
+        ir_unary_instr(IR_COPY, ir_variable(decl->identifier->rewrote_name), value));
   }
 }
 
@@ -757,7 +757,7 @@ IRGenerationResult ir_generate(const TranslationUnit* ast,
       *top_level = (IRTopLevel){
           .tag = IR_TOP_LEVEL_VARIABLE,
           .variable =
-              (IRGlobalVariable){.name = decl->var.name->name, .value = value},
+              (IRGlobalVariable){.name = decl->var.identifier->name, .value = value},
       };
       DYNARRAY_PUSH_BACK(&top_level_vec, IRTopLevel*, &scratch_arena,
                          top_level);

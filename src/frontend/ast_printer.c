@@ -148,8 +148,8 @@ static void format_var_decl(StringBuffer* output, const VariableDecl* decl,
 {
   string_buffer_printf(output, "%*sVariableDecl ", indent, "");
   format_source_range(output, decl->source_range);
-  string_buffer_printf(output, " %.*s: ", (int)decl->name->name.size,
-                       decl->name->name.start);
+  string_buffer_printf(output, " %.*s: ", (int)decl->identifier->name.size,
+                       decl->identifier->name.start);
   format_storage_class(output, decl->storage_class);
   string_buffer_append(output, str("int\n"));
   if (decl->initializer) { format_expr(output, decl->initializer, indent + 2); }

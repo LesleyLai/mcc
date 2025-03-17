@@ -101,7 +101,9 @@ static void print_ir_function(const IRFunctionDef* function)
 
 static void print_ir_global_var(const IRGlobalVariable* var)
 {
-  printf("global %.*s: i32\n", (int)var->name.size, var->name.start);
+  printf("global %.*s: i32", (int)var->name.size, var->name.start);
+  printf(" = %i", var->value);
+  printf("\n");
 }
 
 void print_ir(const IRProgram* ir)

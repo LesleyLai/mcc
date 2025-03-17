@@ -27,13 +27,10 @@ IdentifierInfo* lookup_identifier(const Scope* scope, StringView name)
   return lookup_identifier(scope->parent, name);
 }
 
-IdentifierInfo* add_identifier(Scope* scope, StringView name,
-                               IdentifierKind kind, Linkage linkage,
-                               Arena* arena)
+static IdentifierInfo* add_identifier_to_scope(Scope* scope, StringView name,
+                                               IdentifierKind kind,
+                                               Linkage linkage, Arena* arena)
 {
-  // check variable in current scope
-  if (hashmap_lookup(&scope->identifiers, name) != nullptr) { return nullptr; }
-
   // lookup variable in parent scopes
   const IdentifierInfo* parent_variable = nullptr;
   if (scope->parent) {
@@ -64,5 +61,23 @@ IdentifierInfo* add_identifier(Scope* scope, StringView name,
   const bool insert_succeed =
       hashmap_try_insert(&scope->identifiers, name, variable, arena);
   MCC_ASSERT(insert_succeed);
+
   return variable;
+}
+
+IdentifierInfo* add_identifier(SymbolTable* symbol_table, Scope* scope,
+                               StringView name, IdentifierKind kind,
+                               Linkage linkage, Arena* arena)
+{
+  // check identifier in current scope
+  if (hashmap_lookup(&scope->identifiers, name) != nullptr) { return nullptr; }
+
+  IdentifierInfo* ident_info =
+      add_identifier_to_scope(scope, name, kind, linkage, arena);
+
+  if (linkage != LINKAGE_NONE) {
+    hashmap_try_insert(&symbol_table->global_symbols, name, ident_info, arena);
+  }
+
+  return ident_info;
 }

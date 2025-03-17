@@ -118,7 +118,7 @@ typedef struct VariableDecl {
   const Type* type;
   StorageClass storage_class;
   SourceRange source_range;
-  IdentifierInfo* name;
+  IdentifierInfo* identifier;
   Expr* initializer; // An optional initializer
 } VariableDecl;
 
@@ -229,12 +229,8 @@ typedef struct BlockItem {
 typedef struct TranslationUnit {
   uint32_t decl_count;
   Decl* decls;
-  Scope* global_scope;
 
-  // Besides stored in the scopes, the identifiers of functions in a translation
-  // unit are also refered to in a separate hash table. This is useful because
-  // each named only map to one instance of a function no matter the scope
-  HashMap functions;
+  struct SymbolTable* symbol_table;
 } TranslationUnit;
 
 StringView string_from_ast(const TranslationUnit* tu, Arena* permanent_arena);

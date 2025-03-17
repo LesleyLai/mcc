@@ -45,14 +45,26 @@ typedef struct IdentifierInfo {
 // Represents a block scope
 typedef struct Scope Scope;
 
+// Represents a symbol table in a C translation unit, tracking both scoped and
+// global symbols. In C, identifiers with linkage can be referenced across
+// multiple scopes while remaining unique within a program. To account for this,
+// a pointer to global symbols are stored separately in addition to their
+// respective scopes.
+typedef struct SymbolTable {
+  // Tracks globally visible symbols (those with external or internal linkage)
+  HashMap global_symbols;
+  // Represents the global scope of the translation unit.
+  Scope* global_scope;
+} SymbolTable;
+
 Scope* new_scope(Scope* parent, Arena* arena);
 
 IdentifierInfo* lookup_identifier(const Scope* scope, StringView name);
 
 // Return nullptr if a variable of the same name already exist in the same scope
 // Otherwise we add it to the current scope
-IdentifierInfo* add_identifier(Scope* scope, StringView name,
-                               IdentifierKind kind, Linkage linkage,
-                               Arena* arena);
+IdentifierInfo* add_identifier(SymbolTable* symbol_table, Scope* scope,
+                               StringView name, IdentifierKind kind,
+                               Linkage linkage, Arena* arena);
 
 #endif // MCC_SYMBOL_TABLE_H
