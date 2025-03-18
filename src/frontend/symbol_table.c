@@ -78,6 +78,9 @@ FunctionIdentifierInfo* add_function_identifer(SymbolTable* symbol_table,
 {
   MCC_ASSERT(linkage != LINKAGE_NONE);
 
+  // check identifier in current scope
+  if (hashmap_lookup(&scope->identifiers, name) != nullptr) { return nullptr; }
+
   // TODO: proper types
   FunctionIdentifierInfo* info =
       ARENA_ALLOC_OBJECT(arena, FunctionIdentifierInfo);

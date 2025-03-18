@@ -87,7 +87,8 @@ Scope* new_scope(Scope* parent, Arena* arena);
 
 IdentifierInfo* lookup_identifier(const Scope* scope, StringView name);
 
-// Add information of the function identifier to the current scope
+// Return nullptr if an identifier of the same name already exist in the same
+// scope. Otherwise we add it to the current scope
 FunctionIdentifierInfo* add_function_identifer(SymbolTable* symbol_table,
                                                Scope* scope, StringView name,
                                                Linkage linkage, Arena* arena);

@@ -102,7 +102,7 @@ typedef struct Expr {
     struct ConstExpr const_expr;
     struct UnaryOpExpr unary_op;
     struct BinaryOpExpr binary_op;
-    const IdentifierInfo* variable;
+    IdentifierInfo* variable;
     struct TernaryExpr ternary;
     struct CallExpr call;
   };

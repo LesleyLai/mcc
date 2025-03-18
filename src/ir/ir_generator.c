@@ -359,9 +359,7 @@ static IRValue emit_ir_instructions_from_expr(const Expr* expr,
     }
   }
   case EXPR_VARIABLE: {
-    // TODO: fix this
-    // return ir_variable(expr->variable->rewrote_name);
-    return ir_variable(str("TODO"));
+    return ir_variable(as_object_ident(expr->variable)->rewrote_name);
   }
   case EXPR_TERNARY: {
     const StringView true_label =

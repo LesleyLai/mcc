@@ -180,7 +180,7 @@ static Expr* parse_identifier_expr(Parser* parser, Scope* scope)
   Expr* result = ARENA_ALLOC_OBJECT(parser->permanent_arena, Expr);
 
   // If local variable does not exist
-  const IdentifierInfo* variable_identifier = lookup_identifier(scope, name);
+  IdentifierInfo* variable_identifier = lookup_identifier(scope, name);
   if (!variable_identifier) {
     const StringView error_msg = allocate_printf(
         parser->permanent_arena, "use of undeclared identifier '%.*s'",

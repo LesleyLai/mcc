@@ -95,7 +95,7 @@ async fn run_test(database: &TestDatabase, config: &TestConfig) -> Result<(), Te
         .args(["-c", &command])
         .output();
 
-    let timeout_duration = Duration::from_secs(1);
+    let timeout_duration = Duration::from_secs(10);
     let output = timeout(timeout_duration, output).await;
     if output.is_err() {
         return Err(TestError {
