@@ -48,7 +48,7 @@ pub fn report_tests(database: &TestDatabase, test_output: TestsOutput) -> ExitCo
             println!("{}:", "Failed".red().bold());
             println!("{error}");
 
-            if let Err(snapshot_error) = &error.stderr_snapshot_result {
+            if let Some(snapshot_error) = error.stderr_snapshot_error() {
                 if global_config().interactive
                     && yes_or_no_input("overwrite approved file [yes/no]? ")
                 {

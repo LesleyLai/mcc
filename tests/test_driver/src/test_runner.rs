@@ -4,15 +4,48 @@ use crate::test_database::TestDatabase;
 use std::fmt::Display;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::time::timeout;
+
+enum TestErrorKind {
+    ResultMismatch(TestResultMismatch),
+    Timeout(Duration),
+}
 
 pub struct TestError {
+    kind: TestErrorKind,
+}
+
+impl TestError {
+    // Gets a SnapshotError if there is the mismatch between stderr and its snapshot
+    pub fn stderr_snapshot_error(&self) -> Option<&SnapshotError> {
+        match &self.kind {
+            TestErrorKind::ResultMismatch(mismatch) => {
+                mismatch.stderr_snapshot_result.as_ref().err()
+            }
+            _ => None,
+        }
+    }
+}
+
+impl Display for TestError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.kind {
+            TestErrorKind::ResultMismatch(mismatch) => mismatch.fmt(f),
+            TestErrorKind::Timeout(duration) => {
+                writeln!(f, "timeout after {}s", duration.as_secs_f32())
+            }
+        }
+    }
+}
+
+pub struct TestResultMismatch {
     expect_code: i32,
     actual_code: Option<i32>, // If no actual code, that means the code is returned as a signal
     actual_stderr: Arc<str>,
     pub stderr_snapshot_result: Result<(), SnapshotError>, // only have something when we have a mismatch in actual stderr and expected stderr
 }
 
-impl Display for TestError {
+impl Display for TestResultMismatch {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self
             .actual_code
@@ -60,16 +93,23 @@ async fn run_test(database: &TestDatabase, config: &TestConfig) -> Result<(), Te
     let output = tokio::process::Command::new("sh")
         .current_dir(database.get_path(working_dir))
         .args(["-c", &command])
-        .output()
-        .await
-        .expect("Failed to test command");
+        .output();
+
+    let timeout_duration = Duration::from_secs(1);
+    let output = timeout(timeout_duration, output).await;
+    if output.is_err() {
+        return Err(TestError {
+            kind: TestErrorKind::Timeout(timeout_duration),
+        });
+    }
+
+    let output = output.unwrap().unwrap();
 
     let actual_code = output.status.code();
 
     let actual_stderr = String::from_utf8_lossy(&output.stderr);
     // TODO: better way to replace file name
-    let actual_stderr =
-        actual_stderr.replace(path.to_str().unwrap(), "{{filename}}");
+    let actual_stderr = actual_stderr.replace(path.to_str().unwrap(), "{{filename}}");
     let actual_stderr: Arc<str> = Arc::from(actual_stderr);
 
     let mut stderr_snapshot_result = Ok(());
@@ -91,12 +131,17 @@ async fn run_test(database: &TestDatabase, config: &TestConfig) -> Result<(), Te
     if actual_code.is_none_or(|actual_code| actual_code != expect_code)
         || stderr_snapshot_result.is_err()
     {
-        Err(TestError {
+        let mismatch = TestResultMismatch {
             expect_code,
             actual_code,
             actual_stderr,
             stderr_snapshot_result,
-        })
+        };
+
+        let error = TestError {
+            kind: TestErrorKind::ResultMismatch(mismatch),
+        };
+        Err(error)
     } else {
         Ok(())
     }

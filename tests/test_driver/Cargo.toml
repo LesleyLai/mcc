@@ -9,7 +9,7 @@ toml = "0.8.19"
 serde = { version = "1.0.216", features = ["derive"] }
 colored = "2.2.0"
 regex = "1.11.1"
-tokio = { version = "1.42.0", features = ["process", "rt", "rt-multi-thread", "fs"] }
+tokio = { version = "1.42.0", features = ["process", "time", "rt", "rt-multi-thread", "fs"] }
 futures = "0.3.31"
 
 similar = "2.6.0"
