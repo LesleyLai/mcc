@@ -358,7 +358,11 @@ static IRValue emit_ir_instructions_from_expr(const Expr* expr,
     default: return emit_ir_instructions_from_binary_expr(expr, context);
     }
   }
-  case EXPR_VARIABLE: return ir_variable(expr->variable->rewrote_name);
+  case EXPR_VARIABLE: {
+    // TODO: fix this
+    // return ir_variable(expr->variable->rewrote_name);
+    return ir_variable(str("TODO"));
+  }
   case EXPR_TERNARY: {
     const StringView true_label =
         create_fresh_label_name(context, "ternary_true");
@@ -440,7 +444,10 @@ static void emit_ir_instructions_from_decl(const VariableDecl* decl,
         emit_ir_instructions_from_expr(decl->initializer, context);
     push_instruction(
         context,
-        ir_unary_instr(IR_COPY, ir_variable(decl->identifier->rewrote_name), value));
+        ir_unary_instr(
+            IR_COPY,
+            ir_variable(as_object_ident(decl->identifier)->rewrote_name),
+            value));
   }
 }
 
@@ -716,7 +723,7 @@ static IRFunctionDef generate_ir_function_def(const FunctionDecl* decl,
   StringView* parameters =
       ARENA_ALLOC_ARRAY(tu_context->permanent_arena, StringView, param_count);
   for (uint32_t i = 0; i < param_count; ++i) {
-    parameters[i] = decl->params.data[i]->rewrote_name;
+    parameters[i] = as_object_ident(decl->params.data[i])->rewrote_name;
   }
 
   return (IRFunctionDef){.name = decl->name->name,
@@ -756,8 +763,8 @@ IRGenerationResult ir_generate(const TranslationUnit* ast,
 
       *top_level = (IRTopLevel){
           .tag = IR_TOP_LEVEL_VARIABLE,
-          .variable =
-              (IRGlobalVariable){.name = decl->var.identifier->name, .value = value},
+          .variable = (IRGlobalVariable){.name = decl->var.identifier->name,
+                                         .value = value},
       };
       DYNARRAY_PUSH_BACK(&top_level_vec, IRTopLevel*, &scratch_arena,
                          top_level);

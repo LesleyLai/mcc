@@ -115,13 +115,13 @@ static void report_multiple_definition(FunctionDecl* decl, Context* context)
   error_at(msg, decl->source_range, context);
 }
 
-static void report_redefinition_of_var(VariableDecl* decl, Context* context)
-{
-  StringView msg = allocate_printf(
-      context->permanent_arena, "redefinition of '%.*s'",
-      (int)decl->identifier->name.size, decl->identifier->name.start);
-  error_at(msg, decl->source_range, context);
-}
+// static void report_redefinition_of_var(VariableDecl* decl, Context* context)
+//{
+//   StringView msg = allocate_printf(
+//       context->permanent_arena, "redefinition of '%.*s'",
+//       (int)decl->identifier->name.size, decl->identifier->name.start);
+//   error_at(msg, decl->source_range, context);
+// }
 
 #pragma endregion
 
@@ -292,12 +292,13 @@ static bool type_check_stmt(Stmt* stmt, Context* context)
   decl->identifier->type = typ_int;
 
   if (decl->initializer) {
-    if (decl->identifier->has_definition) {
-      report_redefinition_of_var(decl, context);
-      return false;
-    }
-
-    decl->identifier->has_definition = true;
+    // TODO: fix this
+    //    if (decl->identifier->has_definition) {
+    //      report_redefinition_of_var(decl, context);
+    //      return false;
+    //    }
+    //
+    //    decl->identifier->has_definition = true;
 
     if (!type_check_expr(decl->initializer, context)) { return false; }
 
@@ -346,15 +347,17 @@ static bool type_check_block(Block* block, Context* context)
 static bool type_check_function_decl(FunctionDecl* decl, Context* context)
 {
   StringView function_name = decl->name->name;
-  IdentifierInfo* function_ident =
-      hashmap_lookup(&context->symbol_table->global_symbols, function_name);
+  FunctionIdentifierInfo* function_ident =
+      (FunctionIdentifierInfo*)hashmap_lookup(
+          &context->symbol_table->global_symbols, function_name);
 
-  if (function_ident->type == nullptr) {
-    function_ident->type =
+  if (function_ident->base.type == nullptr) {
+    function_ident->base.type =
         func_type(typ_int, decl->params.length, context->permanent_arena);
   } else {
-    MCC_ASSERT(function_ident->type->tag == TYPE_FUNCTION);
-    const FunctionType* function_type = (FunctionType*)function_ident->type;
+    MCC_ASSERT(function_ident->base.type->tag == TYPE_FUNCTION);
+    const FunctionType* function_type =
+        (FunctionType*)function_ident->base.type;
     if (function_type->return_type != typ_int ||
         function_type->param_count != decl->params.length) {
       report_conflicting_decl_type(decl, context);

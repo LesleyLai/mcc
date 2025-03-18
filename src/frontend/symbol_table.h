@@ -7,12 +7,6 @@
 #include <mcc/str.h>
 #include <mcc/type.h>
 
-typedef enum IdentifierKind {
-  IDENT_INVALID = 0,
-  IDENT_OBJECT,
-  IDENT_FUNCTION,
-} IdentifierKind;
-
 /**
  * @brief Represents the linkage of a C identifier.
  *
@@ -29,18 +23,50 @@ typedef enum Linkage {
   LINKAGE_INTERNAL
 } Linkage;
 
+/**
+ * C has distinction between functions and object identifiers, and they need
+ * somewhat different handling.
+ */
+typedef enum IdentifierTag : uint8_t {
+  IDENTIFIER_INVALID,
+  IDENTIFIER_FUNCTION,
+  IDENTIFIER_OBJECT,
+} IdentifierTag;
+
+// Information for all identifiers
 typedef struct IdentifierInfo {
-  StringView
-      name; // name in the source. This is the name used for variable lookup
+  IdentifierTag tag;
+  StringView name; // name in the source
+  Linkage linkage;
+  const Type* type;
+} IdentifierInfo;
+
+// Identifier that represent an object
+typedef struct ObjectIdentifierInfo {
+  IdentifierInfo base;
   StringView rewrote_name; // name after alpha renaming
   uint32_t shadow_counter; // increase each time we have shadowing
+  bool has_definition;     // prevent redefinition
+} ObjectIdentifierInfo;
 
-  IdentifierKind kind;
-  const Type* type;
-  Linkage linkage;
+// Identifier that represent an object
+typedef struct FunctionIdentifierInfo {
+  IdentifierInfo base;
 
   bool has_definition; // prevent redefinition
-} IdentifierInfo;
+} FunctionIdentifierInfo;
+
+static inline ObjectIdentifierInfo* as_object_ident(IdentifierInfo* ident)
+{
+  MCC_ASSERT(ident->tag == IDENTIFIER_OBJECT);
+  return (ObjectIdentifierInfo*)ident;
+}
+
+static inline FunctionIdentifierInfo* as_function_ident(IdentifierInfo* ident)
+{
+  MCC_ASSERT(ident->tag == IDENTIFIER_FUNCTION);
+  return (FunctionIdentifierInfo*)ident;
+}
 
 // Represents a block scope
 typedef struct Scope Scope;
@@ -61,10 +87,15 @@ Scope* new_scope(Scope* parent, Arena* arena);
 
 IdentifierInfo* lookup_identifier(const Scope* scope, StringView name);
 
+// Add information of the function identifier to the current scope
+FunctionIdentifierInfo* add_function_identifer(SymbolTable* symbol_table,
+                                               Scope* scope, StringView name,
+                                               Linkage linkage, Arena* arena);
+
 // Return nullptr if a variable of the same name already exist in the same scope
 // Otherwise we add it to the current scope
-IdentifierInfo* add_identifier(SymbolTable* symbol_table, Scope* scope,
-                               StringView name, IdentifierKind kind,
-                               Linkage linkage, Arena* arena);
+IdentifierInfo* add_object_identifier(SymbolTable* symbol_table, Scope* scope,
+                                      StringView name, Linkage linkage,
+                                      Arena* arena);
 
 #endif // MCC_SYMBOL_TABLE_H

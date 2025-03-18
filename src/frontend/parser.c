@@ -631,9 +631,8 @@ static VariableDecl parse_variable_decl(Parser* parser,
   Linkage linkage = LINKAGE_NONE;
   if (is_global_variable) { linkage = LINKAGE_EXTERNAL; }
 
-  IdentifierInfo* variable =
-      add_identifier(parser->symbol_table, scope, name, IDENT_OBJECT, linkage,
-                     parser->permanent_arena);
+  IdentifierInfo* variable = add_object_identifier(
+      parser->symbol_table, scope, name, linkage, parser->permanent_arena);
   if (!variable) {
     if (linkage != LINKAGE_NONE) {
       variable = lookup_identifier(scope, name);
@@ -949,9 +948,8 @@ static IdentifierInfo* parse_parameter(Parser* parser, Scope* scope)
     }
 
     IdentifierInfo* name =
-        add_identifier(parser->symbol_table, scope, identifier, IDENT_OBJECT,
-                       LINKAGE_NONE, parser->permanent_arena);
-    // TODO: error handling
+        add_object_identifier(parser->symbol_table, scope, identifier,
+                              LINKAGE_NONE, parser->permanent_arena);
     MCC_ASSERT(name != nullptr);
     return name;
   } break;
@@ -1018,14 +1016,13 @@ static FunctionDecl* parse_function_decl(Parser* parser,
                                          Token name_token, Scope* scope)
 {
   StringView name = str_from_token(parser->src, name_token);
-  IdentifierInfo* function_ident =
-      add_identifier(parser->symbol_table, scope, name, IDENT_FUNCTION,
-                     LINKAGE_EXTERNAL, parser->permanent_arena);
+  IdentifierInfo* function_ident = (IdentifierInfo*)add_function_identifer(
+      parser->symbol_table, scope, name, LINKAGE_EXTERNAL,
+      parser->permanent_arena);
 
   if (!function_ident) {
     function_ident = lookup_identifier(scope, name);
-    MCC_ASSERT(function_ident != nullptr);
-    if (function_ident->kind != IDENT_FUNCTION) {
+    if (function_ident->tag != IDENTIFIER_FUNCTION) {
       const StringView error_msg =
           allocate_printf(parser->permanent_arena,
                           "redefinition of '%.*s' as different kind of symbol",
