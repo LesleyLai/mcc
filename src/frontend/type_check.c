@@ -115,13 +115,13 @@ static void report_multiple_definition(FunctionDecl* decl, Context* context)
   error_at(msg, decl->source_range, context);
 }
 
-// static void report_redefinition_of_var(VariableDecl* decl, Context* context)
-//{
-//   StringView msg = allocate_printf(
-//       context->permanent_arena, "redefinition of '%.*s'",
-//       (int)decl->identifier->name.size, decl->identifier->name.start);
-//   error_at(msg, decl->source_range, context);
-// }
+static void report_redefinition_of_var(VariableDecl* decl, Context* context)
+{
+  StringView msg = allocate_printf(
+      context->permanent_arena, "redefinition of '%.*s'",
+      (int)decl->identifier->name.size, decl->identifier->name.start);
+  error_at(msg, decl->source_range, context);
+}
 
 #pragma endregion
 
@@ -292,13 +292,12 @@ static bool type_check_stmt(Stmt* stmt, Context* context)
   decl->identifier->type = typ_int;
 
   if (decl->initializer) {
-    // TODO: fix this
-    //    if (decl->identifier->has_definition) {
-    //      report_redefinition_of_var(decl, context);
-    //      return false;
-    //    }
-    //
-    //    decl->identifier->has_definition = true;
+    ObjectIdentifierInfo* identifier = as_object_ident(decl->identifier);
+    if (identifier->has_definition) {
+      report_redefinition_of_var(decl, context);
+      return false;
+    }
+    identifier->has_definition = true;
 
     if (!type_check_expr(decl->initializer, context)) { return false; }
 
