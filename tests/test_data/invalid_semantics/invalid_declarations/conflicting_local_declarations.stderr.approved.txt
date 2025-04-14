@@ -1,0 +1,4 @@
+{{filename}}:4:14: Error: redefinition of 'x'
+4 |   static int x;
+  |              ^
+
