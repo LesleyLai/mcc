@@ -21,7 +21,7 @@ fn yes_or_no_input(prompt: &str) -> bool {
     let stdin = std::io::stdin();
 
     loop {
-        print!("{}", prompt);
+        print!("{} ", prompt);
         stdout().flush().unwrap();
         let mut buffer = String::new();
         stdin.read_line(&mut buffer).unwrap();
@@ -50,7 +50,7 @@ pub fn report_tests(database: &TestDatabase, test_output: TestsOutput) -> ExitCo
 
             if let Some(snapshot_error) = error.stderr_snapshot_error() {
                 if global_config().interactive
-                    && yes_or_no_input("overwrite approved file [yes/no]? ")
+                    && yes_or_no_input("overwrite approved file [yes/no]?")
                 {
                     std::fs::write(
                         &snapshot_error.expected_path,

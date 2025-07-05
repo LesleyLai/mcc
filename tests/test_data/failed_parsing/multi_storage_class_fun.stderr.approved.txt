@@ -1,0 +1,4 @@
+{{filename}}:1:12: Error: multiple storage classes in declaration specifiers
+1 | static int extern foo(void) {
+  |            ^~~~~~
+

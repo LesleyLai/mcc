@@ -1,0 +1,4 @@
+{{filename}}:5:7: Error: redefinition of 'i'
+5 |   int i;
+  |       ^
+

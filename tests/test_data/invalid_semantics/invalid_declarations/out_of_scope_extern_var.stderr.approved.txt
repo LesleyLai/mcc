@@ -1,0 +1,4 @@
+{{filename}}:6:10: Error: use of undeclared identifier 'a'
+6 |   return a;
+  |          ^
+

@@ -1,0 +1,4 @@
+{{filename}}:1:7: Error: expect ';'
+1 | int f {
+  |       ^
+

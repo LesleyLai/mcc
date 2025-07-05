@@ -1,0 +1,4 @@
+{{filename}}:3:14: Error: redefinition of 'i'
+3 |   extern int i;
+  |              ^
+
