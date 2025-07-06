@@ -20,6 +20,13 @@ impl TestError {
     pub fn stderr_snapshot_error(&self) -> Option<&SnapshotError> {
         match &self.kind {
             TestErrorKind::ResultMismatch(mismatch) => {
+                // TODO: better solution
+                // Do not convert to SnapshotError if the actual return code is 0 or does not exist
+                // This prevents showing the "overwrite" prompt when the test expects failure but the program unexpectedly succeeds.
+                if mismatch.actual_code == None || mismatch.actual_code == Some(0) {
+                    return None;
+                }
+
                 mismatch.stderr_snapshot_result.as_ref().err()
             }
             _ => None,
@@ -42,7 +49,7 @@ pub struct TestResultMismatch {
     expect_code: i32,
     actual_code: Option<i32>, // If no actual code, that means the code is returned as a signal
     actual_stderr: Arc<str>,
-    pub stderr_snapshot_result: Result<(), SnapshotError>, // only have something when we have a mismatch in actual stderr and expected stderr
+    stderr_snapshot_result: Result<(), SnapshotError>, // only have something when we have a mismatch in actual stderr and expected stderr
 }
 
 impl Display for TestResultMismatch {

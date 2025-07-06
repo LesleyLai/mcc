@@ -39,9 +39,9 @@ pub fn report_tests(database: &TestDatabase, test_output: TestsOutput) -> ExitCo
     let mut failed_test_count = 0;
 
     for (i, result) in test_output.results.into_iter().enumerate() {
-        let config = database.tests()[i];
-        let path = database.get_path(config.path);
-        let suffix = database.get_string(config.suffix);
+        let test_config = database.tests()[i];
+        let path = database.get_path(test_config.path);
+        let suffix = database.get_string(test_config.suffix);
 
         if let Err(error) = result {
             print_test_case_message_prefix(&path, suffix);
@@ -56,7 +56,7 @@ pub fn report_tests(database: &TestDatabase, test_output: TestsOutput) -> ExitCo
                         &snapshot_error.expected_path,
                         snapshot_error.actual.as_ref(),
                     )
-                    .unwrap();
+                        .unwrap();
                 }
             }
 
