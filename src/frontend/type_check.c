@@ -345,10 +345,22 @@ static bool type_check_block(Block* block, Context* context)
 
 static bool type_check_function_decl(FunctionDecl* decl, Context* context)
 {
+  // Functions have external linkage by default unless declared with `static`,
+  // which gives them internal linkage
+
   StringView function_name = decl->name->name;
   FunctionIdentifierInfo* function_ident =
       (FunctionIdentifierInfo*)hashmap_lookup(
           &context->symbol_table->global_symbols, function_name);
+
+  if (function_ident->base.linkage == LINKAGE_EXTERNAL &&
+      decl->storage_class == STORAGE_CLASS_STATIC) {
+    StringView msg = allocate_printf(
+        context->permanent_arena,
+        "Static declaration of '%.*s' follows non-static declaration",
+        (int)decl->name->name.size, decl->name->name.start);
+    error_at(msg, decl->source_range, context);
+  }
 
   if (function_ident->base.type == nullptr) {
     function_ident->base.type =

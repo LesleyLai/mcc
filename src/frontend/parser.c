@@ -1015,10 +1015,16 @@ static FunctionDecl* parse_function_decl(Parser* parser,
                                          DeclSpecifier decl_specifier,
                                          Token name_token, Scope* scope)
 {
+  // Functions have external linkage by default unless declared with `static`,
+  // which gives them internal linkage
+  Linkage linkage = LINKAGE_EXTERNAL;
+  if (decl_specifier.storage_class == STORAGE_CLASS_STATIC) {
+    linkage = LINKAGE_INTERNAL;
+  }
+
   StringView name = str_from_token(parser->src, name_token);
   IdentifierInfo* function_ident = (IdentifierInfo*)add_function_identifer(
-      parser->symbol_table, scope, name, LINKAGE_EXTERNAL,
-      parser->permanent_arena);
+      parser->symbol_table, scope, name, linkage, parser->permanent_arena);
 
   if (!function_ident) {
     function_ident = lookup_identifier(scope, name);
