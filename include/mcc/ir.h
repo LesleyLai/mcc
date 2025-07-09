@@ -44,8 +44,20 @@ typedef enum IRTopLevelTag {
   IR_TOP_LEVEL_VARIABLE,
 } IRTopLevelTag;
 
+typedef enum IRLinkage {
+  IR_LINKAGE_INVALID,
+
+  // Top levels with internal linkage are only directly accessible by objects
+  // in the current module. Corresponds to "static" in C
+  IR_LINKAGE_INTERNAL,
+
+  // Top levels with external linkage are externally visible
+  IR_LINKAGE_EXTERNAL,
+} IRLinkage;
+
 typedef struct IRTopLevel {
   IRTopLevelTag tag;
+  IRLinkage linkage;
   union {
     IRFunctionDef function;
     IRGlobalVariable variable;

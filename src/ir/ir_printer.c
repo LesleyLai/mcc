@@ -101,7 +101,7 @@ static void print_ir_function(const IRFunctionDef* function)
 
 static void print_ir_global_var(const IRGlobalVariable* var)
 {
-  printf("global %.*s: i32", (int)var->name.size, var->name.start);
+  printf("%.*s: i32", (int)var->name.size, var->name.start);
   printf(" = %i", var->value);
   printf("\n");
 }
@@ -110,6 +110,12 @@ void print_ir(const IRProgram* ir)
 {
   for (size_t i = 0; i < ir->top_level_count; i++) {
     IRTopLevel* top_level = ir->top_levels[i];
+    switch (top_level->linkage) {
+    case IR_LINKAGE_INVALID: MCC_UNREACHABLE(); break;
+    case IR_LINKAGE_INTERNAL: printf("internal "); break;
+    case IR_LINKAGE_EXTERNAL: break;
+    }
+
     switch (top_level->tag) {
     case IR_TOP_LEVEL_INVALID: MCC_UNREACHABLE(); break;
     case IR_TOP_LEVEL_FUNCTION: print_ir_function(&top_level->function); break;

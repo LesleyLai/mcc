@@ -41,18 +41,32 @@ typedef struct IdentifierInfo {
   const Type* type;
 } IdentifierInfo;
 
+// In C, a variable declaration can have no definition, have a tentative
+// definition, or have a definition with an initial value
+typedef enum ObjectDefinitionTag {
+  OBJECT_DEFINITION_NONE,      // declaration-only (e.g., `extern int x;`)
+  OBJECT_DEFINITION_TENTATIVE, // tentative definition (e.g. `int x;`)
+  OBJECT_DEFINITION_VALUE,     // A definition with an initial value
+} ObjectDefinitionTag;
+
+typedef struct ObjectDefinition {
+  ObjectDefinitionTag tag;
+  union {
+    int initial_value;
+  };
+} ObjectDefinition;
+
 // Identifier that represent an object
 typedef struct ObjectIdentifierInfo {
   IdentifierInfo base;
-  StringView rewrote_name; // name after alpha renaming
-  uint32_t shadow_counter; // increase each time we have shadowing
-  bool has_definition;     // prevent redefinition
+  StringView rewrote_name;     // name after alpha renaming
+  uint32_t shadow_counter;     // increase each time we have shadowing
+  ObjectDefinition definition; // prevent redefinition
 } ObjectIdentifierInfo;
 
 // Identifier that represent an object
 typedef struct FunctionIdentifierInfo {
   IdentifierInfo base;
-
   bool has_definition; // prevent redefinition
 } FunctionIdentifierInfo;
 

@@ -293,11 +293,19 @@ static bool type_check_stmt(Stmt* stmt, Context* context)
 
   if (decl->initializer) {
     ObjectIdentifierInfo* identifier = as_object_ident(decl->identifier);
-    if (identifier->has_definition) {
+    if (identifier->definition.tag == OBJECT_DEFINITION_VALUE) {
       report_redefinition_of_var(decl, context);
       return false;
     }
-    identifier->has_definition = true;
+
+    // Only accept constant initializer for now
+    // Note: this is pretty much only used for global variables
+    if (decl->initializer->tag == EXPR_CONST) {
+      identifier->definition = (ObjectDefinition){
+          .tag = OBJECT_DEFINITION_VALUE,
+          .initial_value = decl->initializer->const_expr.val,
+      };
+    }
 
     if (!type_check_expr(decl->initializer, context)) { return false; }
 

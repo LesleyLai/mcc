@@ -751,16 +751,21 @@ IRGenerationResult ir_generate(const TranslationUnit* ast,
     switch (decl->tag) {
     case DECL_INVALID: MCC_UNREACHABLE(); break;
     case DECL_VAR: {
-      IRTopLevel* top_level = ARENA_ALLOC_OBJECT(permanent_arena, IRTopLevel);
-
+      // Extract initial value
       int32_t value = 0;
-      if (decl->var.initializer) {
-        MCC_ASSERT(decl->var.initializer->tag == EXPR_CONST);
-        value = decl->var.initializer->const_expr.val;
+      const ObjectDefinition definition =
+          as_object_ident(decl->var.identifier)->definition;
+      if (definition.tag == OBJECT_DEFINITION_VALUE) {
+        value = definition.initial_value;
+
+        // Ignore `extern` followed by static
+        if (decl->var.storage_class == STORAGE_CLASS_EXTERN) { continue; }
       }
 
+      IRTopLevel* top_level = ARENA_ALLOC_OBJECT(permanent_arena, IRTopLevel);
       *top_level = (IRTopLevel){
           .tag = IR_TOP_LEVEL_VARIABLE,
+          .linkage = IR_LINKAGE_EXTERNAL,
           .variable = (IRGlobalVariable){.name = decl->var.identifier->name,
                                          .value = value},
       };
@@ -773,6 +778,7 @@ IRGenerationResult ir_generate(const TranslationUnit* ast,
         IRTopLevel* top_level = ARENA_ALLOC_OBJECT(permanent_arena, IRTopLevel);
         *top_level = (IRTopLevel){
             .tag = IR_TOP_LEVEL_FUNCTION,
+            .linkage = IR_LINKAGE_EXTERNAL,
             .function = generate_ir_function_def(decl->func, &context),
         };
         DYNARRAY_PUSH_BACK(&top_level_vec, IRTopLevel*, &scratch_arena,

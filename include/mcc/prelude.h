@@ -27,7 +27,7 @@
   do {                                                                         \
     (void)fprintf(stderr, "mcc fatal error:\n[%s:%i] in %s: %s\n\n", __FILE__, \
                   __LINE__, __func__, message);                                \
-    abort();                                                                   \
+    exit(1);                                                                   \
   } while (0)
 
 #define MCC_ASSERT(condition)                                                  \
@@ -36,7 +36,7 @@
       (void)fprintf(stderr,                                                    \
                     "mcc fatal error:\n[%s:%i] Assert failed in %s\n\n",       \
                     __FILE__, __LINE__, __func__);                             \
-      abort();                                                                 \
+      exit(1);                                                                 \
     }                                                                          \
   } while (0)
 
@@ -46,7 +46,7 @@
       (void)fprintf(stderr,                                                    \
                     "mcc fatal error:\n[%s:%i] Assert failed in %s: %s\n\n",   \
                     __FILE__, __LINE__, __func__, message);                    \
-      abort();                                                                 \
+      exit(1);                                                                 \
     }                                                                          \
   } while (0)
 
@@ -54,14 +54,14 @@
   do {                                                                         \
     (void)fprintf(stderr, "mcc fatal error:\n[%s:%i]: Unimplemented\n\n",      \
                   __FILE__, __LINE__);                                         \
-    abort();                                                                   \
+    exit(1);                                                                   \
   } while (0)
 
 #define MCC_UNREACHABLE()                                                      \
   do {                                                                         \
     (void)fprintf(stderr, "mcc fatal error:\n[%s:%i]: unreachable\n\n",        \
                   __FILE__, __LINE__);                                         \
-    abort();                                                                   \
+    exit(1);                                                                   \
   } while (0)
 
 /* Defer
